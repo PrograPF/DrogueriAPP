@@ -1,0 +1,117 @@
+import React, { useState } from 'react';
+import { ClipboardList, AlertCircle, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import PendientesForm from './PendientesForm';
+import DiferenciasForm from './DiferenciasForm';
+
+const PendientesDiferenciasModule = () => {
+  const [view, setView] = useState('selection'); // 'selection', 'pendientes', 'diferencias'
+
+  const cardVariants = {
+    hover: { 
+      scale: 1.02, 
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      borderColor: 'rgba(59, 130, 246, 0.5)',
+      transition: { duration: 0.2 }
+    },
+    tap: { scale: 0.98 }
+  };
+
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      <AnimatePresence mode="wait">
+        {view === 'selection' && (
+          <motion.div 
+            key="selection"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '30px', 
+              maxWidth: '900px', 
+              margin: '60px auto' 
+            }}
+          >
+            {/* Botón Pendientes */}
+            <motion.div 
+              variants={cardVariants}
+              whileHover="hover"
+              whileTap="tap"
+              onClick={() => setView('pendientes')}
+              className="glass-card"
+              style={{ 
+                padding: '40px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: '20px'
+              }}
+            >
+              <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%' }}>
+                <ClipboardList size={48} color="#3b82f6" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px' }}>Pendientes</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
+                  Registra artículos solicitados que no fueron entregados por falta de stock.
+                </p>
+              </div>
+              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontWeight: '600' }}>
+                Abrir Formulario <ArrowRight size={18} />
+              </div>
+            </motion.div>
+
+            {/* Botón Diferencias */}
+            <motion.div 
+              variants={cardVariants}
+              whileHover="hover"
+              whileTap="tap"
+              onClick={() => setView('diferencias')}
+              className="glass-card"
+              style={{ 
+                padding: '40px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: '20px'
+              }}
+            >
+              <div style={{ padding: '20px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '50%' }}>
+                <AlertCircle size={48} color="#f59e0b" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px' }}>Diferencias</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
+                  Anota incongruencias de datos (lote, vencimiento, cantidad) para inventario.
+                </p>
+              </div>
+              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: '600' }}>
+                Abrir Formulario <ArrowRight size={18} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {view === 'pendientes' && (
+          <div key="pendientes-view">
+            <PendientesForm onBack={() => setView('selection')} />
+          </div>
+        )}
+
+        {view === 'diferencias' && (
+          <div key="diferencias-view">
+            <DiferenciasForm onBack={() => setView('selection')} />
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default PendientesDiferenciasModule;
