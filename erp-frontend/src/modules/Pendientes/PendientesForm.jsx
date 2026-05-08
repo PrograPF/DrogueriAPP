@@ -102,15 +102,35 @@ const PendientesForm = ({ onBack }) => {
         articuloId = artData.id;
       }
 
-      // 3. Gestionar vigencia: Marcar registros anteriores del mismo artículo/centro como NO vigentes
-      await supabase
+      // 3. Obtener el registro vigente actual para este artículo/centro
+      const { data: currentVigente } = await supabase
         .from('pendientes')
-        .update({ es_vigente: false })
+        .select('id, fecha')
         .eq('articulo_id', articuloId)
         .eq('centro_id', centroId)
-        .eq('es_vigente', true);
+        .eq('es_vigente', true)
+        .maybeSingle();
 
-      // 4. Insertar el nuevo registro como VIGENTE
+      let shouldBeVigente = true;
+
+      if (currentVigente) {
+        const existingDate = new Date(currentVigente.fecha);
+        const newDate = new Date(formData.fecha);
+
+        if (newDate >= existingDate) {
+          // El nuevo es más reciente: archivamos el anterior
+          await supabase
+            .from('pendientes')
+            .update({ es_vigente: false })
+            .eq('id', currentVigente.id);
+          shouldBeVigente = true;
+        } else {
+          // El nuevo es más antiguo: se guarda directamente como historial
+          shouldBeVigente = false;
+        }
+      }
+
+      // 4. Insertar el nuevo registro con la vigencia calculada
       const { error } = await supabase
         .from('pendientes')
         .insert([{
@@ -121,11 +141,16 @@ const PendientesForm = ({ onBack }) => {
           consumo: parseInt(formData.consumo),
           pedido: parseInt(formData.pedido),
           entrega: parseInt(formData.entrega),
-          es_vigente: true
+          es_vigente: shouldBeVigente
         }]);
       
       if (error) throw error;
-      alert('Registro guardado. El anterior ha sido archivado como historial.');
+      
+      if (shouldBeVigente) {
+        alert('Registro guardado como VIGENTE (el más reciente).');
+      } else {
+        alert('Registro guardado como HISTORIAL (ya existe uno con fecha posterior).');
+      }
     } catch (err) {
       console.error('Error en Supabase:', err);
       alert('Error al guardar: ' + err.message);
