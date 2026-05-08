@@ -116,8 +116,7 @@ const PendientesForm = ({ onBack }) => {
         stock: parseInt(formData.stock),
         consumo: parseInt(formData.consumo),
         pedido: parseInt(formData.pedido),
-        entrega: parseInt(formData.entrega),
-        pendiente: pendiente
+        entrega: parseInt(formData.entrega)
       };
 
       if (existingEntries && existingEntries.length > 0) {
