@@ -18,7 +18,7 @@ const InformesModule = () => {
     try {
       const { data: pendientes, error } = await supabase
         .from('pendientes')
-        .select('*')
+        .select('*, articulos(codigo, nombre), centros(nombre)')
         .order('fecha', { ascending: false });
 
       if (error) throw error;
@@ -26,9 +26,9 @@ const InformesModule = () => {
       // Adaptamos nombres de columnas de Supabase a los usados en el componente
       const mappedData = pendientes.map(item => ({
         id: item.id,
-        cod: item.cod,
-        nombre: item.nombre_articulo,
-        centro: item.centro,
+        cod: item.articulos?.codigo || 'S/C',
+        nombre: item.articulos?.nombre || 'Desconocido',
+        centro: item.centros?.nombre || 'S/C',
         cantidad: item.pendiente,
         fecha: item.fecha
       }));

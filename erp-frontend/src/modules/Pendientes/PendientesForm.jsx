@@ -62,18 +62,57 @@ const PendientesForm = ({ onBack }) => {
 
     setLoading(true);
     try {
-      // Regla de Negocio: Buscar si ya existe el mismo artículo para el mismo centro
+      // 1. Asegurar que el centro existe y obtener su ID
+      let { data: centroData, error: centroError } = await supabase
+        .from('centros')
+        .select('id')
+        .eq('nombre', formData.centro)
+        .single();
+      
+      let centroId;
+      if (centroError || !centroData) {
+        const { data: newCentro, error: insCentroErr } = await supabase
+          .from('centros')
+          .insert([{ nombre: formData.centro }])
+          .select()
+          .single();
+        if (insCentroErr) throw insCentroErr;
+        centroId = newCentro.id;
+      } else {
+        centroId = centroData.id;
+      }
+
+      // 2. Asegurar que el artículo existe y obtener su ID
+      let { data: artData, error: artError } = await supabase
+        .from('articulos')
+        .select('id')
+        .eq('codigo', formData.cod)
+        .single();
+      
+      let articuloId;
+      if (artError || !artData) {
+        const { data: newArt, error: insArtErr } = await supabase
+          .from('articulos')
+          .insert([{ codigo: formData.cod, nombre: formData.nombreArticulo }])
+          .select()
+          .single();
+        if (insArtErr) throw insArtErr;
+        articuloId = newArt.id;
+      } else {
+        articuloId = artData.id;
+      }
+
+      // 3. Buscar si ya existe el mismo artículo para el mismo centro
       const { data: existingEntries } = await supabase
         .from('pendientes')
         .select('id')
-        .eq('cod', formData.cod)
-        .eq('centro', formData.centro);
+        .eq('articulo_id', articuloId)
+        .eq('centro_id', centroId);
 
       const payload = {
-        cod: formData.cod,
-        nombre_articulo: formData.nombreArticulo,
+        articulo_id: articuloId,
+        centro_id: centroId,
         fecha: formData.fecha,
-        centro: formData.centro,
         stock: parseInt(formData.stock),
         consumo: parseInt(formData.consumo),
         pedido: parseInt(formData.pedido),
@@ -82,7 +121,7 @@ const PendientesForm = ({ onBack }) => {
       };
 
       if (existingEntries && existingEntries.length > 0) {
-        // Reemplazamos el registro más antiguo/existente (mantenemos la última necesidad)
+        // Reemplazamos el registro existente
         const idToReplace = existingEntries[0].id;
         const { error } = await supabase
           .from('pendientes')

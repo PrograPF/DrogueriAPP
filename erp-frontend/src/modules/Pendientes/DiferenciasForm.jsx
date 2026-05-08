@@ -52,13 +52,51 @@ const DiferenciasForm = ({ onBack }) => {
 
     setLoading(true);
     try {
+      // 1. Asegurar que el centro existe y obtener su ID
+      let { data: centros, error: centroError } = await supabase
+        .from('centros')
+        .select('id')
+        .eq('nombre', formData.centro);
+      
+      let centroId;
+      if (centroError || !centros || centros.length === 0) {
+        const { data: newCentro, error: insCentroErr } = await supabase
+          .from('centros')
+          .insert([{ nombre: formData.centro }])
+          .select()
+          .single();
+        if (insCentroErr) throw insCentroErr;
+        centroId = newCentro.id;
+      } else {
+        centroId = centros[0].id;
+      }
+
+      // 2. Asegurar que el artículo existe y obtener su ID
+      let { data: articulos, error: artError } = await supabase
+        .from('articulos')
+        .select('id')
+        .eq('codigo', formData.cod);
+      
+      let articuloId;
+      if (artError || !articulos || articulos.length === 0) {
+        const { data: newArt, error: insArtErr } = await supabase
+          .from('articulos')
+          .insert([{ codigo: formData.cod, nombre: formData.nombreArticulo }])
+          .select()
+          .single();
+        if (insArtErr) throw insArtErr;
+        articuloId = newArt.id;
+      } else {
+        articuloId = articulos[0].id;
+      }
+
+      // 3. Insertar la diferencia con los IDs resueltos
       const { error } = await supabase
         .from('diferencias')
         .insert([{
-          cod: formData.cod,
-          nombre_articulo: formData.nombreArticulo,
+          articulo_id: articuloId,
+          centro_id: centroId,
           fecha: formData.fecha,
-          centro: formData.centro,
           diferencia: formData.diferencia
         }]);
 
