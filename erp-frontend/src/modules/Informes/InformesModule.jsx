@@ -19,6 +19,7 @@ const InformesModule = () => {
       const { data: pendientes, error } = await supabase
         .from('pendientes')
         .select('*, articulos(codigo, nombre), centros(nombre)')
+        .eq('es_vigente', true)
         .order('fecha', { ascending: false });
 
       if (error) throw error;

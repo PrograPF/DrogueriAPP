@@ -102,42 +102,30 @@ const PendientesForm = ({ onBack }) => {
         articuloId = artData.id;
       }
 
-      // 3. Buscar si ya existe el mismo artículo para el mismo centro
-      const { data: existingEntries } = await supabase
+      // 3. Gestionar vigencia: Marcar registros anteriores del mismo artículo/centro como NO vigentes
+      await supabase
         .from('pendientes')
-        .select('id')
+        .update({ es_vigente: false })
         .eq('articulo_id', articuloId)
-        .eq('centro_id', centroId);
+        .eq('centro_id', centroId)
+        .eq('es_vigente', true);
 
-      const payload = {
-        articulo_id: articuloId,
-        centro_id: centroId,
-        fecha: formData.fecha,
-        stock: parseInt(formData.stock),
-        consumo: parseInt(formData.consumo),
-        pedido: parseInt(formData.pedido),
-        entrega: parseInt(formData.entrega)
-      };
-
-      if (existingEntries && existingEntries.length > 0) {
-        // Reemplazamos el registro existente
-        const idToReplace = existingEntries[0].id;
-        const { error } = await supabase
-          .from('pendientes')
-          .update(payload)
-          .eq('id', idToReplace);
-        
-        if (error) throw error;
-        alert(`Registro actualizado exitosamente para ${formData.centro}`);
-      } else {
-        // Insertamos uno nuevo
-        const { error } = await supabase
-          .from('pendientes')
-          .insert([payload]);
-        
-        if (error) throw error;
-        alert('Datos guardados exitosamente en Supabase.');
-      }
+      // 4. Insertar el nuevo registro como VIGENTE
+      const { error } = await supabase
+        .from('pendientes')
+        .insert([{
+          articulo_id: articuloId,
+          centro_id: centroId,
+          fecha: formData.fecha,
+          stock: parseInt(formData.stock),
+          consumo: parseInt(formData.consumo),
+          pedido: parseInt(formData.pedido),
+          entrega: parseInt(formData.entrega),
+          es_vigente: true
+        }]);
+      
+      if (error) throw error;
+      alert('Registro guardado. El anterior ha sido archivado como historial.');
     } catch (err) {
       console.error('Error en Supabase:', err);
       alert('Error al guardar: ' + err.message);
