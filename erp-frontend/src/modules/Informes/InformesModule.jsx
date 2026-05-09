@@ -118,12 +118,25 @@ const InformesModule = () => {
         </div>
       </div>
 
-      {/* Encabezado Exclusivo para Impresión */}
-      <div className="print-only" style={{ display: 'none', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '10px' }}>
-        <h1 style={{ fontSize: '20pt', margin: 0 }}>HOJA DE DESPACHO DE PENDIENTES</h1>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-          <span>Responsable: ___________________________</span>
-          <span>Fecha: {new Date().toLocaleDateString()}</span>
+      {/* Encabezado Exclusivo para Impresión (Membrete Institucional) */}
+      <div className="print-only" style={{ display: 'none', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '15px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {/* Logo de DESAM */}
+            <img src="/logo-desam.png" alt="Logo DESAM" style={{ height: '60px' }} />
+            <div style={{ textAlign: 'left' }}>
+              <h2 style={{ margin: 0, fontSize: '14pt', fontWeight: '800' }}>DESAM</h2>
+              <p style={{ margin: 0, fontSize: '10pt', fontWeight: '600', color: '#333' }}>Unidad de Droguería</p>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <h1 style={{ fontSize: '18pt', margin: 0, fontWeight: '900' }}>HOJA DE DESPACHO</h1>
+            <p style={{ margin: 0, fontSize: '9pt' }}>Control de Pendientes</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', fontSize: '10pt' }}>
+          <span><strong>Responsable:</strong> ___________________________</span>
+          <span><strong>Fecha de Emisión:</strong> {new Date().toLocaleDateString()}</span>
         </div>
       </div>
 
