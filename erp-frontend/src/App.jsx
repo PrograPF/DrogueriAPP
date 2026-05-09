@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import { LayoutDashboard, FilePlus, Settings, LogOut, PackageSearch } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
 import InformesModule from './modules/Informes/InformesModule';
+import ConfigModule from './modules/Config/ConfigModule';
 
 const SidebarItem = ({ icon: Icon, label, to }) => {
   const location = useLocation();
@@ -72,7 +73,7 @@ const AppContent = () => {
           <Route path="/informes" element={<InformesModule />} />
           <Route path="/dashboard" element={<div style={{ padding: '20px' }}>Próximamente: Dashboard de Jefatura</div>} />
           <Route path="/inventario" element={<div style={{ padding: '20px' }}>Módulo de Inventario en desarrollo...</div>} />
-          <Route path="/config" element={<div style={{ padding: '20px' }}>Configuración del sistema</div>} />
+          <Route path="/config" element={<ConfigModule />} />
         </Routes>
       </div>
     </div>

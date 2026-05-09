@@ -89,6 +89,10 @@ const InformesModule = () => {
     );
   }, [searchTerm, data]);
 
+  const totalGlobal = useMemo(() => {
+    return data.filter(i => i.esVigente).reduce((sum, item) => sum + item.cantidad, 0);
+  }, [data]);
+
   const totalPendienteProducto = useMemo(() => {
     if (!searchTerm) return null;
     const uniqueCodes = [...new Set(filteredData.filter(i => i.esVigente).map(item => item.cod))];
@@ -107,6 +111,18 @@ const InformesModule = () => {
       className="informes-container"
       style={{ maxWidth: '1200px', margin: '0 auto' }}
     >
+      {/* Resumen Global (NUEVO) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }} className="no-print">
+        <div className="glass-card" style={{ padding: '20px', borderLeft: '4px solid #3b82f6' }}>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Total Unidades Pendientes</span>
+          <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#3b82f6', marginTop: '5px' }}>{totalGlobal}</h2>
+        </div>
+        <div className="glass-card" style={{ padding: '20px', borderLeft: '4px solid #10b981' }}>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Artículos con Deuda</span>
+          <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#10b981', marginTop: '5px' }}>{data.filter(i => i.esVigente).length}</h2>
+        </div>
+      </div>
+
       {/* Botones de Cabecera */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }} className="no-print">
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
