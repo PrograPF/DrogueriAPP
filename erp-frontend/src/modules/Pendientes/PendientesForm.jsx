@@ -2,20 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Save, Eraser, Package, ClipboardList, Calendar, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
-import arsenalData from '../arsenal.json';
+import useCentros from '../../hooks/useCentros';
+import useArsenalLookup from '../../hooks/useArsenalLookup';
 
 const PendientesForm = ({ onBack }) => {
-  const [centros, setCentros] = useState([
-    "ANGELMO", "ANTONIO VARAS", "ASISTE-CPU", "C. ALERCE", 
-    "CARMELA CARVAJAL", "CEAPS", "CECOSF ALERCE NORTE", 
-    "CECOSF LAWEN", "CECOSF PUERTA SUR", "CLINICA MOVIL", 
-    "ESR", "LAB. CLINICO", "ORL", "PADRE HURTADO", 
-    "SAPU PH", "SAR ALERCE", "UAPO", "UAPORRINO"
-  ]);
+  const { centros } = useCentros();
 
   const [formData, setFormData] = useState({
     cod: '',
-    nombreArticulo: 'Esperando código...',
     fecha: new Date().toISOString().split('T')[0],
     centro: '',
     stock: 0,
@@ -24,21 +18,9 @@ const PendientesForm = ({ onBack }) => {
     entrega: 0
   });
 
+  const nombreArticulo = useArsenalLookup(formData.cod);
   const [pendiente, setPendiente] = useState(0);
   const [loading, setLoading] = useState(false);
-
-  // Auto-rellenado usando el Arsenal
-  useEffect(() => {
-    if (formData.cod) {
-      const nombre = arsenalData[formData.cod];
-      setFormData(prev => ({ 
-        ...prev, 
-        nombreArticulo: nombre || 'Código no encontrado en arsenal' 
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, nombreArticulo: 'Esperando código...' }));
-    }
-  }, [formData.cod]);
 
   // Cálculo automático del pendiente
   useEffect(() => {
@@ -93,7 +75,7 @@ const PendientesForm = ({ onBack }) => {
       if (artError || !artData) {
         const { data: newArt, error: insArtErr } = await supabase
           .from('articulos')
-          .insert([{ codigo: formData.cod, nombre: formData.nombreArticulo }])
+          .insert([{ codigo: formData.cod, nombre: nombreArticulo }])
           .select()
           .single();
         if (insArtErr) throw insArtErr;
@@ -162,7 +144,6 @@ const PendientesForm = ({ onBack }) => {
   const handleClear = () => {
     setFormData({
       cod: '',
-      nombreArticulo: 'Esperando código...',
       fecha: new Date().toISOString().split('T')[0],
       centro: '',
       stock: 0,
@@ -213,7 +194,7 @@ const PendientesForm = ({ onBack }) => {
               fontWeight: '600',
               border: '1px dashed var(--border-color)'
             }}>
-              {formData.nombreArticulo}
+              {nombreArticulo}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>

@@ -100,3 +100,27 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* === Reglas Globales de Impresión === */
+@media print {
+  /* Ocultar sidebar y header */
+  body > div > div > div:first-child {
+    display: none !important;
+  }
+  body > div > div > div:last-child > header {
+    display: none !important;
+  }
+  /* Fondo blanco y texto negro */
+  body, body > div > div > div:last-child {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+  }
+  /* Contenido ocupa todo el ancho */
+  body > div > div {
+    display: block !important;
+  }
+  body > div > div > div:last-child {
+    width: 100% !important;
+  }
+}

@@ -3,23 +3,34 @@ import { Search, FileText, Package, MapPin, Trash2, Filter, History, CheckCircle
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 
+const PAGE_SIZE = 50;
+
 const InformesModule = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    setData([]);
+    setPage(0);
+    setHasMore(true);
+    fetchData(0, true);
   }, [showHistory]);
 
-  const fetchData = async () => {
+  const fetchData = async (pageNum = 0, reset = false) => {
     setLoading(true);
     try {
+      const from = pageNum * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       let query = supabase
         .from('pendientes')
         .select('*, articulos(codigo, nombre), centros(nombre)')
-        .order('fecha', { ascending: false });
+        .order('fecha', { ascending: false })
+        .range(from, to);
 
       if (!showHistory) {
         query = query.eq('es_vigente', true);
@@ -38,12 +49,19 @@ const InformesModule = () => {
         esVigente: item.es_vigente
       }));
 
-      setData(mappedData);
+      setData(prev => reset ? mappedData : [...prev, ...mappedData]);
+      setHasMore(pendientes.length === PAGE_SIZE);
     } catch (err) {
       console.error('Error cargando datos:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchData(nextPage);
   };
 
   const handleDelete = async (id, nombre) => {
@@ -221,6 +239,15 @@ const InformesModule = () => {
           </tbody>
         </table>
       </div>
+
+      {hasMore && !loading && (
+        <div className="no-print" style={{ textAlign: 'center', marginTop: '20px' }}>
+          <button onClick={loadMore} className="btn-secondary" style={{ padding: '10px 30px' }}>
+            Cargar más registros...
+          </button>
+        </div>
+      )}
+      {loading && <p style={{ textAlign: 'center', color: '#64748b', marginTop: '20px' }}>Cargando...</p>}
 
       <style>{`
         @media print {

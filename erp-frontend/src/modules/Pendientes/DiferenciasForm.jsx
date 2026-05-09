@@ -2,39 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Save, Eraser, Package, Calendar, MessageSquare, AlertCircle, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
-import arsenalData from '../arsenal.json';
+import useCentros from '../../hooks/useCentros';
+import useArsenalLookup from '../../hooks/useArsenalLookup';
 
 const DiferenciasForm = ({ onBack }) => {
-  const [centros] = useState([
-    "ANGELMO", "ANTONIO VARAS", "ASISTE-CPU", "C. ALERCE", 
-    "CARMELA CARVAJAL", "CEAPS", "CECOSF ALERCE NORTE", 
-    "CECOSF LAWEN", "CECOSF PUERTA SUR", "CLINICA MOVIL", 
-    "ESR", "LAB. CLINICO", "ORL", "PADRE HURTADO", 
-    "SAPU PH", "SAR ALERCE", "UAPO", "UAPORRINO"
-  ]);
+  const { centros } = useCentros();
 
   const [formData, setFormData] = useState({
     cod: '',
-    nombreArticulo: 'Esperando código...',
     fecha: new Date().toISOString().split('T')[0],
     centro: '',
     diferencia: ''
   });
 
+  const nombreArticulo = useArsenalLookup(formData.cod);
   const [loading, setLoading] = useState(false);
-
-  // Auto-rellenado usando el Arsenal
-  useEffect(() => {
-    if (formData.cod) {
-      const nombre = arsenalData[formData.cod];
-      setFormData(prev => ({ 
-        ...prev, 
-        nombreArticulo: nombre || 'Código no encontrado en arsenal' 
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, nombreArticulo: 'Esperando código...' }));
-    }
-  }, [formData.cod]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -81,7 +63,7 @@ const DiferenciasForm = ({ onBack }) => {
       if (artError || !articulos || articulos.length === 0) {
         const { data: newArt, error: insArtErr } = await supabase
           .from('articulos')
-          .insert([{ codigo: formData.cod, nombre: formData.nombreArticulo }])
+          .insert([{ codigo: formData.cod, nombre: nombreArticulo }])
           .select()
           .single();
         if (insArtErr) throw insArtErr;
@@ -112,7 +94,6 @@ const DiferenciasForm = ({ onBack }) => {
   const handleClear = () => {
     setFormData({
       cod: '',
-      nombreArticulo: 'Esperando código...',
       fecha: new Date().toISOString().split('T')[0],
       centro: '',
       diferencia: ''
@@ -187,7 +168,7 @@ const DiferenciasForm = ({ onBack }) => {
               border: '1px dashed var(--border-color)',
               minHeight: '45px'
             }}>
-              {formData.nombreArticulo}
+              {nombreArticulo}
             </div>
           </div>
         </div>
