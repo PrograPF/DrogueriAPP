@@ -5,7 +5,7 @@ import { supabase } from '../../supabaseClient';
 
 const PAGE_SIZE = 50;
 
-const InformesModule = () => {
+const InformesModule = ({ onBack }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -125,12 +125,19 @@ const InformesModule = () => {
 
       {/* Botones de Cabecera */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '30px' }} className="no-print">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <FileText size={32} color="#3b82f6" />
-          <div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Módulo de Informes</h2>
-            <p style={{ color: '#94a3b8' }}>Visualización y gestión de artículos pendientes.</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <FileText size={32} color="#3b82f6" />
+            <div>
+              <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Módulo de Informes</h2>
+              <p style={{ color: '#94a3b8' }}>Visualización y gestión de artículos pendientes.</p>
+            </div>
           </div>
+          {onBack && (
+            <button onClick={onBack} className="btn-secondary" style={{ padding: '8px 16px' }}>
+              Volver al Inicio
+            </button>
+          )}
         </div>
         
         <div className="btn-group-responsive" style={{ display: 'flex', gap: '12px' }}>

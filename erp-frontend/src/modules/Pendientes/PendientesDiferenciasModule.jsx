@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ClipboardList, AlertCircle, ArrowRight } from 'lucide-react';
+import { ClipboardList, AlertCircle, ArrowRight, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PendientesForm from './PendientesForm';
 import DiferenciasForm from './DiferenciasForm';
+import InformesModule from '../Informes/InformesModule';
 
 const PendientesDiferenciasModule = () => {
-  const [view, setView] = useState('selection'); // 'selection', 'pendientes', 'diferencias'
+  const [view, setView] = useState('selection'); // 'selection', 'pendientes', 'diferencias', 'historial'
 
   const cardVariants = {
     hover: { 
@@ -28,7 +29,7 @@ const PendientesDiferenciasModule = () => {
             exit={{ opacity: 0, y: -20 }}
             className="responsive-grid-auto"
             style={{ 
-              maxWidth: '900px', 
+              maxWidth: '1200px', 
               margin: '40px auto' 
             }}
           >
@@ -93,6 +94,37 @@ const PendientesDiferenciasModule = () => {
                 Abrir Formulario <ArrowRight size={18} />
               </div>
             </motion.div>
+
+            {/* Botón Historial de Pendientes */}
+            <motion.div 
+              variants={cardVariants}
+              whileHover="hover"
+              whileTap="tap"
+              onClick={() => setView('historial')}
+              className="glass-card"
+              style={{ 
+                padding: '40px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: '20px'
+              }}
+            >
+              <div style={{ padding: '20px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '50%' }}>
+                <History size={48} color="#10b981" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px' }}>Historial de Pendientes</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
+                  Consulta y gestiona el listado de artículos pendientes y genera reportes.
+                </p>
+              </div>
+              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: '600' }}>
+                Ver Listado <ArrowRight size={18} />
+              </div>
+            </motion.div>
           </motion.div>
         )}
 
@@ -105,6 +137,12 @@ const PendientesDiferenciasModule = () => {
         {view === 'diferencias' && (
           <div key="diferencias-view">
             <DiferenciasForm onBack={() => setView('selection')} />
+          </div>
+        )}
+
+        {view === 'historial' && (
+          <div key="historial-view">
+            <InformesModule onBack={() => setView('selection')} />
           </div>
         )}
       </AnimatePresence>
