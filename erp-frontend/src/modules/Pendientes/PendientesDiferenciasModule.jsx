@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PendientesForm from './PendientesForm';
 import DiferenciasForm from './DiferenciasForm';
 import InformesModule from '../Informes/InformesModule';
+import DiferenciasHistorial from '../Informes/DiferenciasHistorial';
 
 const PendientesDiferenciasModule = () => {
-  const [view, setView] = useState('selection'); // 'selection', 'pendientes', 'diferencias', 'historial'
+  const [view, setView] = useState('selection'); // 'selection', 'pendientes', 'diferencias', 'historial', 'historial-diferencias'
 
   const cardVariants = {
     hover: { 
@@ -125,6 +126,37 @@ const PendientesDiferenciasModule = () => {
                 Ver Listado <ArrowRight size={18} />
               </div>
             </motion.div>
+
+            {/* Botón Historial de Diferencias */}
+            <motion.div 
+              variants={cardVariants}
+              whileHover="hover"
+              whileTap="tap"
+              onClick={() => setView('historial-diferencias')}
+              className="glass-card"
+              style={{ 
+                padding: '40px', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: '20px'
+              }}
+            >
+              <div style={{ padding: '20px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '50%' }}>
+                <History size={48} color="#f59e0b" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px' }}>Historial de Diferencias</h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
+                  Revisa el registro de todas las incongruencias y notas de inventario ingresadas.
+                </p>
+              </div>
+              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: '600' }}>
+                Ver Listado <ArrowRight size={18} />
+              </div>
+            </motion.div>
           </motion.div>
         )}
 
@@ -143,6 +175,12 @@ const PendientesDiferenciasModule = () => {
         {view === 'historial' && (
           <div key="historial-view">
             <InformesModule onBack={() => setView('selection')} />
+          </div>
+        )}
+
+        {view === 'historial-diferencias' && (
+          <div key="historial-diferencias-view">
+            <DiferenciasHistorial onBack={() => setView('selection')} />
           </div>
         )}
       </AnimatePresence>
