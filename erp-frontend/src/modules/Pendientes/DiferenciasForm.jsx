@@ -119,7 +119,7 @@ const DiferenciasForm = ({ onBack }) => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div className="responsive-grid-2">
           <div>
             <label style={labelStyle}><Package size={16} /> Código del Producto</label>
             <input 
@@ -142,7 +142,7 @@ const DiferenciasForm = ({ onBack }) => {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '20px' }}>
+        <div className="responsive-grid-2">
           <div>
             <label style={labelStyle}><MapPin size={16} /> Centro</label>
             <select 
@@ -166,7 +166,9 @@ const DiferenciasForm = ({ onBack }) => {
               color: formData.cod ? '#3b82f6' : '#64748b',
               fontWeight: '600',
               border: '1px dashed var(--border-color)',
-              minHeight: '45px'
+              minHeight: '45px',
+              display: 'flex',
+              alignItems: 'center'
             }}>
               {nombreArticulo}
             </div>
@@ -186,7 +188,7 @@ const DiferenciasForm = ({ onBack }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginTop: '40px', justifyContent: 'flex-end' }}>
+      <div className="btn-group-responsive" style={{ display: 'flex', gap: '16px', marginTop: '40px', justifyContent: 'flex-end' }}>
         <button onClick={handleClear} className="btn-secondary">
           <Eraser size={20} /> Limpiar
         </button>

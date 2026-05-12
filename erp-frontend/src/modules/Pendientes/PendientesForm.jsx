@@ -171,7 +171,7 @@ const PendientesForm = ({ onBack }) => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px' }}>
+      <div className="responsive-grid-2">
         {/* Lado Izquierdo */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
@@ -192,7 +192,10 @@ const PendientesForm = ({ onBack }) => {
               borderRadius: '8px', 
               color: formData.cod ? '#3b82f6' : '#64748b',
               fontWeight: '600',
-              border: '1px dashed var(--border-color)'
+              border: '1px dashed var(--border-color)',
+              minHeight: '45px',
+              display: 'flex',
+              alignItems: 'center'
             }}>
               {nombreArticulo}
             </div>
@@ -284,7 +287,7 @@ const PendientesForm = ({ onBack }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginTop: '40px', justifyContent: 'flex-end' }}>
+      <div className="btn-group-responsive" style={{ display: 'flex', gap: '16px', marginTop: '40px', justifyContent: 'flex-end' }}>
         <button onClick={handleClear} className="btn-secondary">
           <Eraser size={20} /> Limpiar Todo
         </button>

@@ -26,12 +26,10 @@ const PendientesDiferenciasModule = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
+            className="responsive-grid-auto"
             style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '30px', 
               maxWidth: '900px', 
-              margin: '60px auto' 
+              margin: '40px auto' 
             }}
           >
             {/* Botón Pendientes */}

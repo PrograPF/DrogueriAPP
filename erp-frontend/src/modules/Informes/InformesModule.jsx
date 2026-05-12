@@ -112,7 +112,7 @@ const InformesModule = () => {
       style={{ maxWidth: '1200px', margin: '0 auto' }}
     >
       {/* Resumen Global (NUEVO) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }} className="no-print">
+      <div className="responsive-grid-auto" style={{ marginBottom: '30px' }}>
         <div className="glass-card" style={{ padding: '20px', borderLeft: '4px solid #3b82f6' }}>
           <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Total Unidades Pendientes</span>
           <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#3b82f6', marginTop: '5px' }}>{totalGlobal}</h2>
@@ -124,7 +124,7 @@ const InformesModule = () => {
       </div>
 
       {/* Botones de Cabecera */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }} className="no-print">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '30px' }} className="no-print">
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <FileText size={32} color="#3b82f6" />
           <div>
@@ -133,7 +133,7 @@ const InformesModule = () => {
           </div>
         </div>
         
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="btn-group-responsive" style={{ display: 'flex', gap: '12px' }}>
           <button 
             onClick={handlePrint}
             className="btn-primary"
@@ -192,7 +192,7 @@ const InformesModule = () => {
         <div className="no-print" style={{ 
             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.1) 100%)',
             padding: '25px', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.3)',
-            marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            marginBottom: '30px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '15px'
           }}>
           <div>
             <span style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: '800', textTransform: 'uppercase' }}>Deuda Actual Vigente</span>
@@ -205,8 +205,8 @@ const InformesModule = () => {
         </div>
       )}
 
-      <div className="print-container" style={{ background: 'transparent', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="print-container" style={{ background: 'transparent', overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
               <th style={thStyle} className="no-print">ESTADO</th>

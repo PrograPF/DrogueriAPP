@@ -1,16 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FilePlus, Settings, LogOut, PackageSearch } from 'lucide-react';
+import { LayoutDashboard, FilePlus, Settings, LogOut, PackageSearch, Menu, X } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
 import InformesModule from './modules/Informes/InformesModule';
 import ConfigModule from './modules/Config/ConfigModule';
 
-const SidebarItem = ({ icon: Icon, label, to }) => {
+const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
   const location = useLocation();
   const active = location.pathname === to;
   
   return (
-    <Link to={to} style={{ 
+    <Link to={to} onClick={onClick} style={{ 
       display: 'flex', 
       alignItems: 'center', 
       gap: '12px', 
@@ -29,43 +29,83 @@ const SidebarItem = ({ icon: Icon, label, to }) => {
 };
 
 const AppContent = () => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="app-container">
+      {/* Sidebar Overlay (Mobile) */}
+      <div 
+        className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} 
+        onClick={closeSidebar}
+      />
+
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#3b82f6', margin: 0 }}>
+          DrogueriAPP
+        </h2>
+        <button 
+          onClick={toggleSidebar}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            color: 'white', 
+            cursor: 'pointer',
+            padding: '5px'
+          }}
+        >
+          {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <div style={{ 
-        width: '280px', 
-        background: 'rgba(30, 41, 59, 0.5)', 
-        borderRight: '1px solid rgba(255, 255, 255, 0.05)',
-        padding: '30px 20px',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <div style={{ marginBottom: '40px', padding: '0 10px' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#3b82f6', letterSpacing: '-1px' }}>
+      <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        <div style={{ marginBottom: '40px', padding: '0 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#3b82f6', letterSpacing: '-1px', margin: 0 }}>
             DrogueriAPP <span style={{ color: '#94a3b8', fontWeight: '400', fontSize: '0.8rem' }}>v1.0</span>
           </h1>
+          <button 
+            className="mobile-only"
+            onClick={closeSidebar}
+            style={{ display: 'none', background: 'none', border: 'none', color: '#94a3b8' }}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div style={{ flex: 1 }}>
-          <SidebarItem icon={FilePlus} label="Pendientes/Diferencias" to="/" />
-          <SidebarItem icon={LayoutDashboard} label="Módulo Informes" to="/informes" />
-          <SidebarItem icon={PackageSearch} label="Inventario" to="/inventario" />
-          <SidebarItem icon={Settings} label="Configuración" to="/config" />
+          <SidebarItem icon={FilePlus} label="Pendientes/Diferencias" to="/" onClick={closeSidebar} />
+          <SidebarItem icon={LayoutDashboard} label="Módulo Informes" to="/informes" onClick={closeSidebar} />
+          <SidebarItem icon={PackageSearch} label="Inventario" to="/inventario" onClick={closeSidebar} />
+          <SidebarItem icon={Settings} label="Configuración" to="/config" onClick={closeSidebar} />
         </div>
 
         <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '20px' }}>
-          <SidebarItem icon={LogOut} label="Cerrar Sesión" to="/logout" />
+          <SidebarItem icon={LogOut} label="Cerrar Sesión" to="/logout" onClick={closeSidebar} />
         </div>
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, padding: '40px', background: 'radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%)', overflowY: 'auto' }}>
+      <div className="main-content">
         <header style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '1.1rem', color: '#94a3b8' }}>¡Hola, Pablo!</h3>
             <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Bienvenido al sistema de control de stock.</p>
           </div>
-          <div style={{ width: '40px', height: '40px', background: '#3b82f6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>P</div>
+          <div style={{ 
+            width: '40px', 
+            height: '40px', 
+            background: '#3b82f6', 
+            borderRadius: '50%', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            fontWeight: 'bold',
+            flexShrink: 0
+          }}>P</div>
         </header>
 
         <Routes>

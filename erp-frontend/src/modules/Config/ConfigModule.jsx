@@ -76,11 +76,13 @@ const ConfigModule = () => {
       animate={{ opacity: 1 }}
       style={{ maxWidth: '800px', margin: '0 auto' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
-        <Settings size={32} color="#3b82f6" />
-        <div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Configuración del Sistema</h2>
-          <p style={{ color: '#94a3b8' }}>Gestión de Centros de Salud y parámetros globales.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '30px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <Settings size={32} color="#3b82f6" />
+          <div>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Configuración del Sistema</h2>
+            <p style={{ color: '#94a3b8' }}>Gestión de Centros de Salud y parámetros globales.</p>
+          </div>
         </div>
       </div>
 
@@ -90,7 +92,7 @@ const ConfigModule = () => {
         </h3>
 
         {/* Formulario Añadir */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
+        <div className="btn-group-responsive" style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
           <input 
             type="text" 
             placeholder="Nombre del nuevo centro..." 

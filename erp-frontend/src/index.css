@@ -101,26 +101,140 @@ input[type=number] {
   -moz-appearance: textfield;
 }
 
+/* Layout classes */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+.sidebar {
+  width: 280px;
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+  z-index: 100;
+}
+
+.main-content {
+  flex: 1;
+  padding: 40px;
+  background: radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%);
+  overflow-y: auto;
+  min-width: 0; /* Prevents flex items from overflowing */
+}
+
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.responsive-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.mobile-header {
+  display: none;
+  padding: 15px 20px;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 80;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Mobile responsive */
+@media (max-width: 1024px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay.open {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-header {
+    display: flex;
+  }
+
+  .main-content {
+    padding: 20px;
+  }
+  
+  header {
+    margin-bottom: 25px !important;
+  }
+
+  .responsive-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .responsive-grid-auto {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .glass-card {
+    padding: 20px !important;
+  }
+
+  .btn-group-responsive {
+    flex-direction: column-reverse;
+    width: 100%;
+  }
+
+  .btn-group-responsive button {
+    width: 100%;
+  }
+}
+
 /* === Reglas Globales de Impresión === */
 @media print {
-  /* Ocultar sidebar y header */
-  body > div > div > div:first-child {
+  .sidebar, .mobile-header, .sidebar-overlay {
     display: none !important;
   }
-  body > div > div > div:last-child > header {
-    display: none !important;
-  }
-  /* Fondo blanco y texto negro */
-  body, body > div > div > div:last-child {
+  
+  .main-content {
+    padding: 0 !important;
     background: white !important;
     color: black !important;
-    padding: 0 !important;
   }
-  /* Contenido ocupa todo el ancho */
-  body > div > div {
-    display: block !important;
-  }
-  body > div > div > div:last-child {
-    width: 100% !important;
+  
+  body, .app-container {
+    background: white !important;
   }
 }
