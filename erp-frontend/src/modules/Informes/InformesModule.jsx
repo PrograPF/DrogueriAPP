@@ -112,7 +112,7 @@ const InformesModule = () => {
       style={{ maxWidth: '1200px', margin: '0 auto' }}
     >
       {/* Resumen Global (NUEVO) */}
-      <div className="responsive-grid-auto" style={{ marginBottom: '30px' }}>
+      <div className="responsive-grid-auto no-print" style={{ marginBottom: '30px' }}>
         <div className="glass-card" style={{ padding: '20px', borderLeft: '4px solid #3b82f6' }}>
           <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Total Unidades Pendientes</span>
           <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#3b82f6', marginTop: '5px' }}>{totalGlobal}</h2>

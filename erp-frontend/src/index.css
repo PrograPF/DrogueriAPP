@@ -224,7 +224,7 @@ input[type=number] {
 
 /* === Reglas Globales de Impresión === */
 @media print {
-  .sidebar, .mobile-header, .sidebar-overlay {
+  .sidebar, .mobile-header, .sidebar-overlay, .no-print {
     display: none !important;
   }
   
@@ -232,6 +232,10 @@ input[type=number] {
     padding: 0 !important;
     background: white !important;
     color: black !important;
+  }
+  
+  .main-content > header {
+    display: none !important;
   }
   
   body, .app-container {

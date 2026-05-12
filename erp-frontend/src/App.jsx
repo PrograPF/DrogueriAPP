@@ -90,7 +90,7 @@ const AppContent = () => {
 
       {/* Main Content */}
       <div className="main-content">
-        <header style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <header className="no-print" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '1.1rem', color: '#94a3b8' }}>¡Hola, Pablo!</h3>
             <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Bienvenido al sistema de control de stock.</p>
