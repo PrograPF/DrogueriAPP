@@ -46,7 +46,8 @@ const InformesModule = ({ onBack }) => {
         centro: item.centros?.nombre || 'S/C',
         cantidad: item.pendiente,
         fecha: item.fecha,
-        esVigente: item.es_vigente
+        esVigente: item.es_vigente,
+        esResuelto: item.es_resuelto // Nuevo campo
       }));
 
       setData(prev => reset ? mappedData : [...prev, ...mappedData]);
@@ -62,6 +63,31 @@ const InformesModule = ({ onBack }) => {
     const nextPage = page + 1;
     setPage(nextPage);
     fetchData(nextPage);
+  };
+
+  const handleToggleResuelto = async (id, currentState) => {
+    try {
+      const { error } = await supabase
+        .from('pendientes')
+        .update({ es_resuelto: !currentState })
+        .eq('id', id);
+      
+      if (error) {
+        // Si el error es que la columna no existe, avisar al usuario
+        if (error.code === '42703') {
+          alert('Error: La columna "es_resuelto" no existe en la base de datos Supabase. Por favor, añádela como booleano (default false).');
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setData(prev => prev.map(item => 
+        item.id === id ? { ...item, esResuelto: !currentState } : item
+      ));
+    } catch (err) {
+      alert('Error al actualizar estado: ' + err.message);
+    }
   };
 
   const handleDelete = async (id, nombre) => {
@@ -217,6 +243,7 @@ const InformesModule = ({ onBack }) => {
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
               <th style={thStyle} className="no-print">ESTADO</th>
+              <th style={thStyle} className="no-print">RESUELTO</th>
               <th style={thStyle}>CÓDIGO</th>
               <th style={thStyle}>DESCRIPCIÓN</th>
               <th style={thStyle}>CENTRO</th>
@@ -233,13 +260,24 @@ const InformesModule = ({ onBack }) => {
             {filteredData.map((item) => (
               <tr key={item.id} style={{ 
                 borderBottom: '1px solid rgba(255,255,255,0.05)',
-                opacity: item.esVigente ? 1 : 0.5
+                opacity: (item.esVigente || item.esResuelto) ? 1 : 0.5,
+                background: item.esResuelto ? 'rgba(16, 185, 129, 0.05)' : 'transparent'
               }}>
                 <td style={tdStyle} className="no-print">
-                  {item.esVigente ? 
-                    <span style={{ color: '#10b981', fontSize: '0.7rem', fontWeight: '800', border: '1px solid #10b981', padding: '2px 6px', borderRadius: '4px' }}>VIGENTE</span> : 
+                  {item.esResuelto ? 
+                    <span style={{ color: '#10b981', fontSize: '0.7rem', fontWeight: '800', border: '1px solid #10b981', padding: '2px 6px', borderRadius: '4px' }}>RESUELTO</span> :
+                    item.esVigente ? 
+                    <span style={{ color: '#3b82f6', fontSize: '0.7rem', fontWeight: '800', border: '1px solid #3b82f6', padding: '2px 6px', borderRadius: '4px' }}>VIGENTE</span> : 
                     <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: '800', border: '1px solid #64748b', padding: '2px 6px', borderRadius: '4px' }}>HISTORIAL</span>
                   }
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
+                  <input 
+                    type="checkbox" 
+                    checked={item.esResuelto || false} 
+                    onChange={() => handleToggleResuelto(item.id, item.esResuelto)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
                 </td>
                 <td style={tdStyle}>
                   <span style={{ fontWeight: '700' }}>{item.cod}</span>
