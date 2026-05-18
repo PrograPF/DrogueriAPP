@@ -232,6 +232,8 @@ input[type=number] {
     padding: 0 !important;
     background: white !important;
     color: black !important;
+    overflow: visible !important;
+    height: auto !important;
   }
   
   .main-content > header {
@@ -240,5 +242,7 @@ input[type=number] {
   
   body, .app-container {
     background: white !important;
+    overflow: visible !important;
+    height: auto !important;
   }
 }

@@ -239,20 +239,20 @@ const InformesModule = ({ onBack }) => {
       )}
 
       <div className="print-container" style={{ background: 'transparent', overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
               <th style={thStyle} className="no-print">ESTADO</th>
               <th style={thStyle} className="no-print">RESUELTO</th>
-              <th style={thStyle}>CÓDIGO</th>
-              <th style={thStyle}>DESCRIPCIÓN</th>
-              <th style={thStyle}>CENTRO</th>
-              <th style={thStyle}>FECHA SOLIC.</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>SOLICITADO</th>
+              <th style={thStyle} className="col-codigo">CÓDIGO</th>
+              <th style={thStyle} className="col-descripcion">DESCRIPCIÓN</th>
+              <th style={thStyle} className="col-centro">CENTRO</th>
+              <th style={thStyle} className="col-fecha">FECHA SOLIC.</th>
+              <th style={{ ...thStyle, textAlign: 'right' }} className="col-solicitado">SOLICITADO</th>
               {/* Columnas Extra para Impresión */}
-              <th style={{ ...thStyle, display: 'none' }} className="print-column">F. VENCIM.</th>
-              <th style={{ ...thStyle, display: 'none' }} className="print-column">LOTE</th>
-              <th style={{ ...thStyle, display: 'none' }} className="print-column">ENVIADO</th>
+              <th style={{ ...thStyle, display: 'none' }} className="print-column col-vencim">F. VENCIM.</th>
+              <th style={{ ...thStyle, display: 'none' }} className="print-column col-lote">LOTE</th>
+              <th style={{ ...thStyle, display: 'none' }} className="print-column col-enviado">ENVIADO</th>
               <th style={{ ...thStyle, textAlign: 'center' }} className="no-print">ACCIONES</th>
             </tr>
           </thead>
@@ -312,22 +312,36 @@ const InformesModule = ({ onBack }) => {
 
       <style>{`
         @media print {
-          body { background: white !important; color: black !important; }
+          body { background: white !important; color: black !important; padding: 1cm !important; }
           .no-print { display: none !important; }
           .print-only { display: block !important; }
           .print-column { display: table-cell !important; }
-          .print-container { width: 100% !important; margin: 0 !important; padding: 0 !important; }
-          table { width: 100% !important; border: 1px solid #000 !important; }
+          .print-container { width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+          .informes-container { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          table { width: 100% !important; border: 1px solid #000 !important; table-layout: fixed; }
           th, td { 
             border: 1px solid #000 !important; 
             color: black !important; 
-            padding: 8px !important; 
-            font-size: 10pt !important;
+            padding: 6px !important; 
+            font-size: 9pt !important;
             opacity: 1 !important;
             background: white !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
           }
           th { background: #eee !important; font-weight: bold !important; }
-          @page { size: landscape; margin: 1cm; }
+          
+          /* Ajustes de columnas para impresión */
+          th.col-codigo { width: 8% !important; }
+          th.col-descripcion { width: 25% !important; }
+          th.col-centro { width: 13% !important; }
+          th.col-fecha { width: 10% !important; }
+          th.col-solicitado { width: 8% !important; }
+          th.col-vencim { width: 8% !important; }
+          th.col-lote { width: 20% !important; }
+          th.col-enviado { width: 8% !important; }
+
+          @page { size: landscape; margin: 0; }
         }
       `}</style>
     </motion.div>

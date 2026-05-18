@@ -133,6 +133,7 @@ const PendientesForm = ({ onBack }) => {
       } else {
         alert('Registro guardado como HISTORIAL (ya existe uno con fecha posterior).');
       }
+      handleClear();
     } catch (err) {
       console.error('Error en Supabase:', err);
       alert('Error al guardar: ' + err.message);

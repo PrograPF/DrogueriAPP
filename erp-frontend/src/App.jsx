@@ -42,7 +42,7 @@ const AppContent = () => {
       />
 
       {/* Mobile Header */}
-      <div className="mobile-header">
+      <div className="mobile-header no-print">
         <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#3b82f6', margin: 0 }}>
           DrogueriAPP
         </h2>
@@ -61,7 +61,7 @@ const AppContent = () => {
       </div>
 
       {/* Sidebar */}
-      <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+      <div className={`sidebar ${isSidebarOpen ? 'open' : ''} no-print`}>
         <div style={{ marginBottom: '40px', padding: '0 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#3b82f6', letterSpacing: '-1px', margin: 0 }}>
             DrogueriAPP <span style={{ color: '#94a3b8', fontWeight: '400', fontSize: '0.8rem' }}>v1.0</span>
