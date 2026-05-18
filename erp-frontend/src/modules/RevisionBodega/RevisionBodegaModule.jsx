@@ -309,7 +309,7 @@ const RevisionBodegaModule = () => {
                     {historial.map((h, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={tdStyle}>{h.fecha}</td>
-                        <td style={tdStyle}>{h.session_id.substring(0,8).toUpperCase()}</td>
+                        <td style={tdStyle}>{h?.session_id?.substring(0,8)?.toUpperCase() || 'N/A'}</td>
                         <td style={tdStyle}>{h.totalArticulos}</td>
                         <td style={tdStyle}>{h.totalUnidades}</td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
@@ -476,35 +476,35 @@ const RevisionBodegaModule = () => {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <h1 style={{ fontSize: '16pt', margin: 0, fontWeight: '900' }}>INFORME DE REVISIÓN EN BODEGA</h1>
-                <p style={{ margin: 0, fontSize: '8pt' }}>ID: {sessionId.substring(0,8).toUpperCase()}</p>
+                <p style={{ margin: 0, fontSize: '8pt' }}>ID: {sessionId?.substring(0,8)?.toUpperCase() || ''}</p>
               </div>
             </div>
           </div>
 
           <div className="no-break no-print" style={{ marginBottom: '30px' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: alertas.length > 0 ? '#f59e0b' : '#10b981', marginBottom: '15px' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: alertas?.length > 0 ? '#f59e0b' : '#10b981', marginBottom: '15px' }}>
               <AlertTriangle size={20} /> 
-              {alertas.length > 0 ? "Alertas de Cruce con Pendientes" : "No hay cruce con artículos pendientes"}
+              {alertas?.length > 0 ? "Alertas de Cruce con Pendientes" : "No hay cruce con artículos pendientes"}
             </h3>
             
-            {alertas.length > 0 && (
+            {alertas?.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
-                {alertas.map((alerta, idx) => (
+                {(alertas || []).map((alerta, idx) => (
                   <div key={idx} style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '15px' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '700', marginBottom: '5px' }}>CÓDIGO {alerta.codigo}</div>
-                    <div style={{ fontWeight: '600', marginBottom: '10px', fontSize: '0.9rem', lineHeight: '1.2' }}>{alerta.nombre}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '700', marginBottom: '5px' }}>CÓDIGO {alerta?.codigo}</div>
+                    <div style={{ fontWeight: '600', marginBottom: '10px', fontSize: '0.9rem', lineHeight: '1.2' }}>{alerta?.nombre}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '5px' }}>
                       <span style={{ color: '#94a3b8' }}>Ingresado Total:</span>
-                      <span style={{ fontWeight: '800', color: '#10b981' }}>{alerta.ingresado}</span>
+                      <span style={{ fontWeight: '800', color: '#10b981' }}>{alerta?.ingresado}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '5px' }}>
                       <span style={{ color: '#94a3b8' }}>Deuda Total (Pendiente):</span>
-                      <span style={{ fontWeight: '800', color: '#ef4444' }}>{alerta.deudaTotal}</span>
+                      <span style={{ fontWeight: '800', color: '#ef4444' }}>{alerta?.deudaTotal}</span>
                     </div>
                     <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(245, 158, 11, 0.3)' }}>
-                      <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: '700' }}>Suministro Posible: {alerta.porcentajeCubierto}%</div>
+                      <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: '700' }}>Suministro Posible: {alerta?.porcentajeCubierto}%</div>
                       <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '5px' }}>
-                        Requerido por: {alerta.detalleCentros.map(c => `${c.centro} (${c.cantidadPendiente})`).join(', ')}
+                        Requerido por: {(alerta?.detalleCentros || []).map(c => `${c?.centro} (${c?.cantidadPendiente})`).join(', ')}
                       </div>
                     </div>
                   </div>
@@ -528,16 +528,16 @@ const RevisionBodegaModule = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, idx) => (
+                {(items || []).map((item, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    <td style={tdStyle}><strong>{item.codigo}</strong></td>
-                    <td style={tdStyle}>{item.nombre}</td>
-                    <td style={tdStyle}>{item.lote}</td>
+                    <td style={tdStyle}><strong>{item?.codigo}</strong></td>
+                    <td style={tdStyle}>{item?.nombre}</td>
+                    <td style={tdStyle}>{item?.lote}</td>
                     <td style={tdStyle}>
-                      <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{item.tipo_documento} {item.numero_documento}</div>
-                      <div style={{ fontSize: '8pt' }}>ISP: {item.isp}</div>
+                      <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{item?.tipo_documento} {item?.numero_documento}</div>
+                      <div style={{ fontSize: '8pt' }}>ISP: {item?.isp}</div>
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800' }}>{item.cantidad}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800' }}>{item?.cantidad}</td>
                   </tr>
                 ))}
               </tbody>
