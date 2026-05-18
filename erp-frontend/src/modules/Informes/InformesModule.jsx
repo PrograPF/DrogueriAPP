@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, FileText, Package, MapPin, Trash2, Filter, History, CheckCircle2, Printer } from 'lucide-react';
+import { Search, FileText, Trash2, History, CheckCircle2, Printer } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
+import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
 
 const PAGE_SIZE = 50;
 
@@ -347,8 +348,5 @@ const InformesModule = ({ onBack }) => {
     </motion.div>
   );
 };
-
-const thStyle = { padding: '16px 20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' };
-const tdStyle = { padding: '16px 20px', fontSize: '0.85rem' };
 
 export default InformesModule;

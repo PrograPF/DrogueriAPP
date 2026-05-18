@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useCentros from '../../hooks/useCentros';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
+import { resolveCentroId, resolveArticuloId } from '../../utils/resolveEntities';
+import { labelStyle } from '../../styles/sharedStyles';
 
 const PendientesForm = ({ onBack }) => {
   const { centros } = useCentros();
@@ -44,45 +46,8 @@ const PendientesForm = ({ onBack }) => {
 
     setLoading(true);
     try {
-      // 1. Asegurar que el centro existe y obtener su ID
-      let { data: centroData, error: centroError } = await supabase
-        .from('centros')
-        .select('id')
-        .eq('nombre', formData.centro)
-        .single();
-      
-      let centroId;
-      if (centroError || !centroData) {
-        const { data: newCentro, error: insCentroErr } = await supabase
-          .from('centros')
-          .insert([{ nombre: formData.centro }])
-          .select()
-          .single();
-        if (insCentroErr) throw insCentroErr;
-        centroId = newCentro.id;
-      } else {
-        centroId = centroData.id;
-      }
-
-      // 2. Asegurar que el artículo existe y obtener su ID
-      let { data: artData, error: artError } = await supabase
-        .from('articulos')
-        .select('id')
-        .eq('codigo', formData.cod)
-        .single();
-      
-      let articuloId;
-      if (artError || !artData) {
-        const { data: newArt, error: insArtErr } = await supabase
-          .from('articulos')
-          .insert([{ codigo: formData.cod, nombre: nombreArticulo }])
-          .select()
-          .single();
-        if (insArtErr) throw insArtErr;
-        articuloId = newArt.id;
-      } else {
-        articuloId = artData.id;
-      }
+      const centroId = await resolveCentroId(formData.centro);
+      const articuloId = await resolveArticuloId(formData.cod, nombreArticulo);
 
       // 3. Obtener el registro vigente actual para este artículo/centro
       const { data: currentVigente } = await supabase
@@ -298,16 +263,6 @@ const PendientesForm = ({ onBack }) => {
       </div>
     </motion.div>
   );
-};
-
-const labelStyle = {
-  fontSize: '0.85rem',
-  fontWeight: '600',
-  color: '#94a3b8',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  marginBottom: '8px'
 };
 
 export default PendientesForm;

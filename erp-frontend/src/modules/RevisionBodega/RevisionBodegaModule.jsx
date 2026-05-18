@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye } from 'lucide-react';
+import { ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
+import { labelStyle, thStyle, tdStyle } from '../../styles/sharedStyles';
 
 const RevisionBodegaModule = () => {
   const [activeTab, setActiveTab] = useState('nueva'); // 'nueva', 'historial'
@@ -588,11 +589,5 @@ const RevisionBodegaModule = () => {
     </div>
   );
 };
-
-const labelStyle = {
-  fontSize: '0.85rem', fontWeight: '600', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'
-};
-const thStyle = { padding: '12px 16px', fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' };
-const tdStyle = { padding: '12px 16px', fontSize: '0.85rem' };
 
 export default RevisionBodegaModule;
