@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, FileText, Trash2, History, CheckCircle2, Printer } from 'lucide-react';
+import { Search, FileText, Trash2, History, CheckCircle2, Printer, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
+import useCentros from '../../hooks/useCentros';
 import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
 
 const PAGE_SIZE = 50;
@@ -9,17 +10,19 @@ const PAGE_SIZE = 50;
 const InformesModule = ({ onBack }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
+  const [filterCodigo, setFilterCodigo] = useState('');
+  const [filterEstado, setFilterEstado] = useState('vigente');
+  const [filterCentro, setFilterCentro] = useState('');
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const { centros } = useCentros();
 
   useEffect(() => {
     setData([]);
     setPage(0);
     setHasMore(true);
     fetchData(0, true);
-  }, [showHistory]);
+  }, [filterEstado]);
 
   const fetchData = async (pageNum = 0, reset = false) => {
     setLoading(true);
@@ -33,7 +36,7 @@ const InformesModule = ({ onBack }) => {
         .order('fecha', { ascending: false })
         .range(from, to);
 
-      if (!showHistory) {
+      if (filterEstado === 'vigente') {
         query = query.eq('es_vigente', true);
       }
 
@@ -107,29 +110,48 @@ const InformesModule = ({ onBack }) => {
   };
 
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data;
-    const term = searchTerm.toLowerCase();
-    return data.filter(item => 
-      item.cod.toLowerCase().includes(term) || 
-      item.nombre.toLowerCase().includes(term) || 
-      item.centro.toLowerCase().includes(term)
-    );
-  }, [searchTerm, data]);
+    return data.filter(item => {
+      if (filterCodigo) {
+        const term = filterCodigo.toLowerCase();
+        if (!item.cod.toLowerCase().includes(term) && !item.nombre.toLowerCase().includes(term)) {
+          return false;
+        }
+      }
+
+      if (filterCentro) {
+        if (item.centro !== filterCentro) {
+          return false;
+        }
+      }
+
+      if (filterEstado !== 'todos') {
+        if (filterEstado === 'vigente') {
+          if (!item.esVigente || item.esResuelto) return false;
+        } else if (filterEstado === 'resuelto') {
+          if (!item.esResuelto) return false;
+        } else if (filterEstado === 'historial') {
+          if (item.esVigente || item.esResuelto) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [data, filterCodigo, filterCentro, filterEstado]);
 
   const totalGlobal = useMemo(() => {
-    return data.filter(i => i.esVigente).reduce((sum, item) => sum + item.cantidad, 0);
-  }, [data]);
+    return filteredData.filter(i => i.esVigente && !i.esResuelto).reduce((sum, item) => sum + item.cantidad, 0);
+  }, [filteredData]);
 
   const totalPendienteProducto = useMemo(() => {
-    if (!searchTerm) return null;
-    const uniqueCodes = [...new Set(filteredData.filter(i => i.esVigente).map(item => item.cod))];
+    if (!filterCodigo) return null;
+    const activeData = filteredData.filter(i => i.esVigente && !i.esResuelto);
+    const uniqueCodes = [...new Set(activeData.map(item => item.cod))];
     if (uniqueCodes.length === 1) {
-      const activeData = filteredData.filter(i => i.esVigente);
       const total = activeData.reduce((sum, item) => sum + item.cantidad, 0);
       return { nombre: activeData[0]?.nombre || 'Producto', total };
     }
     return null;
-  }, [filteredData, searchTerm]);
+  }, [filteredData, filterCodigo]);
 
   return (
     <motion.div 
@@ -146,7 +168,7 @@ const InformesModule = ({ onBack }) => {
         </div>
         <div className="glass-card" style={{ padding: '20px', borderLeft: '4px solid #10b981' }}>
           <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase' }}>Artículos con Deuda</span>
-          <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#10b981', marginTop: '5px' }}>{data.filter(i => i.esVigente).length}</h2>
+          <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#10b981', marginTop: '5px' }}>{filteredData.filter(i => i.esVigente && !i.esResuelto).length}</h2>
         </div>
       </div>
 
@@ -175,14 +197,6 @@ const InformesModule = ({ onBack }) => {
           >
             <Printer size={18} /> Imprimir Hoja de Despacho
           </button>
-          <button 
-            onClick={() => setShowHistory(!showHistory)}
-            className={showHistory ? "btn-primary" : "btn-secondary"}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
-          >
-            {showHistory ? <CheckCircle2 size={18} /> : <History size={18} />}
-            {showHistory ? "Ver Solo Vigentes" : "Ver Todo el Historial"}
-          </button>
         </div>
       </div>
 
@@ -209,16 +223,57 @@ const InformesModule = ({ onBack }) => {
       </div>
 
       <div className="glass-card no-print" style={{ padding: '25px', marginBottom: '30px' }}>
-        <div style={{ position: 'relative' }}>
-          <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
-          <input 
-            type="text"
-            placeholder="Buscar por código, nombre o centro..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field"
-            style={{ paddingLeft: '45px', fontSize: '1rem' }}
-          />
+        <div className="responsive-grid-auto" style={{ gap: '20px' }}>
+          {/* Buscador por Código / Nombre */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Search size={16} /> Buscar por Código / Nombre
+            </label>
+            <input 
+              type="text"
+              placeholder="Ej: 1227 o Paracetamol..."
+              value={filterCodigo}
+              onChange={(e) => setFilterCodigo(e.target.value)}
+              className="input-field"
+              style={{ fontSize: '0.95rem' }}
+            />
+          </div>
+
+          {/* Filtro por Estado */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <History size={16} /> Filtrar por Estado
+            </label>
+            <select
+              value={filterEstado}
+              onChange={(e) => setFilterEstado(e.target.value)}
+              className="input-field"
+              style={{ fontSize: '0.95rem', cursor: 'pointer' }}
+            >
+              <option value="vigente">Vigente (Pendiente Activo)</option>
+              <option value="resuelto">Resuelto</option>
+              <option value="historial">Historial (No Vigente)</option>
+              <option value="todos">Todos los Registros</option>
+            </select>
+          </div>
+
+          {/* Filtro por Centro */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <MapPin size={16} /> Filtrar por Centro
+            </label>
+            <select
+              value={filterCentro}
+              onChange={(e) => setFilterCentro(e.target.value)}
+              className="input-field"
+              style={{ fontSize: '0.95rem', cursor: 'pointer' }}
+            >
+              <option value="">Todos los Centros</option>
+              {centros.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
