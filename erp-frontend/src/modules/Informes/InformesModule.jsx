@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useCentros from '../../hooks/useCentros';
 import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
+import { formatDate } from '../../utils/dateFormatter';
 
 const PAGE_SIZE = 50;
 
@@ -218,7 +219,7 @@ const InformesModule = ({ onBack }) => {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', fontSize: '10pt' }}>
           <span><strong>Responsable:</strong> ___________________________</span>
-          <span><strong>Fecha de Emisión:</strong> {new Date().toLocaleDateString()}</span>
+          <span><strong>Fecha de Emisión:</strong> {formatDate(new Date())}</span>
         </div>
       </div>
 
@@ -340,7 +341,7 @@ const InformesModule = ({ onBack }) => {
                 </td>
                 <td style={tdStyle}>{item.nombre}</td>
                 <td style={tdStyle}>{item.centro}</td>
-                <td style={tdStyle}>{item.fecha}</td>
+                <td style={tdStyle}>{formatDate(item.fecha)}</td>
                 <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800' }}>{item.cantidad}</td>
                 {/* Celdas en blanco para imprimir */}
                 <td style={{ ...tdStyle, display: 'none', border: '1px solid #ccc' }} className="print-column"></td>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
 import { labelStyle, thStyle, tdStyle } from '../../styles/sharedStyles';
+import { formatDate } from '../../utils/dateFormatter';
 
 const RevisionBodegaModule = () => {
   const [activeTab, setActiveTab] = useState('nueva'); // 'nueva', 'historial'
@@ -618,7 +619,7 @@ const RevisionBodegaModule = () => {
                   <p style={{ margin: '5px 0 0 0' }}>Firma y Timbre Responsable de Revisión</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p><strong>Fecha de Emisión:</strong> {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                  <p><strong>Fecha de Emisión:</strong> {formatDate(new Date())} {new Date().toLocaleTimeString()}</p>
                 </div>
               </div>
             </div>

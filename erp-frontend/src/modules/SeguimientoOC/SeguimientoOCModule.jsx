@@ -3,6 +3,7 @@ import { Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, RefreshCw, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
+import { formatDate } from '../../utils/dateFormatter';
 
 // Custom hook local to quickly check arsenal descriptions
 const useArsenalAutoSuggest = (codigo) => {
@@ -435,10 +436,10 @@ const SeguimientoOCModule = () => {
                             </div>
                           </td>
                           <td style={{ padding: '16px', fontSize: '0.85rem' }}>
-                            <div>Envío: {new Date(oc.fecha_envio).toLocaleDateString()}</div>
+                            <div>Envío: {formatDate(oc.fecha_envio)}</div>
                             {oc.fecha_aceptacion && (
                               <div style={{ color: '#10b981', marginTop: '2px' }}>
-                                Acept.: {new Date(oc.fecha_aceptacion).toLocaleDateString()}
+                                Acept.: {formatDate(oc.fecha_aceptacion)}
                               </div>
                             )}
                             {plazos.isExpired && (

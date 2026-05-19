@@ -3,6 +3,7 @@ import { Search, AlertCircle, Trash2, Printer } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
+import { formatDate } from '../../utils/dateFormatter';
 
 const PAGE_SIZE = 50;
 
@@ -148,7 +149,7 @@ const DiferenciasHistorial = ({ onBack }) => {
                 <td style={tdStyle}><span style={{ fontWeight: '700' }}>{item.cod}</span></td>
                 <td style={tdStyle}>{item.nombre}</td>
                 <td style={tdStyle}>{item.centro}</td>
-                <td style={tdStyle}>{item.fecha}</td>
+                <td style={tdStyle}>{formatDate(item.fecha)}</td>
                 <td style={{ ...tdStyle, color: '#f59e0b', fontStyle: 'italic' }}>{item.detalle}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
                   <button onClick={() => handleDelete(item.id, item.nombre)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
