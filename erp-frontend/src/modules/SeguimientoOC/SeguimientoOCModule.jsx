@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag } from 'lucide-react';
+import { Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
@@ -57,6 +57,7 @@ const useArsenalAutoSuggest = (codigo) => {
 
 const SeguimientoOCModule = () => {
   const [view, setView] = useState('list'); // 'list' | 'create'
+  const [activeDept, setActiveDept] = useState('drogueria'); // 'drogueria' | 'dental'
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [ocs, setOcs] = useState([]);
@@ -316,170 +317,251 @@ const SeguimientoOCModule = () => {
                 <button onClick={cargarOcs} className="btn-secondary" style={{ padding: '10px 16px' }} title="Recargar">
                   <RefreshCw size={18} />
                 </button>
-                <button onClick={() => setView('create')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Plus size={20} /> Crear Nueva OC
-                </button>
+                {activeDept === 'drogueria' && (
+                  <button onClick={() => setView('create')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Plus size={20} /> Crear Nueva OC
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Quick Stats Panel */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-              gap: '15px', 
-              marginBottom: '30px' 
-            }}>
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '15px 20px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: '500' }}>TOTAL OC ACTIVAS</span>
-                <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0' }}>{ocs.length}</h3>
-              </div>
-              <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: '500' }}>ENVIADAS</span>
-                <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#3b82f6' }}>
-                  {ocs.filter(o => o.estado === 'Enviada').length}
-                </h3>
-              </div>
-              <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: '500' }}>ACEPTADAS</span>
-                <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#10b981' }}>
-                  {ocs.filter(o => o.estado === 'Aceptada').length}
-                </h3>
-              </div>
-              <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: '500' }}>ATRASADAS (ALERTA ROJA)</span>
-                <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#ef4444' }}>
-                  {ocs.filter(o => checkPlazos(o).isExpired).length}
-                </h3>
-              </div>
+            {/* Tabs Selector */}
+            <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '1px', marginBottom: '30px' }}>
+              <button
+                onClick={() => setActiveDept('drogueria')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  background: activeDept === 'drogueria' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                  color: activeDept === 'drogueria' ? '#3b82f6' : '#94a3b8',
+                  border: 'none',
+                  borderBottom: activeDept === 'drogueria' ? '2px solid #3b82f6' : '2px solid transparent',
+                  borderRadius: '8px 8px 0 0',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <Truck size={18} /> Droguería
+              </button>
+              <button
+                onClick={() => setActiveDept('dental')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  background: activeDept === 'dental' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                  color: activeDept === 'dental' ? '#3b82f6' : '#94a3b8',
+                  border: 'none',
+                  borderBottom: activeDept === 'dental' ? '2px solid #3b82f6' : '2px solid transparent',
+                  borderRadius: '8px 8px 0 0',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <Activity size={18} /> Dental
+              </button>
             </div>
 
-            {/* Search filter bar */}
-            <div style={{ position: 'relative', marginBottom: '25px' }}>
-              <Search style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Buscar por número de OC, proveedor..."
-                className="input-field"
-                style={{ paddingLeft: '48px', width: '100%' }}
-              />
-            </div>
+            {activeDept === 'drogueria' ? (
+              <>
+                {/* Quick Stats Panel */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+                  gap: '15px', 
+                  marginBottom: '30px' 
+                }}>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '15px 20px' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: '500' }}>TOTAL OC ACTIVAS</span>
+                    <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0' }}>{ocs.length}</h3>
+                  </div>
+                  <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: '500' }}>ENVIADAS</span>
+                    <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#3b82f6' }}>
+                      {ocs.filter(o => o.estado === 'Enviada').length}
+                    </h3>
+                  </div>
+                  <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: '500' }}>ACEPTADAS</span>
+                    <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#10b981' }}>
+                      {ocs.filter(o => o.estado === 'Aceptada').length}
+                    </h3>
+                  </div>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: '500' }}>ATRASADAS (ALERTA ROJA)</span>
+                    <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#ef4444' }}>
+                      {ocs.filter(o => checkPlazos(o).isExpired).length}
+                    </h3>
+                  </div>
+                </div>
 
-            {/* List Table */}
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 10px auto' }} />
-                Cargando Órdenes de Compra...
-              </div>
-            ) : filteredOcs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', border: '1px dashed var(--border-color)', borderRadius: '12px' }}>
-                <ShoppingBag size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
-                No se encontraron Órdenes de Compra registradas.
-              </div>
-            ) : (
-              <div className="table-container">
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
-                      <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>N° OC</th>
-                      <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>TIPO</th>
-                      <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>PROVEEDOR / RUT</th>
-                      <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ARTÍCULOS</th>
-                      <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>FECHAS CLAVE</th>
-                      <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ESTADO OC</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOcs.map(oc => {
-                      const plazos = checkPlazos(oc);
-                      const rowStyle = plazos.isExpired ? {
-                        background: 'rgba(239, 68, 68, 0.04)',
-                        borderLeft: '4px solid #ef4444',
-                        transition: 'all 0.3s ease'
-                      } : {
-                        borderLeft: '4px solid transparent',
-                        transition: 'all 0.3s ease'
-                      };
+                {/* Search filter bar */}
+                <div style={{ position: 'relative', marginBottom: '25px' }}>
+                  <Search style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Buscar por número de OC, proveedor..."
+                    className="input-field"
+                    style={{ paddingLeft: '48px', width: '100%' }}
+                  />
+                </div>
 
-                      return (
-                        <tr key={oc.id} style={{ 
-                          borderBottom: '1px solid var(--border-color)', 
-                          ...rowStyle
-                        }} className="table-row">
-                          <td style={{ padding: '16px', fontWeight: '700', fontSize: '1rem', color: '#3b82f6' }}>
-                            {oc.numero_oc}
-                          </td>
-                          <td style={{ padding: '16px' }}>
-                            <span style={{ 
-                              padding: '4px 8px', 
-                              borderRadius: '6px', 
-                              fontSize: '0.8rem', 
-                              fontWeight: '700',
-                              background: oc.tipo_oc === 'AG' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(139, 92, 246, 0.15)',
-                              color: oc.tipo_oc === 'AG' ? '#3b82f6' : '#a78bfa'
-                            }}>
-                              {oc.tipo_oc}
-                            </span>
-                          </td>
-                          <td style={{ padding: '16px' }}>
-                            <div style={{ fontWeight: '600' }}>{oc.proveedor}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>RUT: {oc.rut_provider || oc.rut_proveedor || 'No registrado'}</div>
-                          </td>
-                          <td style={{ padding: '16px', maxWidth: '250px' }}>
-                            <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {oc.ordenes_compra_articulos?.map((art, idx) => (
-                                <span key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                  Cód: {art.codigo_articulo} <strong style={{ color: '#10b981' }}>x{art.cantidad}</strong>
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td style={{ padding: '16px', fontSize: '0.85rem' }}>
-                            <div>Envío: {formatDate(oc.fecha_envio)}</div>
-                            {oc.fecha_aceptacion && (
-                              <div style={{ color: '#10b981', marginTop: '2px' }}>
-                                Acept.: {formatDate(oc.fecha_aceptacion)}
-                              </div>
-                            )}
-                            {plazos.isExpired && (
-                              <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontWeight: '600' }}>
-                                <AlertTriangle size={14} /> {plazos.alertMessage}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: '16px' }}>
-                            <select 
-                              value={oc.estado} 
-                              onChange={(e) => handleUpdateEstado(oc.id, e.target.value)}
-                              className="input-field"
-                              style={{ 
-                                padding: '6px 12px', 
-                                fontSize: '0.85rem', 
-                                fontWeight: '600',
-                                width: 'auto',
-                                cursor: 'pointer',
-                                background: oc.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.1)' : 
-                                            oc.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.1)' : 
-                                            oc.estado === 'Cancelada' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                                color: oc.estado === 'Enviada' ? '#3b82f6' : 
-                                       oc.estado === 'Aceptada' ? '#10b981' : 
-                                       oc.estado === 'Cancelada' ? '#ef4444' : '#f59e0b',
-                                border: '1px solid rgba(255,255,255,0.1)'
-                              }}
-                            >
-                              <option value="Enviada" style={{ background: '#1e293b' }}>Enviada</option>
-                              <option value="Aceptada" style={{ background: '#1e293b' }}>Aceptada</option>
-                              <option value="Cancelada" style={{ background: '#1e293b' }}>Cancelada</option>
-                              <option value="Aceptada con multa" style={{ background: '#1e293b' }}>Aceptada con multa (Atrasada)</option>
-                            </select>
-                          </td>
+                {/* List Table */}
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 10px auto' }} />
+                    Cargando Órdenes de Compra...
+                  </div>
+                ) : filteredOcs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', border: '1px dashed var(--border-color)', borderRadius: '12px' }}>
+                    <ShoppingBag size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
+                    No se encontraron Órdenes de Compra registradas.
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
+                          <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>N° OC</th>
+                          <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>TIPO</th>
+                          <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>PROVEEDOR / RUT</th>
+                          <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ARTÍCULOS</th>
+                          <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>FECHAS CLAVE</th>
+                          <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ESTADO OC</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {filteredOcs.map(oc => {
+                          const plazos = checkPlazos(oc);
+                          const rowStyle = plazos.isExpired ? {
+                            background: 'rgba(239, 68, 68, 0.04)',
+                            borderLeft: '4px solid #ef4444',
+                            transition: 'all 0.3s ease'
+                          } : {
+                            borderLeft: '4px solid transparent',
+                            transition: 'all 0.3s ease'
+                          };
+
+                          return (
+                            <tr key={oc.id} style={{ 
+                              borderBottom: '1px solid var(--border-color)', 
+                              ...rowStyle
+                            }} className="table-row">
+                              <td style={{ padding: '16px', fontWeight: '700', fontSize: '1rem', color: '#3b82f6' }}>
+                                {oc.numero_oc}
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                <span style={{ 
+                                  padding: '4px 8px', 
+                                  borderRadius: '6px', 
+                                  fontSize: '0.8rem', 
+                                  fontWeight: '700',
+                                  background: oc.tipo_oc === 'AG' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(139, 92, 246, 0.15)',
+                                  color: oc.tipo_oc === 'AG' ? '#3b82f6' : '#a78bfa'
+                                }}>
+                                  {oc.tipo_oc}
+                                </span>
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                <div style={{ fontWeight: '600' }}>{oc.proveedor}</div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>RUT: {oc.rut_provider || oc.rut_proveedor || 'No registrado'}</div>
+                              </td>
+                              <td style={{ padding: '16px', maxWidth: '250px' }}>
+                                <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  {oc.ordenes_compra_articulos?.map((art, idx) => (
+                                    <span key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                      Cód: {art.codigo_articulo} <strong style={{ color: '#10b981' }}>x{art.cantidad}</strong>
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={{ padding: '16px', fontSize: '0.85rem' }}>
+                                <div>Envío: {formatDate(oc.fecha_envio)}</div>
+                                {oc.fecha_aceptacion && (
+                                  <div style={{ color: '#10b981', marginTop: '2px' }}>
+                                    Acept.: {formatDate(oc.fecha_aceptacion)}
+                                  </div>
+                                )}
+                                {plazos.isExpired && (
+                                  <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontWeight: '600' }}>
+                                    <AlertTriangle size={14} /> {plazos.alertMessage}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                <select 
+                                  value={oc.estado} 
+                                  onChange={(e) => handleUpdateEstado(oc.id, e.target.value)}
+                                  className="input-field"
+                                  style={{ 
+                                    padding: '6px 12px', 
+                                    fontSize: '0.85rem', 
+                                    fontWeight: '600',
+                                    width: 'auto',
+                                    cursor: 'pointer',
+                                    background: oc.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.1)' : 
+                                                oc.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.1)' : 
+                                                oc.estado === 'Cancelada' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                                    color: oc.estado === 'Enviada' ? '#3b82f6' : 
+                                           oc.estado === 'Aceptada' ? '#10b981' : 
+                                           oc.estado === 'Cancelada' ? '#ef4444' : '#f59e0b',
+                                    border: '1px solid rgba(255,255,255,0.1)'
+                                  }}
+                                >
+                                  <option value="Enviada" style={{ background: '#1e293b' }}>Enviada</option>
+                                  <option value="Aceptada" style={{ background: '#1e293b' }}>Aceptada</option>
+                                  <option value="Cancelada" style={{ background: '#1e293b' }}>Cancelada</option>
+                                  <option value="Aceptada con multa" style={{ background: '#1e293b' }}>Aceptada con multa (Atrasada)</option>
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <motion.div
+                key="dental-placeholder"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                style={{ 
+                  padding: '60px 20px', 
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '20px',
+                  maxWidth: '500px',
+                  margin: '40px auto'
+                }}
+              >
+                <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '50%', border: '1px dashed rgba(59, 130, 246, 0.3)' }}>
+                  <Activity size={44} color="#3b82f6" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '8px' }}>Seguimiento Dental</h3>
+                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: '1.6', margin: 0 }}>
+                    Este panel permitirá gestionar el seguimiento de Órdenes de Compra del área odontológica.
+                  </p>
+                  <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '12px', fontStyle: 'italic' }}>
+                    Estado: En desarrollo. Próximamente se replicarán las funcionalidades operacionales de Droguería.
+                  </p>
+                </div>
+              </motion.div>
             )}
           </motion.div>
         ) : (
