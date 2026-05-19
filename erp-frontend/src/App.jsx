@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck } from 'lucide-react';
+import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
 import RevisionBodegaModule from './modules/RevisionBodega/RevisionBodegaModule';
 import ConfigModule from './modules/Config/ConfigModule';
+import SeguimientoOCModule from './modules/SeguimientoOC/SeguimientoOCModule';
 
 const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
   const location = useLocation();
@@ -79,6 +80,7 @@ const AppContent = () => {
         <div style={{ flex: 1 }}>
           <SidebarItem icon={FilePlus} label="Pendientes/Diferencias" to="/" onClick={closeSidebar} />
           <SidebarItem icon={ClipboardCheck} label="Revisión Bodega" to="/revision" onClick={closeSidebar} />
+          <SidebarItem icon={Truck} label="Seguimiento OC" to="/seguimiento-oc" onClick={closeSidebar} />
           <SidebarItem icon={PackageSearch} label="Inventario" to="/inventario" onClick={closeSidebar} />
           <SidebarItem icon={Settings} label="Configuración" to="/config" onClick={closeSidebar} />
         </div>
@@ -111,6 +113,7 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<PendientesDiferenciasModule />} />
           <Route path="/revision" element={<RevisionBodegaModule />} />
+          <Route path="/seguimiento-oc" element={<SeguimientoOCModule />} />
           <Route path="/dashboard" element={<div style={{ padding: '20px' }}>Próximamente: Dashboard de Jefatura</div>} />
           <Route path="/inventario" element={<div style={{ padding: '20px' }}>Módulo de Inventario en desarrollo...</div>} />
           <Route path="/config" element={<ConfigModule />} />
