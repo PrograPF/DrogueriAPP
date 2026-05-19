@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, 
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
-  Activity, ClipboardList 
+  Activity, ClipboardList, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -67,10 +67,14 @@ const SeguimientoOCModule = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [ocs, setOcs] = useState([]);
   
+  // Modal State
+  const [selectedOcForModal, setSelectedOcForModal] = useState(null);
+
   // Articles catalog mapping for instant code -> name translation
   const [articulosCatalog, setArticulosCatalog] = useState({});
 
   // Reception sub-tab state
+  const [recepcionSearchQuery, setRecepcionSearchQuery] = useState('');
   const [selectedOcIdForRecepcion, setSelectedOcIdForRecepcion] = useState('');
   const [recepcionQuantities, setRecepcionQuantities] = useState({}); // { [articleId]: incomingQty }
   const [savingRecepcion, setSavingRecepcion] = useState(false);
@@ -156,6 +160,16 @@ const SeguimientoOCModule = () => {
 
       if (error) throw error;
       alert('Estado de la OC actualizado correctamente.');
+      
+      // Sync local modal state if currently open
+      if (selectedOcForModal && selectedOcForModal.id === ocId) {
+        setSelectedOcForModal(prev => ({
+          ...prev,
+          estado: nuevoEstado,
+          fecha_aceptacion: nuevoEstado === 'Aceptada' ? new Date().toISOString() : prev.fecha_aceptacion
+        }));
+      }
+
       cargarOcs();
     } catch (err) {
       console.error('Error al actualizar estado:', err);
@@ -421,17 +435,32 @@ const SeguimientoOCModule = () => {
    * lo cual incrementará de forma automatizada los valores de 'cantidad_recepcionada'.
    */
 
-  // Filtered OCs
+  // Filtered OCs for Tracking Table
   const filteredOcs = ocs.filter(oc => {
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
     return (
       oc.numero_oc.toLowerCase().includes(q) ||
       oc.proveedor.toLowerCase().includes(q)
     );
   });
 
-  // Active OCs suitable for receiving (excluding completely cancelled ones)
-  const activeOcsForRecepcion = ocs.filter(o => o.estado !== 'Cancelada');
+  // Filtered Active OCs for Recepcion Search Input (incorporates deep search: OC #, Proveedor, or Article Cód/Desc)
+  const filteredActiveOcsForRecepcion = ocs.filter(oc => {
+    if (oc.estado === 'Cancelada') return false; // Filter out completely cancelled ones
+    const q = recepcionSearchQuery.toLowerCase().trim();
+    if (!q) return true; // Show all active OCs if query is empty
+
+    const matchesOc = oc.numero_oc.toLowerCase().includes(q);
+    const matchesProv = oc.proveedor.toLowerCase().includes(q);
+    const matchesArt = (oc.ordenes_compra_articulos || []).some(art => {
+      const artCode = (art.codigo_articulo || '').toLowerCase();
+      const artName = (articulosCatalog[art.codigo_articulo] || '').toLowerCase();
+      return artCode.includes(q) || artName.includes(q);
+    });
+
+    return matchesOc || matchesProv || matchesArt;
+  });
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px' }}>
@@ -471,6 +500,7 @@ const SeguimientoOCModule = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
+                  alignContent: 'center',
                   gap: '8px',
                   padding: '12px 24px',
                   background: activeDept === 'drogueria' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
@@ -491,6 +521,7 @@ const SeguimientoOCModule = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
+                  alignContent: 'center',
                   gap: '8px',
                   padding: '12px 24px',
                   background: activeDept === 'dental' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
@@ -623,7 +654,7 @@ const SeguimientoOCModule = () => {
                       </button>
                     </div>
 
-                    {/* List Table */}
+                    {/* List Table (Executively Clean - Hidden TIPO and ARTICULOS columns) */}
                     {loading ? (
                       <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                         <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 10px auto' }} />
@@ -640,9 +671,7 @@ const SeguimientoOCModule = () => {
                           <thead>
                             <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>N° OC</th>
-                              <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>TIPO</th>
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>PROVEEDOR / RUT</th>
-                              <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ARTÍCULOS</th>
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>FECHAS CLAVE</th>
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ESTADO OC</th>
                             </tr>
@@ -664,40 +693,30 @@ const SeguimientoOCModule = () => {
                                   borderBottom: '1px solid var(--border-color)', 
                                   ...rowStyle
                                 }} className="table-row">
-                                  <td style={{ padding: '16px', fontWeight: '700', fontSize: '1rem', color: '#3b82f6' }}>
-                                    {oc.numero_oc}
+                                  <td style={{ padding: '16px' }}>
+                                    <button 
+                                      onClick={() => setSelectedOcForModal(oc)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#3b82f6',
+                                        fontWeight: '700',
+                                        fontSize: '1rem',
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                        textDecoration: 'underline',
+                                        textAlign: 'left',
+                                        transition: 'color 0.2s'
+                                      }}
+                                      onMouseOver={(e) => e.target.style.color = '#60a5fa'}
+                                      onMouseOut={(e) => e.target.style.color = '#3b82f6'}
+                                    >
+                                      {oc.numero_oc}
+                                    </button>
                                   </td>
                                   <td style={{ padding: '16px' }}>
-                                    <span style={{ 
-                                      padding: '4px 8px', 
-                                      borderRadius: '6px', 
-                                      fontSize: '0.8rem', 
-                                      fontWeight: '700',
-                                      background: oc.tipo_oc === 'AG' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(139, 92, 246, 0.15)',
-                                      color: oc.tipo_oc === 'AG' ? '#3b82f6' : '#a78bfa'
-                                    }}>
-                                      {oc.tipo_oc}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '16px' }}>
-                                    <div style={{ fontWeight: '600' }}>{oc.proveedor}</div>
+                                    <div style={{ fontWeight: '600', color: '#f8fafc' }}>{oc.proveedor}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>RUT: {oc.rut_proveedor || 'No registrado'}</div>
-                                  </td>
-                                  <td style={{ padding: '16px', maxWidth: '250px' }}>
-                                    <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      {oc.ordenes_compra_articulos?.map((art, idx) => {
-                                        const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                                        return (
-                                          <span key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'block' }}>
-                                            <div style={{ fontWeight: '500', color: '#f8fafc', fontSize: '0.8rem' }}>{nombreArt}</div>
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
-                                              <span>Cód: {art.codigo_articulo}</span>
-                                              <span>Recibido: <strong style={{ color: art.cantidad_recepcionada >= art.cantidad ? '#10b981' : '#f59e0b' }}>{art.cantidad_recepcionada || 0} / {art.cantidad}</strong></span>
-                                            </div>
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
                                   </td>
                                   <td style={{ padding: '16px', fontSize: '0.85rem' }}>
                                     <div>Envío: {formatDate(oc.fecha_envio)}</div>
@@ -750,7 +769,7 @@ const SeguimientoOCModule = () => {
                     )}
                   </motion.div>
                 ) : (
-                  /* SUB-TAB 2: RECEPCIÓN Y ENTREGAS PARCIALES */
+                  /* SUB-TAB 2: RECEPCIÓN Y ENTREGAS PARCIALES (Multifilter Search, hidden Tipo and redundant Progress Bar) */
                   <motion.div
                     key="subtab-recepcion"
                     initial={{ opacity: 0, y: 10 }}
@@ -762,38 +781,86 @@ const SeguimientoOCModule = () => {
                         <ClipboardList size={22} /> Control de Recepciones de Bodega
                       </h3>
                       <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '0 0 20px 0', lineHeight: '1.5' }}>
-                        Seleccione una Orden de Compra para registrar la entrega física de los productos. Ingrese las cantidades parciales que han llegado en esta recepción. El sistema cambiará el estado de la OC a "Completada" de forma automática cuando todos los productos solicitados hayan ingresado.
+                        Busque la Orden de Compra por su número, por el nombre/RUT de su proveedor o por el código/descripción de cualquiera de sus artículos.
                       </p>
 
-                      {/* OC Selector */}
-                      <div style={{ maxWidth: '500px', marginBottom: '25px' }}>
-                        <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#f8fafc' }}>Seleccionar Orden de Compra Activa</label>
-                        <select
-                          value={selectedOcIdForRecepcion}
-                          onChange={(e) => {
-                            setSelectedOcIdForRecepcion(e.target.value);
-                            setRecepcionQuantities({});
-                          }}
-                          className="input-field"
-                          style={{ background: 'rgba(30, 41, 59, 0.5)', cursor: 'pointer' }}
-                        >
-                          <option value="">-- Seleccione una OC activa --</option>
-                          {activeOcsForRecepcion.map(oc => (
-                            <option key={oc.id} value={oc.id} style={{ background: '#1e293b' }}>
-                              {oc.numero_oc} - {oc.proveedor} ({oc.estado})
-                            </option>
-                          ))}
-                        </select>
+                      {/* Multifilter Live Search Bar */}
+                      <div style={{ marginBottom: '25px' }}>
+                        <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#f8fafc' }}>Buscar Orden de Compra Activa</label>
+                        <div style={{ position: 'relative', width: '100%', maxWidth: '600px' }}>
+                          <Search style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={18} />
+                          <input
+                            type="text"
+                            value={recepcionSearchQuery}
+                            onChange={(e) => setRecepcionSearchQuery(e.target.value)}
+                            placeholder="Buscar por N° de OC, proveedor, RUT, código o nombre de artículo..."
+                            className="input-field"
+                            style={{ paddingLeft: '44px', width: '100%' }}
+                          />
+                        </div>
+
+                        {/* Search Results selection panel */}
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                          gap: '12px', 
+                          marginTop: '15px', 
+                          maxHeight: '220px', 
+                          overflowY: 'auto', 
+                          padding: '6px',
+                          background: 'rgba(255, 255, 255, 0.01)',
+                          border: '1px solid rgba(255, 255, 255, 0.03)',
+                          borderRadius: '10px'
+                        }}>
+                          {filteredActiveOcsForRecepcion.length === 0 ? (
+                            <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: '0.85rem', padding: '20px', textAlign: 'center' }}>
+                              No se encontraron Órdenes de Compra activas coincidentes.
+                            </div>
+                          ) : (
+                            filteredActiveOcsForRecepcion.map(oc => {
+                              const isSelected = selectedOcIdForRecepcion === oc.id;
+                              return (
+                                <button
+                                  key={oc.id}
+                                  onClick={() => {
+                                    setSelectedOcIdForRecepcion(oc.id);
+                                    setRecepcionQuantities({});
+                                  }}
+                                  style={{
+                                    background: isSelected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                                    border: isSelected ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.06)',
+                                    borderRadius: '8px',
+                                    padding: '12px 16px',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    color: '#f8fafc',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px'
+                                  }}
+                                >
+                                  <div style={{ fontWeight: '700', fontSize: '0.95rem', color: isSelected ? '#10b981' : '#3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                    <span>{oc.numero_oc}</span>
+                                    <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: '#94a3b8' }}>{oc.estado}</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: '500' }}>{oc.proveedor}</div>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Artículos: {oc.ordenes_compra_articulos?.length || 0}</div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
 
-                      {/* Detail Panel of Selected OC */}
+                      {/* Detail Panel of Selected OC (Tipo DE OC removed completely!) */}
                       {(() => {
                         const selOc = ocs.find(o => o.id === selectedOcIdForRecepcion);
                         if (!selOc) {
                           return (
                             <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', border: '1px dashed var(--border-color)', borderRadius: '8px', background: 'rgba(255,255,255,0.005)' }}>
                               <Truck size={36} style={{ marginBottom: '10px', opacity: 0.3 }} />
-                              Seleccione una Orden de Compra para desplegar los artículos y registrar ingresos.
+                              Seleccione una Orden de Compra de los resultados de búsqueda para desplegar los artículos y registrar ingresos.
                             </div>
                           );
                         }
@@ -809,7 +876,7 @@ const SeguimientoOCModule = () => {
                               padding: '20px'
                             }}
                           >
-                            {/* OC Summary Info */}
+                            {/* OC Summary Info (Tipo de OC completely removed!) */}
                             <div style={{ 
                               display: 'grid', 
                               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -823,10 +890,6 @@ const SeguimientoOCModule = () => {
                                 <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Proveedor</span>
                                 <strong style={{ color: '#f8fafc' }}>{selOc.proveedor}</strong>
                                 <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.8rem', marginTop: '2px' }}>RUT: {selOc.rut_proveedor || 'No registrado'}</span>
-                              </div>
-                              <div>
-                                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Tipo de OC</span>
-                                <strong style={{ color: '#3b82f6' }}>{selOc.tipo_oc}</strong>
                               </div>
                               <div>
                                 <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Estado de OC</span>
@@ -853,17 +916,16 @@ const SeguimientoOCModule = () => {
                               </div>
                             </div>
 
-                            {/* Articles Grid / Table for Partial Reception */}
+                            {/* Articles Grid / Table for Partial Reception (Redundant progress column removed!) */}
                             <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '15px', color: '#f8fafc' }}>Artículos por Recepcionar</h4>
                             <div className="table-container" style={{ marginBottom: '25px', overflowX: 'auto' }}>
                               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.8rem' }}>
-                                    <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO</th>
-                                    <th style={{ padding: '10px 12px', color: '#94a3b8', width: '120px' }}>SOLICITADO</th>
-                                    <th style={{ padding: '10px 12px', color: '#94a3b8', width: '160px' }}>RECIBIDO ACUMULADO</th>
-                                    <th style={{ padding: '10px 12px', color: '#94a3b8' }}>PROGRESO</th>
-                                    <th style={{ padding: '10px 12px', color: '#94a3b8', width: '140px' }}>NUEVA RECEPCIÓN</th>
+                                    <th style={{ padding: '12px', color: '#94a3b8' }}>ARTÍCULO</th>
+                                    <th style={{ padding: '12px', color: '#94a3b8', width: '150px' }}>SOLICITADO</th>
+                                    <th style={{ padding: '12px', color: '#94a3b8', width: '220px' }}>RECIBIDO ACUMULADO</th>
+                                    <th style={{ padding: '12px', color: '#94a3b8', width: '160px' }}>NUEVA RECEPCIÓN</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -871,7 +933,7 @@ const SeguimientoOCModule = () => {
                                     const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
                                     const cantSolicitada = art.cantidad || 1;
                                     const cantRecibida = art.cantidad_recepcionada || 0;
-                                    const pct = Math.min(Math.round((cantRecibida / cantSolicitada) * 100), 100);
+                                    const isComplete = cantRecibida >= cantSolicitada;
 
                                     return (
                                       <tr key={art.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
@@ -879,41 +941,21 @@ const SeguimientoOCModule = () => {
                                           <div style={{ fontWeight: '600', color: '#f8fafc' }}>{nombreArt}</div>
                                           <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Código: {art.codigo_articulo}</div>
                                         </td>
-                                        <td style={{ padding: '12px', fontWeight: '600' }}>
+                                        <td style={{ padding: '12px', fontWeight: '600', color: '#cbd5e1' }}>
                                           {cantSolicitada} uds.
                                         </td>
                                         <td style={{ padding: '12px' }}>
                                           <span style={{ 
                                             fontWeight: '700', 
-                                            color: cantRecibida >= cantSolicitada ? '#10b981' : '#f59e0b',
-                                            background: cantRecibida >= cantSolicitada ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
-                                            padding: '2px 6px',
-                                            borderRadius: '4px'
+                                            color: isComplete ? '#10b981' : '#f59e0b',
+                                            background: isComplete ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                                            padding: '4px 8px',
+                                            borderRadius: '6px',
+                                            border: isComplete ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(245,158,11,0.15)',
+                                            display: 'inline-block'
                                           }}>
                                             {cantRecibida} / {cantSolicitada}
                                           </span>
-                                        </td>
-                                        <td style={{ padding: '12px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', minWidth: '100px' }}>
-                                            <div style={{ 
-                                              flex: 1, 
-                                              height: '8px', 
-                                              background: 'rgba(255,255,255,0.05)', 
-                                              borderRadius: '4px',
-                                              border: '1px solid rgba(255,255,255,0.08)',
-                                              overflow: 'hidden',
-                                              position: 'relative'
-                                            }}>
-                                              <div style={{ 
-                                                width: `${pct}%`, 
-                                                height: '100%', 
-                                                background: pct >= 100 ? '#10b981' : 'linear-gradient(90deg, #3b82f6, #10b981)',
-                                                borderRadius: '4px',
-                                                transition: 'width 0.4s ease-out'
-                                              }} />
-                                            </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', width: '32px', textAlign: 'right', fontWeight: '600' }}>{pct}%</span>
-                                          </div>
                                         </td>
                                         <td style={{ padding: '12px' }}>
                                           <input
@@ -929,7 +971,7 @@ const SeguimientoOCModule = () => {
                                               borderColor: (recepcionQuantities[art.id] && parseInt(recepcionQuantities[art.id]) > 0) ? '#10b981' : 'rgba(255,255,255,0.1)'
                                             }}
                                             min="0"
-                                            disabled={cantRecibida >= cantSolicitada}
+                                            disabled={isComplete}
                                           />
                                         </td>
                                       </tr>
@@ -1155,6 +1197,231 @@ const SeguimientoOCModule = () => {
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP DETAIL MODAL (Overlay Dialog) */}
+      <AnimatePresence>
+        {selectedOcForModal && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}
+            onClick={() => setSelectedOcForModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              style={{
+                background: '#1e293b',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '700px',
+                padding: '28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+                position: 'relative'
+              }}
+              onClick={(e) => e.stopPropagation()} // Prevent close on clicking inside the card
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setSelectedOcForModal(null)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '50%',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.color = '#f8fafc';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.color = '#94a3b8';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              {/* Title & Badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '10px' }}>
+                  <Truck size={24} color="#3b82f6" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    Orden de Compra: {selectedOcForModal.numero_oc}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Details Info Grid */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                gap: '15px', 
+                background: 'rgba(255,255,255,0.01)',
+                border: '1px solid rgba(255,255,255,0.04)',
+                borderRadius: '10px',
+                padding: '16px',
+                marginBottom: '25px',
+                fontSize: '0.9rem'
+              }}>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Proveedor</span>
+                  <strong style={{ color: '#f8fafc', fontSize: '0.95rem' }}>{selectedOcForModal.proveedor}</strong>
+                  <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.8rem', marginTop: '2px' }}>RUT: {selectedOcForModal.rut_proveedor || 'No registrado'}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Estado de OC</span>
+                  <span style={{ 
+                    padding: '2px 8px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: '700',
+                    background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
+                                selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
+                                selectedOcForModal.estado === 'Completada' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
+                    color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
+                           selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
+                           selectedOcForModal.estado === 'Completada' ? '#10b981' : '#f59e0b',
+                    display: 'inline-block',
+                    marginTop: '4px'
+                  }}>
+                    {selectedOcForModal.estado}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Fecha de Envío</span>
+                  <strong style={{ color: '#cbd5e1' }}>{formatDate(selectedOcForModal.fecha_envio)}</strong>
+                  {selectedOcForModal.fecha_aceptacion && (
+                    <span style={{ display: 'block', color: '#10b981', fontSize: '0.8rem', marginTop: '2px' }}>
+                      Aceptada: {formatDate(selectedOcForModal.fecha_aceptacion)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Alert Message inside Modal (Plazos Atrasos) */}
+              {(() => {
+                const plazos = checkPlazos(selectedOcForModal);
+                if (!plazos.isExpired) return null;
+                return (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '10px', 
+                    background: 'rgba(239, 68, 68, 0.08)', 
+                    border: '1px solid rgba(239, 68, 68, 0.2)', 
+                    padding: '12px 16px', 
+                    borderRadius: '8px', 
+                    color: '#f87171', 
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    marginBottom: '25px'
+                  }}>
+                    <AlertTriangle size={18} />
+                    {plazos.alertMessage}
+                  </div>
+                );
+              })()}
+
+              {/* Modal Articles Table */}
+              <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '12px', color: '#f8fafc' }}>Detalle de Artículos</h4>
+              <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.8rem' }}>
+                      <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO</th>
+                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '110px' }}>SOLICITADO</th>
+                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '110px' }}>RECIBIDO</th>
+                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '120px' }}>ESTADO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
+                      const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
+                      const cantSol = art.cantidad || 0;
+                      const cantRec = art.cantidad_recepcionada || 0;
+                      
+                      let deliveryState = 'Pendiente';
+                      let badgeBg = 'rgba(255,255,255,0.05)';
+                      let badgeColor = '#94a3b8';
+
+                      if (cantRec > 0) {
+                        if (cantRec >= cantSol) {
+                          deliveryState = 'Completa';
+                          badgeBg = 'rgba(16, 185, 129, 0.15)';
+                          badgeColor = '#10b981';
+                        } else {
+                          deliveryState = 'Parcial';
+                          badgeBg = 'rgba(245, 158, 11, 0.15)';
+                          badgeColor = '#f59e0b';
+                        }
+                      }
+
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
+                          <td style={{ padding: '10px 12px' }}>
+                            <div style={{ fontWeight: '600', color: '#f8fafc' }}>{nombreArt}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Cód: {art.codigo_articulo}</div>
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantSol} uds.</td>
+                          <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantRec} uds.</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span style={{ 
+                              padding: '2px 8px', 
+                              borderRadius: '4px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '700',
+                              background: badgeBg,
+                              color: badgeColor
+                            }}>
+                              {deliveryState}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Close Bottom Button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '25px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+                <button 
+                  onClick={() => setSelectedOcForModal(null)} 
+                  className="btn-secondary" 
+                  style={{ padding: '8px 20px', fontSize: '0.85rem' }}
+                >
+                  Cerrar Ventana
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
