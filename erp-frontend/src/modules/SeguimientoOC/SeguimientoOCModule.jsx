@@ -18,6 +18,46 @@ const getTodayString = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// Helper to get today's date formatted as dd/mm/yyyy
+const getTodayDisplayString = () => {
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, '0');
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const yyyy = today.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+// Check if DD/MM/YYYY is valid
+const isValidDateStr = (str) => {
+  if (!str || str.length !== 10) return false;
+  const parts = str.split('/');
+  if (parts.length !== 3) return false;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (year < 1900 || year > 2100) return false;
+  return true;
+};
+
+// Parse DD/MM/YYYY to ISO
+const parseDisplayDate = (str) => {
+  if (!str) return new Date().toISOString();
+  const parts = str.split('/');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // 0-indexed month
+    const year = parseInt(parts[2], 10);
+    const d = new Date(year, month, day, 12, 0, 0); // Noon to prevent timezone shifts
+    if (!isNaN(d.getTime())) {
+      return d.toISOString();
+    }
+  }
+  return new Date().toISOString();
+};
+
 // Custom hook local to quickly check arsenal descriptions
 const useArsenalAutoSuggest = (codigo) => {
   const [nombre, setNombre] = useState('');
@@ -96,8 +136,28 @@ const SeguimientoOCModule = () => {
     tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1'
     dias_plazo_atraso: 4, // Default to 4
     estado: 'Enviada', // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Completada'
-    fecha_envio: getTodayString() // Manual Date Selector State
+    fecha_envio_display: getTodayDisplayString() // Chilean formatted date: DD/MM/YYYY
   });
+
+  const handleDateDisplayChange = (e) => {
+    const val = e.target.value;
+    // Keep only digits and slash
+    let clean = val.replace(/[^0-9]/g, '');
+    if (clean.length > 8) clean = clean.substring(0, 8);
+    
+    let formatted = '';
+    if (clean.length > 0) {
+      formatted += clean.substring(0, 2);
+    }
+    if (clean.length > 2) {
+      formatted += '/' + clean.substring(2, 4);
+    }
+    if (clean.length > 4) {
+      formatted += '/' + clean.substring(4, 8);
+    }
+    
+    setFormData(prev => ({ ...prev, fecha_envio_display: formatted }));
+  };
 
   // Dynamic articles rows state
   const [articulosForm, setArticulosForm] = useState([
@@ -245,8 +305,13 @@ const SeguimientoOCModule = () => {
 
   // Save the OC and create new items if necessary
   const handleSaveOC = async () => {
-    if (!formData.numero_oc.trim() || !formData.proveedor.trim() || !formData.fecha_envio) {
+    if (!formData.numero_oc.trim() || !formData.proveedor.trim() || !formData.fecha_envio_display) {
       alert('Por favor complete el Número de OC, Proveedor y Fecha de Envío.');
+      return;
+    }
+
+    if (!isValidDateStr(formData.fecha_envio_display)) {
+      alert('Por favor ingrese una fecha válida en formato Día/Mes/Año (DD/MM/YYYY). Ejemplo: 19/05/2026');
       return;
     }
 
@@ -289,7 +354,7 @@ const SeguimientoOCModule = () => {
         tipo_oc: formData.tipo_oc,
         dias_plazo_atraso: formData.tipo_oc === 'AG' ? 4 : parseInt(formData.dias_plazo_atraso),
         estado: formData.estado,
-        fecha_envio: new Date(formData.fecha_envio + 'T12:00:00').toISOString() // Neutral timezone shift prevention
+        fecha_envio: parseDisplayDate(formData.fecha_envio_display)
       };
 
       if (formData.estado === 'Aceptada') {
@@ -328,7 +393,7 @@ const SeguimientoOCModule = () => {
         tipo_oc: 'AG',
         dias_plazo_atraso: 4,
         estado: 'Enviada',
-        fecha_envio: getTodayString()
+        fecha_envio_display: getTodayDisplayString()
       });
       setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
       setView('list');
@@ -1155,16 +1220,20 @@ const SeguimientoOCModule = () => {
                     className="input-field"
                   />
                 </div>
-                {/* Manual date selector input field */}
+                {/* Manual date selector input field - Forcing DD/MM/YYYY */}
                 <div>
                   <label style={labelStyle}><Calendar size={16} /> Fecha de Envío</label>
                   <input
-                    type="date"
-                    value={formData.fecha_envio}
-                    onChange={e => setFormData(prev => ({ ...prev, fecha_envio: e.target.value }))}
+                    type="text"
+                    value={formData.fecha_envio_display}
+                    onChange={handleDateDisplayChange}
+                    placeholder="DD/MM/YYYY"
                     className="input-field"
-                    style={{ colorScheme: 'dark', cursor: 'pointer' }}
+                    style={{ letterSpacing: '0.05em' }}
                   />
+                  <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Formato: Día/Mes/Año (ej: 19/05/2026)
+                  </small>
                 </div>
               </div>
 
