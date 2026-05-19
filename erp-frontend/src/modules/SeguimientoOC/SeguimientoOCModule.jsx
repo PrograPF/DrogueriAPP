@@ -9,6 +9,15 @@ import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
 import { formatDate } from '../../utils/dateFormatter';
 
+// Helper to get today's date formatted as yyyy-MM-dd
+const getTodayString = () => {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 // Custom hook local to quickly check arsenal descriptions
 const useArsenalAutoSuggest = (codigo) => {
   const [nombre, setNombre] = useState('');
@@ -86,7 +95,8 @@ const SeguimientoOCModule = () => {
     rut_proveedor: '',
     tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1'
     dias_plazo_atraso: 4, // Default to 4
-    estado: 'Enviada' // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Completada'
+    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Completada'
+    fecha_envio: getTodayString() // Manual Date Selector State
   });
 
   // Dynamic articles rows state
@@ -177,6 +187,38 @@ const SeguimientoOCModule = () => {
     }
   };
 
+  // Delete OC function
+  const handleDeleteOC = async (id, numeroOc) => {
+    if (window.confirm(`¿Está seguro de eliminar la Orden de Compra "${numeroOc}"? Se eliminarán también todos sus artículos asociados de forma permanente.`)) {
+      setLoading(true);
+      try {
+        // 1. Delete associated articles
+        const { error: errItems } = await supabase
+          .from('ordenes_compra_articulos')
+          .delete()
+          .eq('oc_id', id);
+
+        if (errItems) throw errItems;
+
+        // 2. Delete parent OC
+        const { error: errOc } = await supabase
+          .from('ordenes_compra')
+          .delete()
+          .eq('id', id);
+
+        if (errOc) throw errOc;
+
+        alert('Orden de Compra eliminada correctamente.');
+        cargarOcs();
+      } catch (err) {
+        console.error('Error al eliminar OC:', err);
+        alert('Error al eliminar: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   // Add a new row to article sub-form
   const handleAddRow = () => {
     setArticulosForm(prev => [
@@ -203,8 +245,8 @@ const SeguimientoOCModule = () => {
 
   // Save the OC and create new items if necessary
   const handleSaveOC = async () => {
-    if (!formData.numero_oc.trim() || !formData.proveedor.trim()) {
-      alert('Por favor complete el Número de OC y Proveedor.');
+    if (!formData.numero_oc.trim() || !formData.proveedor.trim() || !formData.fecha_envio) {
+      alert('Por favor complete el Número de OC, Proveedor y Fecha de Envío.');
       return;
     }
 
@@ -239,7 +281,7 @@ const SeguimientoOCModule = () => {
         }
       }
 
-      // 2. Insert parent OC
+      // 2. Insert parent OC (with manual date selection support)
       const ocInsert = {
         numero_oc: formData.numero_oc.trim(),
         proveedor: formData.proveedor.trim(),
@@ -247,7 +289,7 @@ const SeguimientoOCModule = () => {
         tipo_oc: formData.tipo_oc,
         dias_plazo_atraso: formData.tipo_oc === 'AG' ? 4 : parseInt(formData.dias_plazo_atraso),
         estado: formData.estado,
-        fecha_envio: new Date().toISOString()
+        fecha_envio: new Date(formData.fecha_envio + 'T12:00:00').toISOString() // Neutral timezone shift prevention
       };
 
       if (formData.estado === 'Aceptada') {
@@ -285,7 +327,8 @@ const SeguimientoOCModule = () => {
         rut_proveedor: '',
         tipo_oc: 'AG',
         dias_plazo_atraso: 4,
-        estado: 'Enviada'
+        estado: 'Enviada',
+        fecha_envio: getTodayString()
       });
       setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
       setView('list');
@@ -426,15 +469,6 @@ const SeguimientoOCModule = () => {
     }
   };
 
-  /**
-   * FUTURE INTEGRATION NOTE:
-   * Eventualmente, desde el módulo de Revisión de Bodega, se enviará una solicitud automática
-   * con las cantidades recepcionadas y revisadas de la OC "X".
-   * Para implementar esta lógica, se puede habilitar una tabla intermedia de solicitudes ('recepciones_pendientes_aprobacion')
-   * o un endpoint RPC. El usuario recibirá una notificación aquí para aceptar o rechazar la solicitud, 
-   * lo cual incrementará de forma automatizada los valores de 'cantidad_recepcionada'.
-   */
-
   // Filtered OCs for Tracking Table
   const filteredOcs = ocs.filter(oc => {
     const q = searchQuery.toLowerCase().trim();
@@ -445,7 +479,7 @@ const SeguimientoOCModule = () => {
     );
   });
 
-  // Filtered Active OCs for Recepcion Search Input (incorporates deep search: OC #, Proveedor, or Article Cód/Desc)
+  // Filtered Active OCs for Recepcion Search Input
   const filteredActiveOcsForRecepcion = ocs.filter(oc => {
     if (oc.estado === 'Cancelada') return false; // Filter out completely cancelled ones
     const q = recepcionSearchQuery.toLowerCase().trim();
@@ -654,7 +688,7 @@ const SeguimientoOCModule = () => {
                       </button>
                     </div>
 
-                    {/* List Table (Executively Clean - Hidden TIPO and ARTICULOS columns) */}
+                    {/* List Table */}
                     {loading ? (
                       <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                         <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 10px auto' }} />
@@ -674,6 +708,7 @@ const SeguimientoOCModule = () => {
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>PROVEEDOR / RUT</th>
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>FECHAS CLAVE</th>
                               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ESTADO OC</th>
+                              <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600', width: '80px', textAlign: 'center' }}>ACCIONES</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -760,6 +795,28 @@ const SeguimientoOCModule = () => {
                                       <option value="Completada" style={{ background: '#1e293b' }}>Completada</option>
                                     </select>
                                   </td>
+                                  <td style={{ padding: '16px', textAlign: 'center' }}>
+                                    <button 
+                                      onClick={() => handleDeleteOC(oc.id, oc.numero_oc)}
+                                      style={{ 
+                                        color: '#ef4444', 
+                                        background: 'none', 
+                                        border: 'none', 
+                                        cursor: 'pointer', 
+                                        padding: '6px', 
+                                        borderRadius: '6px',
+                                        transition: 'all 0.2s',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}
+                                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                                      onMouseOut={(e) => e.currentTarget.style.background = 'none'}
+                                      title="Eliminar Orden de Compra"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -769,7 +826,7 @@ const SeguimientoOCModule = () => {
                     )}
                   </motion.div>
                 ) : (
-                  /* SUB-TAB 2: RECEPCIÓN Y ENTREGAS PARCIALES (Multifilter Search, hidden Tipo and redundant Progress Bar) */
+                  /* SUB-TAB 2: RECEPCIÓN Y ENTREGAS PARCIALES */
                   <motion.div
                     key="subtab-recepcion"
                     initial={{ opacity: 0, y: 10 }}
@@ -784,7 +841,7 @@ const SeguimientoOCModule = () => {
                         Busque la Orden de Compra por su número, por el nombre/RUT de su proveedor o por el código/descripción de cualquiera de sus artículos.
                       </p>
 
-                      {/* Multifilter Live Search Bar */}
+                      {/* Search Bar */}
                       <div style={{ marginBottom: '25px' }}>
                         <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#f8fafc' }}>Buscar Orden de Compra Activa</label>
                         <div style={{ position: 'relative', width: '100%', maxWidth: '600px' }}>
@@ -799,7 +856,7 @@ const SeguimientoOCModule = () => {
                           />
                         </div>
 
-                        {/* Search Results selection panel */}
+                        {/* Search Results */}
                         <div style={{ 
                           display: 'grid', 
                           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
@@ -853,7 +910,7 @@ const SeguimientoOCModule = () => {
                         </div>
                       </div>
 
-                      {/* Detail Panel of Selected OC (Tipo DE OC removed completely!) */}
+                      {/* Detail Panel of Selected OC */}
                       {(() => {
                         const selOc = ocs.find(o => o.id === selectedOcIdForRecepcion);
                         if (!selOc) {
@@ -876,7 +933,7 @@ const SeguimientoOCModule = () => {
                               padding: '20px'
                             }}
                           >
-                            {/* OC Summary Info (Tipo de OC completely removed!) */}
+                            {/* OC Summary Info */}
                             <div style={{ 
                               display: 'grid', 
                               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -916,7 +973,7 @@ const SeguimientoOCModule = () => {
                               </div>
                             </div>
 
-                            {/* Articles Grid / Table for Partial Reception (Redundant progress column removed!) */}
+                            {/* Articles Grid / Table for Partial Reception */}
                             <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '15px', color: '#f8fafc' }}>Artículos por Recepcionar</h4>
                             <div className="table-container" style={{ marginBottom: '25px', overflowX: 'auto' }}>
                               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1098,6 +1155,17 @@ const SeguimientoOCModule = () => {
                     className="input-field"
                   />
                 </div>
+                {/* Manual date selector input field */}
+                <div>
+                  <label style={labelStyle}><Calendar size={16} /> Fecha de Envío</label>
+                  <input
+                    type="date"
+                    value={formData.fecha_envio}
+                    onChange={e => setFormData(prev => ({ ...prev, fecha_envio: e.target.value }))}
+                    className="input-field"
+                    style={{ colorScheme: 'dark', cursor: 'pointer' }}
+                  />
+                </div>
               </div>
 
               {/* Lado Derecho - Config OC */}
@@ -1200,7 +1268,7 @@ const SeguimientoOCModule = () => {
         )}
       </AnimatePresence>
 
-      {/* POPUP DETAIL MODAL (Overlay Dialog) */}
+      {/* POPUP DETAIL MODAL */}
       <AnimatePresence>
         {selectedOcForModal && (
           <div 
@@ -1234,7 +1302,7 @@ const SeguimientoOCModule = () => {
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
                 position: 'relative'
               }}
-              onClick={(e) => e.stopPropagation()} // Prevent close on clicking inside the card
+              onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
               <button 
@@ -1272,7 +1340,7 @@ const SeguimientoOCModule = () => {
                   <Truck size={24} color="#3b82f6" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: '#f8fafc' }}>
                     Orden de Compra: {selectedOcForModal.numero_oc}
                   </h3>
                 </div>
@@ -1325,7 +1393,7 @@ const SeguimientoOCModule = () => {
                 </div>
               </div>
 
-              {/* Alert Message inside Modal (Plazos Atrasos) */}
+              {/* Alert Message inside Modal */}
               {(() => {
                 const plazos = checkPlazos(selectedOcForModal);
                 if (!plazos.isExpired) return null;
