@@ -14,8 +14,6 @@ const PendientesForm = ({ onBack }) => {
     cod: '',
     fecha: new Date().toISOString().split('T')[0],
     centro: '',
-    stock: 0,
-    consumo: 0,
     pedido: 0,
     entrega: 0
   });
@@ -84,8 +82,6 @@ const PendientesForm = ({ onBack }) => {
           articulo_id: articuloId,
           centro_id: centroId,
           fecha: formData.fecha,
-          stock: parseInt(formData.stock),
-          consumo: parseInt(formData.consumo),
           pedido: parseInt(formData.pedido),
           entrega: parseInt(formData.entrega),
           es_vigente: shouldBeVigente
@@ -112,8 +108,6 @@ const PendientesForm = ({ onBack }) => {
       cod: '',
       fecha: new Date().toISOString().split('T')[0],
       centro: '',
-      stock: 0,
-      consumo: 0,
       pedido: 0,
       entrega: 0
     });
@@ -166,28 +160,7 @@ const PendientesForm = ({ onBack }) => {
               {nombreArticulo}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-            <div>
-              <label style={labelStyle}>Stock Actual</label>
-              <input 
-                type="number"
-                name="stock"
-                value={formData.stock}
-                onChange={handleChange}
-                className="input-field" 
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Consumo</label>
-              <input 
-                type="number"
-                name="consumo"
-                value={formData.consumo}
-                onChange={handleChange}
-                className="input-field" 
-              />
-            </div>
-          </div>
+
         </div>
 
         {/* Lado Derecho */}

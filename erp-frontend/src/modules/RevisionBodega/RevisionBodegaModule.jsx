@@ -24,11 +24,39 @@ const RevisionBodegaModule = () => {
     numero_documento: '',
     codigo: '',
     lote: '',
+    vencimiento: '',
     isp: '',
     cantidad: ''
   });
 
   const nombreArticulo = useArsenalLookup(form.codigo);
+
+  // Auto-detectar lote y vencimiento desde la tabla 'articulos' en Supabase
+  useEffect(() => {
+    if (form.codigo) {
+      const timeoutId = setTimeout(async () => {
+        try {
+          const { data, error } = await supabase
+            .from('articulos')
+            .select('lote, vencimiento')
+            .eq('codigo', form.codigo)
+            .maybeSingle();
+
+          if (!error && data) {
+            setForm(prev => ({
+              ...prev,
+              vencimiento: data.vencimiento || prev.vencimiento,
+              lote: prev.lote || data.lote || ''
+            }));
+          }
+        } catch (err) {
+          console.error("Error auto-detectando lote/vencimiento:", err);
+        }
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [form.codigo]);
 
   // Cargar Historial
   useEffect(() => {
@@ -40,13 +68,24 @@ const RevisionBodegaModule = () => {
   const cargarHistorial = async () => {
     setLoadingHistorial(true);
     try {
-      // Obtenemos los nombres de articulos también para mostrar en el detalle
       const { data, error } = await supabase
         .from('revisiones_bodega')
         .select('*')
         .order('created_at', { ascending: false });
         
       if (error) throw error;
+
+      // Consultar todos los artículos para tener nombres y vencimientos actualizados
+      const { data: articulos, error: artError } = await supabase
+        .from('articulos')
+        .select('codigo, nombre, vencimiento');
+      
+      const articulosMap = {};
+      if (!artError && articulos) {
+        articulos.forEach(a => {
+          articulosMap[a.codigo] = a;
+        });
+      }
 
       // Agrupar por session_id
       const grupos = {};
@@ -60,11 +99,14 @@ const RevisionBodegaModule = () => {
             totalUnidades: 0
           };
         }
+        
+        const artInfo = articulosMap[item.codigo_articulo] || {};
         grupos[item.session_id].items.push({
           id: item.id,
           codigo: item.codigo_articulo,
-          nombre: 'Consultando...',
+          nombre: artInfo.nombre || 'Artículo ' + item.codigo_articulo,
           lote: item.lote,
+          vencimiento: artInfo.vencimiento || 'S/V',
           isp: item.isp,
           cantidad: item.cantidad,
           tipo_documento: item.tipo_documento || '',
@@ -98,6 +140,7 @@ const RevisionBodegaModule = () => {
       codigo: form.codigo,
       nombre: nombreArticulo || 'Desconocido',
       lote: form.lote || 'S/L',
+      vencimiento: form.vencimiento || '',
       isp: form.isp || 'S/I',
       cantidad: parseInt(form.cantidad),
       tipo_documento: form.tipo_documento,
@@ -107,7 +150,7 @@ const RevisionBodegaModule = () => {
     setItems(prev => [...prev, newItem]);
     
     // No borramos tipo_documento ni numero_documento para que sirvan para el siguiente artículo escaneado en la misma guía/factura
-    setForm(prev => ({ ...prev, codigo: '', lote: '', isp: '', cantidad: '' }));
+    setForm(prev => ({ ...prev, codigo: '', lote: '', vencimiento: '', isp: '', cantidad: '' }));
   };
 
   const handleRemoveItem = (id) => {
@@ -196,15 +239,28 @@ const RevisionBodegaModule = () => {
   const verSesionHistorial = async (sesion) => {
     setLoadingHistorial(true);
     try {
-      // Para el historial, cargamos los items en el estado,
-      // corremos el cruce (para ver si a día de hoy esos códigos sirven)
       setSessionId(sesion.session_id);
       
-      // Intentamos recuperar nombres (simulado rápido)
-      const itemsCompletos = sesion.items.map(it => ({
-        ...it,
-        nombre: it.nombre !== 'Consultando...' ? it.nombre : 'Artículo ' + it.codigo
-      }));
+      // Recuperar nombres y vencimientos actualizados
+      const { data: articulos, error: artError } = await supabase
+        .from('articulos')
+        .select('codigo, nombre, vencimiento');
+      
+      const articulosMap = {};
+      if (!artError && articulos) {
+        articulos.forEach(a => {
+          articulosMap[a.codigo] = a;
+        });
+      }
+      
+      const itemsCompletos = sesion.items.map(it => {
+        const artInfo = articulosMap[it.codigo] || {};
+        return {
+          ...it,
+          nombre: artInfo.nombre || it.nombre,
+          vencimiento: artInfo.vencimiento || it.vencimiento || 'S/V'
+        };
+      });
       
       setItems(itemsCompletos);
       const nuevasAlertas = await calcularCrucePendientes(itemsCompletos);
@@ -379,6 +435,10 @@ const RevisionBodegaModule = () => {
                 <input name="lote" value={form.lote} onChange={handleInputChange} className="input-field" placeholder="Lote..." />
               </div>
               <div>
+                <label style={labelStyle}>F. Vencimiento</label>
+                <input type="date" name="vencimiento" value={form.vencimiento} onChange={handleInputChange} className="input-field" />
+              </div>
+              <div>
                 <label style={labelStyle}>Registro ISP</label>
                 <input name="isp" value={form.isp} onChange={handleInputChange} className="input-field" placeholder="ISP..." />
               </div>
@@ -413,7 +473,7 @@ const RevisionBodegaModule = () => {
                   <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
                     <th style={thStyle}>CÓDIGO</th>
                     <th style={thStyle}>DESCRIPCIÓN</th>
-                    <th style={thStyle}>LOTE</th>
+                    <th style={thStyle}>LOTE / VENC.</th>
                     <th style={thStyle}>DOC. / ISP</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>CANTIDAD</th>
                     <th style={{ ...thStyle, textAlign: 'center' }}>X</th>
@@ -432,7 +492,10 @@ const RevisionBodegaModule = () => {
                         <motion.tr key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <td style={tdStyle}><strong>{item.codigo}</strong></td>
                           <td style={tdStyle}>{item.nombre}</td>
-                          <td style={tdStyle}>{item.lote}</td>
+                          <td style={tdStyle}>
+                            <div>{item.lote}</div>
+                            {item.vencimiento && <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Venc: {item.vencimiento}</div>}
+                          </td>
                           <td style={tdStyle}>
                             <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 'bold' }}>{item.tipo_documento} {item.numero_documento}</div>
                             <div style={{ fontSize: '0.8rem' }}>ISP: {item.isp}</div>
@@ -523,7 +586,7 @@ const RevisionBodegaModule = () => {
                 <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
                   <th style={thStyle} className="col-codigo">CÓDIGO</th>
                   <th style={thStyle} className="col-descripcion">DESCRIPCIÓN</th>
-                  <th style={thStyle} className="col-lote">LOTE</th>
+                  <th style={thStyle} className="col-lote">LOTE / VENC.</th>
                   <th style={thStyle} className="col-isp">DOCUMENTO / ISP</th>
                   <th style={{ ...thStyle, textAlign: 'right' }} className="col-cantidad">CANTIDAD</th>
                 </tr>
@@ -533,7 +596,10 @@ const RevisionBodegaModule = () => {
                   <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                     <td style={tdStyle}><strong>{item?.codigo}</strong></td>
                     <td style={tdStyle}>{item?.nombre}</td>
-                    <td style={tdStyle}>{item?.lote}</td>
+                    <td style={tdStyle}>
+                      <div>{item?.lote}</div>
+                      {item?.vencimiento && <div style={{ fontSize: '8pt', color: '#f59e0b' }}>Venc: {item?.vencimiento}</div>}
+                    </td>
                     <td style={tdStyle}>
                       <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{item?.tipo_documento} {item?.numero_documento}</div>
                       <div style={{ fontSize: '8pt' }}>ISP: {item?.isp}</div>
