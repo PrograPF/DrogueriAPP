@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useCentros from '../../hooks/useCentros';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
-import { resolveCentroId, resolveArticuloId } from '../../utils/resolveEntities';
+import { resolveCentroId } from '../../utils/resolveEntities';
 import { labelStyle } from '../../styles/sharedStyles';
 
 const DiferenciasForm = ({ onBack }) => {
@@ -37,13 +37,12 @@ const DiferenciasForm = ({ onBack }) => {
     setLoading(true);
     try {
       const centroId = await resolveCentroId(formData.centro);
-      const articuloId = await resolveArticuloId(formData.cod, nombreArticulo);
 
-      // 3. Insertar la diferencia con los IDs resueltos
+      // 3. Insertar la diferencia con el código y centro_id
       const { error } = await supabase
         .from('diferencias')
         .insert([{
-          articulo_id: articuloId,
+          codigo_articulo: formData.cod,
           centro_id: centroId,
           fecha: formData.fecha,
           diferencia: formData.diferencia

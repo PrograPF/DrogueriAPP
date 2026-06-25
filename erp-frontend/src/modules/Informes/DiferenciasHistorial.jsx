@@ -14,6 +14,31 @@ const DiferenciasHistorial = ({ onBack }) => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
+  const [articulosCatalog, setArticulosCatalog] = useState({});
+
+  // Cargar catálogo de fármacos y DM para traducción en caliente
+  useEffect(() => {
+    const cargarCatalog = async () => {
+      try {
+        const { data: arts, error } = await supabase
+          .from('articulos')
+          .select('codigo, descripcion');
+        if (error) throw error;
+
+        const mapping = {};
+        (arts || []).forEach(item => {
+          if (item.codigo) {
+            mapping[item.codigo.trim()] = item.descripcion;
+          }
+        });
+        setArticulosCatalog(mapping);
+      } catch (err) {
+        console.error('Error al cargar catálogo de artículos:', err);
+      }
+    };
+    cargarCatalog();
+  }, []);
+
   useEffect(() => {
     fetchData(0, true);
   }, []);
@@ -26,7 +51,7 @@ const DiferenciasHistorial = ({ onBack }) => {
 
       const { data: differences, error } = await supabase
         .from('diferencias')
-        .select('*, articulos(codigo, nombre), centros(nombre)')
+        .select('*, centros(nombre)')
         .order('fecha', { ascending: false })
         .range(from, to);
 
@@ -34,8 +59,7 @@ const DiferenciasHistorial = ({ onBack }) => {
       
       const mappedData = differences.map(item => ({
         id: item.id,
-        cod: item.articulos?.codigo || 'S/C',
-        nombre: item.articulos?.nombre || 'Desconocido',
+        cod: item.codigo_articulo || 'S/C',
         centro: item.centros?.nombre || 'S/C',
         fecha: item.fecha,
         detalle: item.diferencia
@@ -72,15 +96,19 @@ const DiferenciasHistorial = ({ onBack }) => {
   };
 
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data;
+    const mapped = data.map(item => ({
+      ...item,
+      nombre: articulosCatalog[item.cod?.trim()] || 'Cargando nombre...'
+    }));
+    if (!searchTerm) return mapped;
     const term = searchTerm.toLowerCase();
-    return data.filter(item => 
+    return mapped.filter(item => 
       item.cod.toLowerCase().includes(term) || 
       item.nombre.toLowerCase().includes(term) || 
       item.centro.toLowerCase().includes(term) ||
       item.detalle.toLowerCase().includes(term)
     );
-  }, [searchTerm, data]);
+  }, [searchTerm, data, articulosCatalog]);
 
   return (
     <motion.div 

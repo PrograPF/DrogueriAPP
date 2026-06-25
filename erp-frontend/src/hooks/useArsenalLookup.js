@@ -1,35 +1,52 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 /**
- * Hook que carga el arsenal.json de forma diferida (lazy).
- * Solo se carga cuando un formulario lo necesita, no al inicio de la app.
+ * Hook que busca la descripción de un fármaco o DM en Supabase.
+ * Utiliza un debounce de 400ms para no saturar de consultas la base de datos.
  */
 const useArsenalLookup = (codigo) => {
   const [nombre, setNombre] = useState('Esperando código...');
-  const [arsenalData, setArsenalData] = useState(null);
 
-  // Cargar arsenal.json solo la primera vez que se necesite
   useEffect(() => {
-    if (!arsenalData) {
-      import('../modules/arsenal.json').then(module => {
-        setArsenalData(module.default);
-      });
-    }
-  }, []);
-
-  // Buscar nombre cuando cambia el código o se carga el arsenal
-  useEffect(() => {
-    if (!arsenalData) return;
-
-    if (codigo) {
-      const found = arsenalData[codigo];
-      setNombre(found || 'Código no encontrado en arsenal');
-    } else {
+    if (!codigo || codigo.trim() === '') {
       setNombre('Esperando código...');
+      return;
     }
-  }, [codigo, arsenalData]);
+
+    setNombre('Buscando...');
+
+    const lookup = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('articulos')
+          .select('descripcion')
+          .eq('codigo', codigo.trim())
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setNombre(data.descripcion);
+        } else {
+          setNombre('Código no encontrado en arsenal');
+        }
+      } catch (err) {
+        console.error('Error al buscar en el arsenal:', err);
+        setNombre('Error en búsqueda');
+      }
+    };
+
+    const handler = setTimeout(() => {
+      lookup();
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [codigo]);
 
   return nombre;
 };
 
 export default useArsenalLookup;
+

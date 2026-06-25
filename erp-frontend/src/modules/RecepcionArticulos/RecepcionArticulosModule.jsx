@@ -22,13 +22,13 @@ const RecepcionArticulosModule = () => {
     try {
       const { data, error } = await supabase
         .from('articulos')
-        .select('codigo, nombre');
+        .select('codigo, descripcion');
       if (error) throw error;
       
       const mapping = {};
       (data || []).forEach(art => {
         if (art.codigo) {
-          mapping[art.codigo.trim()] = art.nombre;
+          mapping[art.codigo.trim()] = art.descripcion;
         }
       });
       setArticulosCatalog(mapping);

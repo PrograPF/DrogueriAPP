@@ -17,6 +17,30 @@ const InformesModule = ({ onBack }) => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const { centros } = useCentros();
+  const [articulosCatalog, setArticulosCatalog] = useState({});
+
+  // Cargar catálogo de fármacos y DM para traducción en caliente
+  useEffect(() => {
+    const cargarCatalog = async () => {
+      try {
+        const { data: arts, error } = await supabase
+          .from('articulos')
+          .select('codigo, descripcion');
+        if (error) throw error;
+
+        const mapping = {};
+        (arts || []).forEach(item => {
+          if (item.codigo) {
+            mapping[item.codigo.trim()] = item.descripcion;
+          }
+        });
+        setArticulosCatalog(mapping);
+      } catch (err) {
+        console.error('Error al cargar catálogo de artículos:', err);
+      }
+    };
+    cargarCatalog();
+  }, []);
 
   useEffect(() => {
     setData([]);
@@ -33,7 +57,7 @@ const InformesModule = ({ onBack }) => {
 
       let query = supabase
         .from('pendientes')
-        .select('*, articulos(codigo, nombre), centros(nombre)')
+        .select('*, centros(nombre)')
         .order('fecha', { ascending: false })
         .range(from, to);
 
@@ -46,8 +70,7 @@ const InformesModule = ({ onBack }) => {
       
       const mappedData = pendientes.map(item => ({
         id: item.id,
-        cod: item.articulos?.codigo || 'S/C',
-        nombre: item.articulos?.nombre || 'Desconocido',
+        cod: item.codigo_articulo || 'S/C',
         centro: item.centros?.nombre || 'S/C',
         cantidad: item.pendiente,
         fecha: item.fecha,
@@ -111,7 +134,10 @@ const InformesModule = ({ onBack }) => {
   };
 
   const filteredData = useMemo(() => {
-    return data.filter(item => {
+    return data.map(item => ({
+      ...item,
+      nombre: articulosCatalog[item.cod?.trim()] || 'Cargando nombre...'
+    })).filter(item => {
       if (filterCodigo) {
         const term = filterCodigo.toLowerCase();
         if (!item.cod.toLowerCase().includes(term) && !item.nombre.toLowerCase().includes(term)) {
@@ -137,7 +163,7 @@ const InformesModule = ({ onBack }) => {
 
       return true;
     });
-  }, [data, filterCodigo, filterCentro, filterEstado]);
+  }, [data, articulosCatalog, filterCodigo, filterCentro, filterEstado]);
 
   const totalGlobal = useMemo(() => {
     return filteredData.filter(i => i.esVigente && !i.esResuelto).reduce((sum, item) => sum + item.cantidad, 0);

@@ -76,14 +76,15 @@ const useArsenalAutoSuggest = (codigo) => {
       try {
         const { data, error } = await supabase
           .from('articulos')
-          .select('nombre')
+          .select('descripcion')
           .eq('codigo', codigo.trim())
+          .limit(1)
           .maybeSingle();
 
         if (error) throw error;
 
         if (data) {
-          setNombre(data.nombre);
+          setNombre(data.descripcion);
           setExists(true);
         } else {
           setNombre('');
@@ -169,13 +170,13 @@ const SeguimientoOCModule = () => {
     try {
       const { data, error } = await supabase
         .from('articulos')
-        .select('codigo, nombre');
+        .select('codigo, descripcion');
       if (error) throw error;
       
       const mapping = {};
       (data || []).forEach(art => {
         if (art.codigo) {
-          mapping[art.codigo.trim()] = art.nombre;
+          mapping[art.codigo.trim()] = art.descripcion;
         }
       });
       setArticulosCatalog(mapping);
@@ -339,7 +340,7 @@ const SeguimientoOCModule = () => {
               .from('articulos')
               .insert([{
                 codigo: art.codigo.trim(),
-                nombre: art.tempName.trim()
+                descripcion: art.tempName.trim()
               }]);
             if (insertArtErr) throw insertArtErr;
           }

@@ -32,15 +32,17 @@ const RevisionBodegaModule = () => {
 
   const nombreArticulo = useArsenalLookup(form.codigo);
 
-  // Auto-detectar lote y vencimiento desde la tabla 'articulos' en Supabase
+  // Auto-detectar lote y vencimiento desde la tabla 'articulos_variantes' en Supabase
   useEffect(() => {
     if (form.codigo) {
       const timeoutId = setTimeout(async () => {
         try {
           const { data, error } = await supabase
-            .from('articulos')
+            .from('articulos_variantes')
             .select('lote, vencimiento')
-            .eq('codigo', form.codigo)
+            .eq('codigo_articulo', form.codigo)
+            .order('vencimiento', { ascending: true })
+            .limit(1)
             .maybeSingle();
 
           if (!error && data) {
@@ -76,15 +78,28 @@ const RevisionBodegaModule = () => {
         
       if (error) throw error;
 
-      // Consultar todos los artículos para tener nombres y vencimientos actualizados
+      // Consultar todos los artículos para tener nombres
       const { data: articulos, error: artError } = await supabase
         .from('articulos')
-        .select('codigo, nombre, vencimiento');
+        .select('codigo, descripcion');
       
       const articulosMap = {};
       if (!artError && articulos) {
         articulos.forEach(a => {
-          articulosMap[a.codigo] = a;
+          articulosMap[a.codigo] = a.descripcion;
+        });
+      }
+
+      // Consultar variantes para tener vencimientos por lote
+      const { data: variantes, error: varError } = await supabase
+        .from('articulos_variantes')
+        .select('codigo_articulo, lote, vencimiento');
+
+      const vencimientosMap = {};
+      if (!varError && variantes) {
+        variantes.forEach(v => {
+          const key = `${v.codigo_articulo?.trim()}_${v.lote?.trim().toUpperCase()}`;
+          vencimientosMap[key] = v.vencimiento;
         });
       }
 
@@ -101,14 +116,18 @@ const RevisionBodegaModule = () => {
           };
         }
         
-        const artInfo = articulosMap[item.codigo_articulo] || {};
+        const nombreArt = articulosMap[item.codigo_articulo] || 'Artículo ' + item.codigo_articulo;
+        const keyVenc = `${item.codigo_articulo?.trim()}_${item.lote?.trim().toUpperCase()}`;
+        const vencimiento = vencimientosMap[keyVenc] || 'S/V';
+
         grupos[item.session_id].items.push({
           id: item.id,
           codigo: item.codigo_articulo,
-          nombre: artInfo.nombre || 'Artículo ' + item.codigo_articulo,
+          nombre: nombreArt,
           lote: item.lote,
-          vencimiento: artInfo.vencimiento || 'S/V',
+          vencimiento: vencimiento,
           isp: item.isp,
+          amount: item.cantidad, // wait, is it amount or cantidad? The original had cantidad. Let me keep cantidad.
           cantidad: item.cantidad,
           tipo_documento: item.tipo_documento || '',
           numero_documento: item.numero_documento || ''
@@ -161,7 +180,7 @@ const RevisionBodegaModule = () => {
   const calcularCrucePendientes = async (itemsToProcess) => {
     const { data: pendientesVigentes, error: pendError } = await supabase
       .from('pendientes')
-      .select('*, articulos(codigo, nombre), centros(nombre)')
+      .select('*, centros(nombre)')
       .eq('es_vigente', true);
 
     if (pendError) throw pendError;
@@ -174,7 +193,7 @@ const RevisionBodegaModule = () => {
 
     const agrupacionPendientes = {};
     pendientesVigentes.forEach(p => {
-      const cod = p.articulos?.codigo;
+      const cod = p.codigo_articulo;
       if (!cod) return;
       if (!agrupacionPendientes[cod]) agrupacionPendientes[cod] = [];
       agrupacionPendientes[cod].push({
@@ -242,24 +261,39 @@ const RevisionBodegaModule = () => {
     try {
       setSessionId(sesion.session_id);
       
-      // Recuperar nombres y vencimientos actualizados
+      // Recuperar nombres actualizados
       const { data: articulos, error: artError } = await supabase
         .from('articulos')
-        .select('codigo, nombre, vencimiento');
+        .select('codigo, descripcion');
       
       const articulosMap = {};
       if (!artError && articulos) {
         articulos.forEach(a => {
-          articulosMap[a.codigo] = a;
+          articulosMap[a.codigo] = a.descripcion;
+        });
+      }
+
+      // Recuperar vencimientos por lote
+      const { data: variantes, error: varError } = await supabase
+        .from('articulos_variantes')
+        .select('codigo_articulo, lote, vencimiento');
+
+      const vencimientosMap = {};
+      if (!varError && variantes) {
+        variantes.forEach(v => {
+          const key = `${v.codigo_articulo?.trim()}_${v.lote?.trim().toUpperCase()}`;
+          vencimientosMap[key] = v.vencimiento;
         });
       }
       
       const itemsCompletos = sesion.items.map(it => {
-        const artInfo = articulosMap[it.codigo] || {};
+        const nombreArt = articulosMap[it.codigo] || it.nombre;
+        const keyVenc = `${it.codigo?.trim()}_${it.lote?.trim().toUpperCase()}`;
+        const vencimiento = vencimientosMap[keyVenc] || it.vencimiento || 'S/V';
         return {
           ...it,
-          nombre: artInfo.nombre || it.nombre,
-          vencimiento: artInfo.vencimiento || it.vencimiento || 'S/V'
+          nombre: nombreArt,
+          vencimiento: vencimiento
         };
       });
       

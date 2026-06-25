@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useCentros from '../../hooks/useCentros';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
-import { resolveCentroId, resolveArticuloId } from '../../utils/resolveEntities';
+import { resolveCentroId } from '../../utils/resolveEntities';
 import { labelStyle } from '../../styles/sharedStyles';
 
 const PendientesForm = ({ onBack }) => {
@@ -45,13 +45,12 @@ const PendientesForm = ({ onBack }) => {
     setLoading(true);
     try {
       const centroId = await resolveCentroId(formData.centro);
-      const articuloId = await resolveArticuloId(formData.cod, nombreArticulo);
 
-      // 3. Obtener el registro vigente actual para este artículo/centro
+      // 3. Obtener el registro vigente actual para este artículo/centro usando codigo_articulo
       const { data: currentVigente } = await supabase
         .from('pendientes')
         .select('id, fecha')
-        .eq('articulo_id', articuloId)
+        .eq('codigo_articulo', formData.cod)
         .eq('centro_id', centroId)
         .eq('es_vigente', true)
         .maybeSingle();
@@ -79,7 +78,7 @@ const PendientesForm = ({ onBack }) => {
       const { error } = await supabase
         .from('pendientes')
         .insert([{
-          articulo_id: articuloId,
+          codigo_articulo: formData.cod,
           centro_id: centroId,
           fecha: formData.fecha,
           pedido: parseInt(formData.pedido),
