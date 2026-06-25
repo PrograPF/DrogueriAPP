@@ -1265,10 +1265,10 @@ const SeguimientoOCModule = () => {
                     onBlur={() => {
                       setTimeout(() => setShowProveedorSuggestions(false), 200);
                     }}
-                    placeholder="Escriba para buscar proveedor..."
+                    placeholder="Seleccionar o buscar proveedor..."
                     className="input-field"
                   />
-                  {showProveedorSuggestions && proveedorSearch.trim() !== '' && (
+                  {showProveedorSuggestions && (
                     <div style={{
                       position: 'absolute',
                       top: '100%',
