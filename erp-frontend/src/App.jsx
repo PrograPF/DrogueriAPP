@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList } from 'lucide-react';
+import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList, Building2 } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
 import RevisionBodegaModule from './modules/RevisionBodega/RevisionBodegaModule';
 import ConfigModule from './modules/Config/ConfigModule';
 import SeguimientoOCModule from './modules/SeguimientoOC/SeguimientoOCModule';
 import RecepcionArticulosModule from './modules/RecepcionArticulos/RecepcionArticulosModule';
+import ProveedoresModule from './modules/Proveedores/ProveedoresModule';
 
 const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
   const location = useLocation();
@@ -84,6 +85,7 @@ const AppContent = () => {
           <SidebarItem icon={ClipboardList} label="Recepción Artículos" to="/recepcion" onClick={closeSidebar} />
           <SidebarItem icon={ClipboardCheck} label="Revisión Bodega" to="/revision" onClick={closeSidebar} />
           <SidebarItem icon={PackageSearch} label="Inventario" to="/inventario" onClick={closeSidebar} />
+          <SidebarItem icon={Building2} label="Proveedores" to="/proveedores" onClick={closeSidebar} />
           <SidebarItem icon={Settings} label="Configuración" to="/config" onClick={closeSidebar} />
         </div>
 
@@ -119,6 +121,7 @@ const AppContent = () => {
           <Route path="/recepcion" element={<RecepcionArticulosModule />} />
           <Route path="/dashboard" element={<div style={{ padding: '20px' }}>Próximamente: Dashboard de Jefatura</div>} />
           <Route path="/inventario" element={<div style={{ padding: '20px' }}>Módulo de Inventario en desarrollo...</div>} />
+          <Route path="/proveedores" element={<ProveedoresModule />} />
           <Route path="/config" element={<ConfigModule />} />
         </Routes>
       </div>
