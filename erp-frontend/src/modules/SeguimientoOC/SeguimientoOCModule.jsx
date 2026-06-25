@@ -136,7 +136,7 @@ const SeguimientoOCModule = () => {
     rut_proveedor: '',
     tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1', 'PEDIDO ESPECIAL'
     dias_plazo_atraso: 4, // Default to 4
-    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Completada'
+    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Recepcionado'
     fecha_envio_display: getTodayDisplayString() // Chilean formatted date: DD/MM/YYYY
   });
 
@@ -453,7 +453,7 @@ const SeguimientoOCModule = () => {
   // Helper to calculate state dates and visual alerts
   const checkPlazos = (oc) => {
     // Completed OCs or Cancelled OCs do not trigger alerts
-    if (oc.estado === 'Cancelada' || oc.estado === 'Completada') {
+    if (oc.estado === 'Cancelada' || oc.estado === 'Recepcionado') {
       return { isExpired: false, alertMessage: '' };
     }
 
@@ -551,14 +551,14 @@ const SeguimientoOCModule = () => {
           art => (art.cantidad_recepcionada || 0) >= (art.cantidad || 0)
         );
 
-        if (allCompleted && updatedOc.estado !== 'Completada') {
+        if (allCompleted && updatedOc.estado !== 'Recepcionado') {
           const { error: updateOcErr } = await supabase
             .from('ordenes_compra')
-            .update({ estado: 'Completada' })
+            .update({ estado: 'Recepcionado' })
             .eq('id', selectedOcIdForRecepcion);
 
           if (updateOcErr) throw updateOcErr;
-          alert('¡Excelente! Todas las cantidades han sido completadas. La OC se ha marcado como "Completada" automáticamente.');
+          alert('¡Excelente! Todas las cantidades han sido completadas. La OC se ha marcado como "Recepcionado" automáticamente.');
         } else {
           alert('Recepción parcial registrada correctamente.');
         }
@@ -887,11 +887,11 @@ const SeguimientoOCModule = () => {
                                         background: oc.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.1)' : 
                                                     oc.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.1)' : 
                                                     oc.estado === 'Cancelada' ? 'rgba(239, 68, 68, 0.1)' : 
-                                                    oc.estado === 'Completada' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.1)',
+                                                    oc.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.1)',
                                         color: oc.estado === 'Enviada' ? '#3b82f6' : 
                                                oc.estado === 'Aceptada' ? '#10b981' : 
                                                oc.estado === 'Cancelada' ? '#ef4444' : 
-                                               oc.estado === 'Completada' ? '#10b981' : '#f59e0b',
+                                               oc.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
                                         border: '1px solid rgba(255,255,255,0.1)'
                                       }}
                                     >
@@ -899,7 +899,7 @@ const SeguimientoOCModule = () => {
                                       <option value="Aceptada" style={{ background: '#1e293b' }}>Aceptada</option>
                                       <option value="Cancelada" style={{ background: '#1e293b' }}>Cancelada</option>
                                       <option value="Aceptada con multa" style={{ background: '#1e293b' }}>Aceptada con multa (Atrasada)</option>
-                                      <option value="Completada" style={{ background: '#1e293b' }}>Completada</option>
+                                      <option value="Recepcionado" style={{ background: '#1e293b' }}>Recepcionado</option>
                                     </select>
                                   </td>
                                   <td style={{ padding: '16px', textAlign: 'center' }}>
@@ -1064,10 +1064,10 @@ const SeguimientoOCModule = () => {
                                   fontWeight: '700',
                                   background: selOc.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
                                               selOc.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
-                                              selOc.estado === 'Completada' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
+                                              selOc.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
                                   color: selOc.estado === 'Enviada' ? '#3b82f6' : 
                                          selOc.estado === 'Aceptada' ? '#10b981' : 
-                                         selOc.estado === 'Completada' ? '#10b981' : '#f59e0b',
+                                         selOc.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
                                   display: 'inline-block',
                                   marginTop: '4px'
                                 }}>
@@ -1553,10 +1553,10 @@ const SeguimientoOCModule = () => {
                     fontWeight: '700',
                     background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
                                 selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
-                                selectedOcForModal.estado === 'Completada' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
+                                selectedOcForModal.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
                     color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
                            selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
-                           selectedOcForModal.estado === 'Completada' ? '#10b981' : '#f59e0b',
+                           selectedOcForModal.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
                     display: 'inline-block',
                     marginTop: '4px'
                   }}>

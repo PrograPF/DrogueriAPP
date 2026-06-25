@@ -65,20 +65,19 @@ const RecepcionArticulosModule = () => {
     }
   };
 
-  // Perform full article reception
-  const handleRecepcionarArticulo = async (artId, ocId, currentCantidad) => {
-    if (!window.confirm('¿Seguro que deseas marcar este artículo como RECEPCIONADO?')) return;
+  // Update article reception status
+  const handleUpdateArticuloEstado = async (artId, ocId, nuevoEstado) => {
     try {
       const now = new Date().toISOString();
-      
+      const payload = {
+        estado: nuevoEstado,
+        fecha_almacenamiento: nuevoEstado !== 'Pendiente' ? now : null
+      };
+
       // 1. Update the article details
       const { error: artErr } = await supabase
         .from('ordenes_compra_articulos')
-        .update({
-          cantidad_recepcionada: currentCantidad,
-          estado: 'Recepcionado',
-          fecha_almacenamiento: now
-        })
+        .update(payload)
         .eq('id', artId);
 
       if (artErr) throw artErr;
@@ -90,9 +89,7 @@ const RecepcionArticulosModule = () => {
           *,
           ordenes_compra_articulos (
             id,
-            estado,
-            cantidad,
-            cantidad_recepcionada
+            estado
           )
         `)
         .eq('id', ocId);
@@ -101,35 +98,41 @@ const RecepcionArticulosModule = () => {
 
       const ocToCheck = updatedOcs?.[0];
       if (ocToCheck) {
-        const allCompleted = (ocToCheck.ordenes_compra_articulos || []).every(
-          art => art.estado === 'Recepcionado' || (art.cantidad_recepcionada || 0) >= (art.cantidad || 0)
+        const allProcessed = (ocToCheck.ordenes_compra_articulos || []).every(
+          art => art.estado && art.estado !== 'Pendiente'
         );
 
-        if (allCompleted) {
-          // Update parent OC status to 'Completada'
+        if (allProcessed) {
+          // Update parent OC status to 'Recepcionado'
           const { error: ocErr } = await supabase
             .from('ordenes_compra')
-            .update({ estado: 'Completada' })
+            .update({ estado: 'Recepcionado' })
             .eq('id', ocId);
 
           if (ocErr) throw ocErr;
-          alert('Artículo recepcionado. ¡La OC se ha marcado como COMPLETADA!');
+          alert('Estado de artículo actualizado. ¡La OC se ha marcado como RECEPCIONADO automáticamente!');
         } else {
-          // If not all are completed, but we just received something, we can change the OC status to 'Aceptada'
-          if (ocToCheck.estado === 'Enviada') {
+          // If not all are completed, but the parent OC was 'Recepcionado', revert it to 'Aceptada'
+          if (ocToCheck.estado === 'Recepcionado') {
+            await supabase
+              .from('ordenes_compra')
+              .update({ estado: 'Aceptada' })
+              .eq('id', ocId);
+          } else if (ocToCheck.estado === 'Enviada' && nuevoEstado !== 'Pendiente') {
+            // If it was 'Enviada' and we received something, set to 'Aceptada'
             await supabase
               .from('ordenes_compra')
               .update({ estado: 'Aceptada', fecha_aceptacion: now })
               .eq('id', ocId);
           }
-          alert('Artículo recepcionado correctamente.');
+          alert('Estado de artículo actualizado correctamente.');
         }
       }
 
       await cargarOcs();
     } catch (err) {
-      console.error('Error al recepcionar artículo:', err);
-      alert('Error al recepcionar: ' + err.message);
+      console.error('Error al actualizar estado del artículo:', err);
+      alert('Error al actualizar estado: ' + err.message);
     }
   };
 
@@ -369,10 +372,10 @@ const RecepcionArticulosModule = () => {
                             fontWeight: '700',
                             background: oc.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
                                         oc.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
-                                        oc.estado === 'Completada' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
+                                        oc.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
                             color: oc.estado === 'Enviada' ? '#3b82f6' : 
                                    oc.estado === 'Aceptada' ? '#10b981' : 
-                                   oc.estado === 'Completada' ? '#10b981' : '#f59e0b'
+                                   oc.estado === 'Recepcionado' ? '#10b981' : '#f59e0b'
                           }}>
                             {oc.estado}
                           </span>
@@ -403,7 +406,7 @@ const RecepcionArticulosModule = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {(oc.ordenes_compra_articulos || []).map((art, idx) => {
                           const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                          const isRecepcionando = art.estado === 'Recepcionado';
+                          const hasFecha = art.fecha_almacenamiento;
                           
                           return (
                             <div key={idx} style={{ 
@@ -420,7 +423,7 @@ const RecepcionArticulosModule = () => {
                                   <span style={{ color: '#64748b', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
                                   <span style={{ fontWeight: '500' }}>{artName}</span>
                                 </div>
-                                {isRecepcionando && art.fecha_almacenamiento && (
+                                {hasFecha && (
                                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                                     Almacenamiento: {formatDate(art.fecha_almacenamiento)}
                                   </span>
@@ -430,50 +433,35 @@ const RecepcionArticulosModule = () => {
                                 <span style={{ fontWeight: '600', color: '#94a3b8' }}>
                                   {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
                                 </span>
-                                {isRecepcionando ? (
-                                  <span style={{ 
-                                    fontSize: '0.75rem', 
-                                    color: '#10b981', 
-                                    background: 'rgba(16,185,129,0.1)', 
-                                    padding: '3px 8px', 
-                                    borderRadius: '6px', 
-                                    fontWeight: '700' 
-                                  }}>
-                                    Recepcionado
-                                  </span>
-                                ) : (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ 
-                                      fontSize: '0.75rem', 
-                                      color: '#f59e0b', 
-                                      background: 'rgba(245,158,11,0.1)', 
-                                      padding: '3px 8px', 
-                                      borderRadius: '6px', 
-                                      fontWeight: '700' 
-                                    }}>
-                                      {art.cantidad_recepcionada > 0 ? 'Parcial' : 'Pendiente'}
-                                    </span>
-                                    <button
-                                      onClick={() => handleRecepcionarArticulo(art.id, oc.id, art.cantidad)}
-                                      style={{
-                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        color: 'white',
-                                        padding: '5px 12px',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '700',
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        boxShadow: '0 2px 5px rgba(16,185,129,0.2)'
-                                      }}
-                                    >
-                                      <CheckCircle size={12} /> Recepcionar
-                                    </button>
-                                  </div>
-                                )}
+                                <select
+                                  value={art.estado || 'Pendiente'}
+                                  onChange={(e) => handleUpdateArticuloEstado(art.id, oc.id, e.target.value)}
+                                  className="input-field"
+                                  style={{
+                                    padding: '5px 10px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    width: 'auto',
+                                    cursor: 'pointer',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    background: 
+                                      art.estado === 'recepcion completa' ? 'rgba(16, 185, 129, 0.15)' :
+                                      art.estado === 'recepcion incompleta' ? 'rgba(245, 158, 11, 0.15)' :
+                                      art.estado === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
+                                      art.estado === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
+                                    color: 
+                                      art.estado === 'recepcion completa' ? '#10b981' :
+                                      art.estado === 'recepcion incompleta' ? '#f59e0b' :
+                                      art.estado?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
+                                  }}
+                                >
+                                  <option value="Pendiente" style={{ background: '#1e293b' }}>Pendiente</option>
+                                  <option value="recepcion completa" style={{ background: '#1e293b' }}>Recepción Completa</option>
+                                  <option value="recepcion incompleta" style={{ background: '#1e293b' }}>Recepción Incompleta</option>
+                                  <option value="rechazado por vencimiento" style={{ background: '#1e293b' }}>Rechazado por Vencimiento</option>
+                                  <option value="rechazado por calidad" style={{ background: '#1e293b' }}>Rechazado por Calidad</option>
+                                </select>
                               </div>
                             </div>
                           );
