@@ -13,6 +13,8 @@ const RecepcionArticulosModule = () => {
   const [loading, setLoading] = useState(false);
   const [ocs, setOcs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [localStatuses, setLocalStatuses] = useState({}); // { [artId]: status }
+  const [guardandoOcId, setGuardandoOcId] = useState(null);
   
   // Articles catalog mapping for instant code -> name translation
   const [articulosCatalog, setArticulosCatalog] = useState({});
@@ -65,24 +67,46 @@ const RecepcionArticulosModule = () => {
     }
   };
 
-  // Update article reception status
-  const handleUpdateArticuloEstado = async (artId, ocId, nuevoEstado) => {
+  // Handle status selection in memory
+  const handleStatusChange = (artId, value) => {
+    setLocalStatuses(prev => ({
+      ...prev,
+      [artId]: value
+    }));
+  };
+
+  // Save reception for a specific OC
+  const handleSaveOcReception = async (oc) => {
+    const changedArts = (oc.ordenes_compra_articulos || []).filter(
+      art => localStatuses[art.id] !== undefined && localStatuses[art.id] !== (art.estado || 'Pendiente')
+    );
+
+    if (changedArts.length === 0) {
+      alert('No hay cambios pendientes para guardar en esta OC.');
+      return;
+    }
+
+    setGuardandoOcId(oc.id);
     try {
       const now = new Date().toISOString();
-      const payload = {
-        estado: nuevoEstado,
-        fecha_almacenamiento: nuevoEstado !== 'Pendiente' ? now : null
-      };
 
-      // 1. Update the article details
-      const { error: artErr } = await supabase
-        .from('ordenes_compra_articulos')
-        .update(payload)
-        .eq('id', artId);
+      // 1. Update all changed articles in Supabase
+      for (const art of changedArts) {
+        const nuevoEstado = localStatuses[art.id];
+        const payload = {
+          estado: nuevoEstado,
+          fecha_almacenamiento: nuevoEstado !== 'Pendiente' ? now : null
+        };
 
-      if (artErr) throw artErr;
+        const { error: artErr } = await supabase
+          .from('ordenes_compra_articulos')
+          .update(payload)
+          .eq('id', art.id);
 
-      // 2. Fetch parent OC with all its articles to check completeness
+        if (artErr) throw artErr;
+      }
+
+      // 2. Fetch latest articles of this OC to calculate overall completeness
       const { data: updatedOcs, error: refreshErr } = await supabase
         .from('ordenes_compra')
         .select(`
@@ -92,7 +116,7 @@ const RecepcionArticulosModule = () => {
             estado
           )
         `)
-        .eq('id', ocId);
+        .eq('id', oc.id);
 
       if (refreshErr) throw refreshErr;
 
@@ -102,37 +126,50 @@ const RecepcionArticulosModule = () => {
           art => art.estado && art.estado !== 'Pendiente'
         );
 
+        const someProcessed = (ocToCheck.ordenes_compra_articulos || []).some(
+          art => art.estado && art.estado !== 'Pendiente'
+        );
+
         if (allProcessed) {
           // Update parent OC status to 'Recepcionado'
           const { error: ocErr } = await supabase
             .from('ordenes_compra')
             .update({ estado: 'Recepcionado' })
-            .eq('id', ocId);
+            .eq('id', oc.id);
 
           if (ocErr) throw ocErr;
-          alert('Estado de artículo actualizado. ¡La OC se ha marcado como RECEPCIONADO automáticamente!');
+          alert('Recepción guardada con éxito. ¡La OC se ha marcado como RECEPCIONADO!');
         } else {
-          // If not all are completed, but the parent OC was 'Recepcionado', revert it to 'Aceptada'
+          // Revert parent OC status to 'Aceptada' if it was 'Recepcionado' but no longer fully completed
           if (ocToCheck.estado === 'Recepcionado') {
             await supabase
               .from('ordenes_compra')
               .update({ estado: 'Aceptada' })
-              .eq('id', ocId);
-          } else if (ocToCheck.estado === 'Enviada' && nuevoEstado !== 'Pendiente') {
-            // If it was 'Enviada' and we received something, set to 'Aceptada'
+              .eq('id', oc.id);
+          } else if (ocToCheck.estado === 'Enviada' && someProcessed) {
+            // Set to Aceptada if some are processed but was Enviada
             await supabase
               .from('ordenes_compra')
               .update({ estado: 'Aceptada', fecha_aceptacion: now })
-              .eq('id', ocId);
+              .eq('id', oc.id);
           }
-          alert('Estado de artículo actualizado correctamente.');
+          alert('Recepción guardada correctamente.');
         }
       }
 
+      // Clear local modified states for this OC
+      const updatedLocalStatuses = { ...localStatuses };
+      changedArts.forEach(art => {
+        delete updatedLocalStatuses[art.id];
+      });
+      setLocalStatuses(updatedLocalStatuses);
+
       await cargarOcs();
     } catch (err) {
-      console.error('Error al actualizar estado del artículo:', err);
-      alert('Error al actualizar estado: ' + err.message);
+      console.error('Error al guardar recepción de OC:', err);
+      alert('Error al guardar: ' + err.message);
+    } finally {
+      setGuardandoOcId(null);
     }
   };
 
@@ -407,6 +444,7 @@ const RecepcionArticulosModule = () => {
                         {(oc.ordenes_compra_articulos || []).map((art, idx) => {
                           const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
                           const hasFecha = art.fecha_almacenamiento;
+                          const activeStatus = localStatuses[art.id] !== undefined ? localStatuses[art.id] : (art.estado || 'Pendiente');
                           
                           return (
                             <div key={idx} style={{ 
@@ -434,8 +472,8 @@ const RecepcionArticulosModule = () => {
                                   {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
                                 </span>
                                 <select
-                                  value={art.estado || 'Pendiente'}
-                                  onChange={(e) => handleUpdateArticuloEstado(art.id, oc.id, e.target.value)}
+                                  value={activeStatus}
+                                  onChange={(e) => handleStatusChange(art.id, e.target.value)}
                                   className="input-field"
                                   style={{
                                     padding: '5px 10px',
@@ -446,14 +484,14 @@ const RecepcionArticulosModule = () => {
                                     borderRadius: '8px',
                                     border: '1px solid rgba(255,255,255,0.1)',
                                     background: 
-                                      art.estado === 'recepcion completa' ? 'rgba(16, 185, 129, 0.15)' :
-                                      art.estado === 'recepcion incompleta' ? 'rgba(245, 158, 11, 0.15)' :
-                                      art.estado === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
-                                      art.estado === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
+                                      activeStatus === 'recepcion completa' ? 'rgba(16, 185, 129, 0.15)' :
+                                      activeStatus === 'recepcion incompleta' ? 'rgba(245, 158, 11, 0.15)' :
+                                      activeStatus === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
+                                      activeStatus === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
                                     color: 
-                                      art.estado === 'recepcion completa' ? '#10b981' :
-                                      art.estado === 'recepcion incompleta' ? '#f59e0b' :
-                                      art.estado?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
+                                      activeStatus === 'recepcion completa' ? '#10b981' :
+                                      activeStatus === 'recepcion incompleta' ? '#f59e0b' :
+                                      activeStatus?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
                                   }}
                                 >
                                   <option value="Pendiente" style={{ background: '#1e293b' }}>Pendiente</option>
@@ -468,6 +506,55 @@ const RecepcionArticulosModule = () => {
                         })}
                       </div>
                     </div>
+                    {/* Save Button for OC Card */}
+                    {(() => {
+                      const hasChanges = (oc.ordenes_compra_articulos || []).some(
+                        art => localStatuses[art.id] !== undefined && localStatuses[art.id] !== (art.estado || 'Pendiente')
+                      );
+                      if (!hasChanges) return null;
+                      return (
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'flex-end', 
+                          marginTop: '15px', 
+                          paddingTop: '15px', 
+                          borderTop: '1px solid rgba(255, 255, 255, 0.05)' 
+                        }}>
+                          <button
+                            onClick={() => handleSaveOcReception(oc)}
+                            disabled={guardandoOcId === oc.id}
+                            className="btn-primary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '10px 20px',
+                              fontSize: '0.85rem',
+                              fontWeight: '700',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              color: '#ffffff',
+                              cursor: 'pointer',
+                              borderRadius: '10px',
+                              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {guardandoOcId === oc.id ? (
+                              <>
+                                <RefreshCw size={15} className="animate-spin" />
+                                Guardando...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle size={15} />
+                                Guardar Estado
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

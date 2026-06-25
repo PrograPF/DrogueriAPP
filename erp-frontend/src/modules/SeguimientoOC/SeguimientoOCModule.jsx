@@ -27,6 +27,15 @@ const getTodayDisplayString = () => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
+// Helper to format timestamps as DD/MM/YYYY hh:mm
+const formatDateTime = (isoString) => {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const dateStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  return `${dateStr} a las ${timeStr}`;
+};
+
 // Check if DD/MM/YYYY is valid
 const isValidDateStr = (str) => {
   if (!str || str.length !== 10) return false;
@@ -203,7 +212,9 @@ const SeguimientoOCModule = () => {
             id,
             codigo_articulo,
             cantidad,
-            cantidad_recepcionada
+            cantidad_recepcionada,
+            estado,
+            fecha_almacenamiento
           )
         `)
         .order('fecha_envio', { ascending: false });
@@ -537,7 +548,9 @@ const SeguimientoOCModule = () => {
             id,
             codigo_articulo,
             cantidad,
-            cantidad_recepcionada
+            cantidad_recepcionada,
+            estado,
+            fecha_almacenamiento
           )
         `)
         .eq('id', selectedOcIdForRecepcion);
@@ -1616,20 +1629,19 @@ const SeguimientoOCModule = () => {
                       const cantSol = art.cantidad || 0;
                       const cantRec = art.cantidad_recepcionada || 0;
                       
-                      let deliveryState = 'Pendiente';
+                      let deliveryState = art.estado || 'Pendiente';
                       let badgeBg = 'rgba(255,255,255,0.05)';
                       let badgeColor = '#94a3b8';
 
-                      if (cantRec > 0) {
-                        if (cantRec >= cantSol) {
-                          deliveryState = 'Completa';
-                          badgeBg = 'rgba(16, 185, 129, 0.15)';
-                          badgeColor = '#10b981';
-                        } else {
-                          deliveryState = 'Parcial';
-                          badgeBg = 'rgba(245, 158, 11, 0.15)';
-                          badgeColor = '#f59e0b';
-                        }
+                      if (deliveryState === 'recepcion completa') {
+                        badgeBg = 'rgba(16, 185, 129, 0.15)';
+                        badgeColor = '#10b981';
+                      } else if (deliveryState === 'recepcion incompleta') {
+                        badgeBg = 'rgba(245, 158, 11, 0.15)';
+                        badgeColor = '#f59e0b';
+                      } else if (deliveryState?.startsWith('rechazado')) {
+                        badgeBg = 'rgba(239, 68, 68, 0.15)';
+                        badgeColor = '#ef4444';
                       }
 
                       return (
@@ -1637,19 +1649,28 @@ const SeguimientoOCModule = () => {
                           <td style={{ padding: '10px 12px' }}>
                             <div style={{ fontWeight: '600', color: '#f8fafc' }}>{nombreArt}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Cód: {art.codigo_articulo}</div>
+                            {art.fecha_almacenamiento && (
+                              <div style={{ fontSize: '0.73rem', color: '#8892b0', marginTop: '3px', fontStyle: 'italic' }}>
+                                Guardado: {formatDateTime(art.fecha_almacenamiento)}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantSol} uds.</td>
                           <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantRec} uds.</td>
                           <td style={{ padding: '10px 12px' }}>
                             <span style={{ 
-                              padding: '2px 8px', 
-                              borderRadius: '4px', 
+                              padding: '4px 8px', 
+                              borderRadius: '6px', 
                               fontSize: '0.75rem', 
                               fontWeight: '700',
                               background: badgeBg,
-                              color: badgeColor
+                              color: badgeColor,
+                              textTransform: 'capitalize'
                             }}>
-                              {deliveryState}
+                              {deliveryState === 'recepcion completa' ? 'Recepción Completa' :
+                               deliveryState === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                               deliveryState === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                               deliveryState === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente'}
                             </span>
                           </td>
                         </tr>
