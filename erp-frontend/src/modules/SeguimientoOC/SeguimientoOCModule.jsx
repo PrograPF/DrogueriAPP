@@ -214,7 +214,8 @@ const SeguimientoOCModule = () => {
             cantidad,
             cantidad_recepcionada,
             estado,
-            fecha_almacenamiento
+            fecha_almacenamiento,
+            historial
           )
         `)
         .order('fecha_envio', { ascending: false });
@@ -550,7 +551,8 @@ const SeguimientoOCModule = () => {
             cantidad,
             cantidad_recepcionada,
             estado,
-            fecha_almacenamiento
+            fecha_almacenamiento,
+            historial
           )
         `)
         .eq('id', selectedOcIdForRecepcion);
@@ -1649,11 +1651,32 @@ const SeguimientoOCModule = () => {
                           <td style={{ padding: '10px 12px' }}>
                             <div style={{ fontWeight: '600', color: '#f8fafc' }}>{nombreArt}</div>
                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Cód: {art.codigo_articulo}</div>
-                            {art.fecha_almacenamiento && (
-                              <div style={{ fontSize: '0.73rem', color: '#8892b0', marginTop: '3px', fontStyle: 'italic' }}>
-                                Guardado: {formatDateTime(art.fecha_almacenamiento)}
-                              </div>
-                            )}
+                            {(() => {
+                              const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
+                                ? art.historial
+                                : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
+                              
+                              if (historyEntries.length === 0) return null;
+
+                              return (
+                                <div style={{ marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid rgba(255,255,255,0.06)' }}>
+                                  {historyEntries.map((entry, eIdx) => {
+                                    const displayState = 
+                                      entry.estado === 'recepcion completa' ? 'Recepción Completa' :
+                                      entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                      entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                                      entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
+                                    
+                                    return (
+                                      <div key={eIdx} style={{ fontSize: '0.71rem', color: '#8892b0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: '#3b82f6' }}></span>
+                                        <strong style={{ color: '#cbd5e1' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantSol} uds.</td>
                           <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantRec} uds.</td>

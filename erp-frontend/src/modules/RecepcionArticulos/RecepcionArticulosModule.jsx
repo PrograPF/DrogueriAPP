@@ -8,6 +8,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { formatDate } from '../../utils/dateFormatter';
 
+const formatDateTime = (isoString) => {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const dateStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  return `${dateStr} a las ${timeStr}`;
+};
+
 const RecepcionArticulosModule = () => {
   const [activeMode, setActiveMode] = useState('oc'); // 'oc' | 'cenabast'
   const [loading, setLoading] = useState(false);
@@ -53,7 +61,8 @@ const RecepcionArticulosModule = () => {
             cantidad,
             cantidad_recepcionada,
             estado,
-            fecha_almacenamiento
+            fecha_almacenamiento,
+            historial
           )
         `)
         .order('fecha_envio', { ascending: false });
@@ -93,9 +102,17 @@ const RecepcionArticulosModule = () => {
       // 1. Update all changed articles in Supabase
       for (const art of changedArts) {
         const nuevoEstado = localStatuses[art.id];
-        const payload = {
+        const currentHistorial = Array.isArray(art.historial) ? art.historial : [];
+        const newEntry = {
           estado: nuevoEstado,
           fecha_almacenamiento: nuevoEstado !== 'Pendiente' ? now : null
+        };
+        const nuevoHistorial = [...currentHistorial, newEntry];
+
+        const payload = {
+          estado: nuevoEstado,
+          fecha_almacenamiento: nuevoEstado !== 'Pendiente' ? now : null,
+          historial: nuevoHistorial
         };
 
         const { error: artErr } = await supabase
@@ -461,11 +478,32 @@ const RecepcionArticulosModule = () => {
                                   <span style={{ color: '#64748b', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
                                   <span style={{ fontWeight: '500' }}>{artName}</span>
                                 </div>
-                                {hasFecha && (
-                                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                    Almacenamiento: {formatDate(art.fecha_almacenamiento)}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
+                                    ? art.historial
+                                    : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
+                                  
+                                  if (historyEntries.length === 0) return null;
+
+                                  return (
+                                    <div style={{ marginTop: '4px', paddingLeft: '6px', borderLeft: '2px solid rgba(255,255,255,0.06)' }}>
+                                      {historyEntries.map((entry, eIdx) => {
+                                        const displayState = 
+                                          entry.estado === 'recepcion completa' ? 'Recepción Completa' :
+                                          entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                          entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                                          entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
+                                        
+                                        return (
+                                          <div key={eIdx} style={{ fontSize: '0.71rem', color: '#8892b0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6' }}></span>
+                                            <strong style={{ color: '#cbd5e1' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <span style={{ fontWeight: '600', color: '#94a3b8' }}>
