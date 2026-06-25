@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit2, Trash2, Save, X, MapPin, Search, Database, AlertTriangle, List, Calendar, DollarSign, Info } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, Save, X, MapPin, Search, Database, AlertTriangle, List, Calendar, DollarSign, Info, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
+import ProveedoresModule from '../Proveedores/ProveedoresModule';
 
 const ConfigModule = () => {
   // Tabs State: 'centros', 'catalog', or 'categories'
@@ -515,6 +516,13 @@ const ConfigModule = () => {
         >
           <List size={18} /> Categorías
         </button>
+        <button 
+          onClick={() => setActiveTab('proveedores')}
+          className={activeTab === 'proveedores' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Building2 size={18} /> Proveedores
+        </button>
       </div>
 
       {/* ==========================================
@@ -679,6 +687,13 @@ const ConfigModule = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* ==========================================
+          VISTA: GESTIÓN DE PROVEEDORES
+          ========================================== */}
+      {activeTab === 'proveedores' && (
+        <ProveedoresModule />
       )}
 
       {/* ==========================================
