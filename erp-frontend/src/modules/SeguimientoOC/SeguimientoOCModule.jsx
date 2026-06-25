@@ -134,11 +134,17 @@ const SeguimientoOCModule = () => {
     numero_oc: '',
     proveedor: '',
     rut_proveedor: '',
-    tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1'
+    tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1', 'PEDIDO ESPECIAL'
     dias_plazo_atraso: 4, // Default to 4
     estado: 'Enviada', // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Completada'
     fecha_envio_display: getTodayDisplayString() // Chilean formatted date: DD/MM/YYYY
   });
+
+  // States for supplier searchable dropdown
+  const [proveedores, setProveedores] = useState([]);
+  const [loadingProveedores, setLoadingProveedores] = useState(false);
+  const [proveedorSearch, setProveedorSearch] = useState('');
+  const [showProveedorSuggestions, setShowProveedorSuggestions] = useState(false);
 
   const handleDateDisplayChange = (e) => {
     const val = e.target.value;
@@ -211,9 +217,42 @@ const SeguimientoOCModule = () => {
     }
   };
 
+  const cargarProveedores = async () => {
+    setLoadingProveedores(true);
+    try {
+      const { data, error } = await supabase
+        .from('proveedores')
+        .select('id, rut, nombre_proveedor')
+        .order('nombre_proveedor', { ascending: true });
+      if (error) throw error;
+      setProveedores(data || []);
+    } catch (err) {
+      console.error('Error al cargar proveedores:', err);
+    } finally {
+      setLoadingProveedores(false);
+    }
+  };
+
+  const handleStartCreate = () => {
+    setFormData({
+      numero_oc: '',
+      proveedor: '',
+      rut_proveedor: '',
+      tipo_oc: 'AG',
+      dias_plazo_atraso: 4,
+      estado: 'Enviada',
+      fecha_envio_display: getTodayDisplayString()
+    });
+    setProveedorSearch('');
+    setShowProveedorSuggestions(false);
+    setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
+    setView('create');
+  };
+
   useEffect(() => {
     cargarOcs();
     cargarArticulosCatalog();
+    cargarProveedores();
   }, []);
 
   // Update status directly from table
@@ -396,6 +435,8 @@ const SeguimientoOCModule = () => {
         estado: 'Enviada',
         fecha_envio_display: getTodayDisplayString()
       });
+      setProveedorSearch('');
+      setShowProveedorSuggestions(false);
       setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
       setView('list');
       cargarOcs();
@@ -746,7 +787,7 @@ const SeguimientoOCModule = () => {
                       </div>
                       
                       <button 
-                        onClick={() => setView('create')} 
+                        onClick={handleStartCreate} 
                         className="btn-primary" 
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', height: '46px', flexShrink: 0 }}
                       >
@@ -1201,25 +1242,94 @@ const SeguimientoOCModule = () => {
                     className="input-field"
                   />
                 </div>
-                <div>
+                <div style={{ position: 'relative' }}>
                   <label style={labelStyle}>Proveedor</label>
                   <input
                     type="text"
-                    value={formData.proveedor}
-                    onChange={e => setFormData(prev => ({ ...prev, proveedor: e.target.value }))}
-                    placeholder="Ej: Droguería Chile S.A."
+                    value={proveedorSearch}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setProveedorSearch(val);
+                      const filtered = proveedores.filter(p => 
+                        (p.nombre_proveedor || '').toLowerCase().includes(val.toLowerCase()) ||
+                        (p.rut || '').toLowerCase().includes(val.toLowerCase())
+                      );
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        proveedor: val,
+                        rut_proveedor: proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === val.toLowerCase())?.rut || ''
+                      }));
+                      setShowProveedorSuggestions(true);
+                    }}
+                    onFocus={() => setShowProveedorSuggestions(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowProveedorSuggestions(false), 200);
+                    }}
+                    placeholder="Escriba para buscar proveedor..."
                     className="input-field"
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>RUT Proveedor</label>
-                  <input
-                    type="text"
-                    value={formData.rut_proveedor}
-                    onChange={e => setFormData(prev => ({ ...prev, rut_proveedor: e.target.value }))}
-                    placeholder="Ej: 76.224.551-3"
-                    className="input-field"
-                  />
+                  {showProveedorSuggestions && proveedorSearch.trim() !== '' && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: '#1e293b',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 100,
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      marginTop: '4px'
+                    }}>
+                      {proveedores.filter(p => 
+                        (p.nombre_proveedor || '').toLowerCase().includes(proveedorSearch.toLowerCase()) ||
+                        (p.rut || '').toLowerCase().includes(proveedorSearch.toLowerCase())
+                      ).length === 0 ? (
+                        <div style={{ padding: '10px 14px', color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                          No se encontraron proveedores
+                        </div>
+                      ) : (
+                        proveedores.filter(p => 
+                          (p.nombre_proveedor || '').toLowerCase().includes(proveedorSearch.toLowerCase()) ||
+                          (p.rut || '').toLowerCase().includes(proveedorSearch.toLowerCase())
+                        ).map(p => (
+                          <div
+                            key={p.id}
+                            onMouseDown={() => {
+                              setProveedorSearch(p.nombre_proveedor);
+                              setFormData(prev => ({
+                                ...prev,
+                                proveedor: p.nombre_proveedor,
+                                rut_proveedor: p.rut
+                              }));
+                              setShowProveedorSuggestions(false);
+                            }}
+                            style={{
+                              padding: '10px 14px',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              color: '#cbd5e1',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={e => {
+                              e.target.style.background = 'rgba(59, 130, 246, 0.15)';
+                              e.target.style.color = '#3b82f6';
+                            }}
+                            onMouseLeave={e => {
+                              e.target.style.background = 'transparent';
+                              e.target.style.color = '#cbd5e1';
+                            }}
+                          >
+                            <span style={{ fontWeight: '600' }}>{p.nombre_proveedor}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '8px' }}>({p.rut})</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
                 {/* Manual date selector input field - Forcing DD/MM/YYYY */}
                 <div>
@@ -1251,6 +1361,7 @@ const SeguimientoOCModule = () => {
                     <option value="SE">SE (Servicio de Entrega)</option>
                     <option value="CM">CM (Convenio)</option>
                     <option value="L1">L1 (Licitación Pública)</option>
+                    <option value="PEDIDO ESPECIAL">PEDIDO ESPECIAL</option>
                   </select>
                 </div>
 
