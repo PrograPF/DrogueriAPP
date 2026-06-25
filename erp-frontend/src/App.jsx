@@ -80,9 +80,9 @@ const AppContent = () => {
 
         <div style={{ flex: 1 }}>
           <SidebarItem icon={FilePlus} label="Pendientes/Diferencias" to="/" onClick={closeSidebar} />
-          <SidebarItem icon={ClipboardCheck} label="Revisión Bodega" to="/revision" onClick={closeSidebar} />
           <SidebarItem icon={Truck} label="Seguimiento OC" to="/seguimiento-oc" onClick={closeSidebar} />
           <SidebarItem icon={ClipboardList} label="Recepción Artículos" to="/recepcion" onClick={closeSidebar} />
+          <SidebarItem icon={ClipboardCheck} label="Revisión Bodega" to="/revision" onClick={closeSidebar} />
           <SidebarItem icon={PackageSearch} label="Inventario" to="/inventario" onClick={closeSidebar} />
           <SidebarItem icon={Settings} label="Configuración" to="/config" onClick={closeSidebar} />
         </div>
