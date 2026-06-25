@@ -1619,10 +1619,8 @@ const SeguimientoOCModule = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.8rem' }}>
-                      <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO</th>
-                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '110px' }}>SOLICITADO</th>
-                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '110px' }}>RECIBIDO</th>
-                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '120px' }}>ESTADO</th>
+                      <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO / DETALLE</th>
+                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '160px', textAlign: 'right' }}>ESTADO</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1648,9 +1646,15 @@ const SeguimientoOCModule = () => {
 
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
-                          <td style={{ padding: '10px 12px' }}>
-                            <div style={{ fontWeight: '600', color: '#f8fafc' }}>{nombreArt}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Cód: {art.codigo_articulo}</div>
+                          <td style={{ padding: '12px 12px', verticalAlign: 'top' }}>
+                            <div style={{ fontWeight: '600', color: '#f8fafc', lineHeight: '1.4' }}>{nombreArt}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
+                              <span style={{ color: '#64748b' }}>Cód: {art.codigo_articulo}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                              <span>Solicitado: <strong style={{ color: '#cbd5e1' }}>{cantSol} uds.</strong></span>
+                              <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                              <span>Recibido: <strong style={{ color: cantRec >= cantSol ? '#10b981' : '#f59e0b' }}>{cantRec} uds.</strong></span>
+                            </div>
                             {(() => {
                               const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
                                 ? art.historial
@@ -1678,9 +1682,7 @@ const SeguimientoOCModule = () => {
                               );
                             })()}
                           </td>
-                          <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantSol} uds.</td>
-                          <td style={{ padding: '10px 12px', fontWeight: '600', color: '#cbd5e1' }}>{cantRec} uds.</td>
-                          <td style={{ padding: '10px 12px' }}>
+                          <td style={{ padding: '12px 12px', verticalAlign: 'top', textAlign: 'right' }}>
                             <span style={{ 
                               padding: '4px 8px', 
                               borderRadius: '6px', 
@@ -1688,7 +1690,8 @@ const SeguimientoOCModule = () => {
                               fontWeight: '700',
                               background: badgeBg,
                               color: badgeColor,
-                              textTransform: 'capitalize'
+                              textTransform: 'capitalize',
+                              display: 'inline-block'
                             }}>
                               {deliveryState === 'recepcion completa' ? 'Recepción Completa' :
                                deliveryState === 'recepcion incompleta' ? 'Recepción Incompleta' :
