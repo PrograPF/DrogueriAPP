@@ -49,7 +49,9 @@ const RecepcionArticulosModule = () => {
             id,
             codigo_articulo,
             cantidad,
-            cantidad_recepcionada
+            cantidad_recepcionada,
+            estado,
+            fecha_almacenamiento
           )
         `)
         .order('fecha_envio', { ascending: false });
@@ -60,6 +62,74 @@ const RecepcionArticulosModule = () => {
       console.error('Error al cargar OCs:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Perform full article reception
+  const handleRecepcionarArticulo = async (artId, ocId, currentCantidad) => {
+    if (!window.confirm('¿Seguro que deseas marcar este artículo como RECEPCIONADO?')) return;
+    try {
+      const now = new Date().toISOString();
+      
+      // 1. Update the article details
+      const { error: artErr } = await supabase
+        .from('ordenes_compra_articulos')
+        .update({
+          cantidad_recepcionada: currentCantidad,
+          estado: 'Recepcionado',
+          fecha_almacenamiento: now
+        })
+        .eq('id', artId);
+
+      if (artErr) throw artErr;
+
+      // 2. Fetch parent OC with all its articles to check completeness
+      const { data: updatedOcs, error: refreshErr } = await supabase
+        .from('ordenes_compra')
+        .select(`
+          *,
+          ordenes_compra_articulos (
+            id,
+            estado,
+            cantidad,
+            cantidad_recepcionada
+          )
+        `)
+        .eq('id', ocId);
+
+      if (refreshErr) throw refreshErr;
+
+      const ocToCheck = updatedOcs?.[0];
+      if (ocToCheck) {
+        const allCompleted = (ocToCheck.ordenes_compra_articulos || []).every(
+          art => art.estado === 'Recepcionado' || (art.cantidad_recepcionada || 0) >= (art.cantidad || 0)
+        );
+
+        if (allCompleted) {
+          // Update parent OC status to 'Completada'
+          const { error: ocErr } = await supabase
+            .from('ordenes_compra')
+            .update({ estado: 'Completada' })
+            .eq('id', ocId);
+
+          if (ocErr) throw ocErr;
+          alert('Artículo recepcionado. ¡La OC se ha marcado como COMPLETADA!');
+        } else {
+          // If not all are completed, but we just received something, we can change the OC status to 'Aceptada'
+          if (ocToCheck.estado === 'Enviada') {
+            await supabase
+              .from('ordenes_compra')
+              .update({ estado: 'Aceptada', fecha_aceptacion: now })
+              .eq('id', ocId);
+          }
+          alert('Artículo recepcionado correctamente.');
+        }
+      }
+
+      await cargarOcs();
+    } catch (err) {
+      console.error('Error al recepcionar artículo:', err);
+      alert('Error al recepcionar: ' + err.message);
     }
   };
 
@@ -330,30 +400,79 @@ const RecepcionArticulosModule = () => {
                       <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>
                         Artículos en esta OC ({oc.ordenes_compra_articulos?.length || 0})
                       </div>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {(oc.ordenes_compra_articulos || []).map((art, idx) => {
                           const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                          const isComplete = (art.cantidad_recepcionada || 0) >= (art.cantidad || 0);
+                          const isRecepcionando = art.estado === 'Recepcionado';
                           
                           return (
-                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#cbd5e1' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
-                                <span>{artName}</span>
+                            <div key={idx} style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              fontSize: '0.85rem', 
+                              color: '#cbd5e1',
+                              padding: '8px 0',
+                              borderBottom: idx < oc.ordenes_compra_articulos.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none'
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
+                                  <span style={{ fontWeight: '500' }}>{artName}</span>
+                                </div>
+                                {isRecepcionando && art.fecha_almacenamiento && (
+                                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                    Almacenamiento: {formatDate(art.fecha_almacenamiento)}
+                                  </span>
+                                )}
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontWeight: '600' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontWeight: '600', color: '#94a3b8' }}>
                                   {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
                                 </span>
-                                {isComplete ? (
-                                  <span style={{ fontSize: '0.75rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                                    Completa
+                                {isRecepcionando ? (
+                                  <span style={{ 
+                                    fontSize: '0.75rem', 
+                                    color: '#10b981', 
+                                    background: 'rgba(16,185,129,0.1)', 
+                                    padding: '3px 8px', 
+                                    borderRadius: '6px', 
+                                    fontWeight: '700' 
+                                  }}>
+                                    Recepcionado
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                                    {art.cantidad_recepcionada > 0 ? 'Parcial' : 'Pendiente'}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ 
+                                      fontSize: '0.75rem', 
+                                      color: '#f59e0b', 
+                                      background: 'rgba(245,158,11,0.1)', 
+                                      padding: '3px 8px', 
+                                      borderRadius: '6px', 
+                                      fontWeight: '700' 
+                                    }}>
+                                      {art.cantidad_recepcionada > 0 ? 'Parcial' : 'Pendiente'}
+                                    </span>
+                                    <button
+                                      onClick={() => handleRecepcionarArticulo(art.id, oc.id, art.cantidad)}
+                                      style={{
+                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        color: 'white',
+                                        padding: '5px 12px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        boxShadow: '0 2px 5px rgba(16,185,129,0.2)'
+                                      }}
+                                    >
+                                      <CheckCircle size={12} /> Recepcionar
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
