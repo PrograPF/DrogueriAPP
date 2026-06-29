@@ -3,6 +3,7 @@ import { Settings, Plus, Edit2, Trash2, Save, X, MapPin, Search, Database, Alert
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import ProveedoresModule from '../Proveedores/ProveedoresModule';
+import { formatDate } from '../../utils/dateFormatter';
 
 const ConfigModule = () => {
   // Tabs State: 'centros', 'catalog', or 'categories'
@@ -68,6 +69,9 @@ const ConfigModule = () => {
   const [formValorConIva, setFormValorConIva] = useState(0);
   const [formTotalSinIva, setFormTotalSinIva] = useState(0);
   const [formTotalConIva, setFormTotalConIva] = useState(0);
+  const [formIsp, setFormIsp] = useState('S/I');
+  const [formFechaIngreso, setFormFechaIngreso] = useState('');
+  const [formFechaSalida, setFormFechaSalida] = useState('');
 
   // ==========================================
   // EFECTOS INICIALES
@@ -398,6 +402,9 @@ const ConfigModule = () => {
     setFormValorConIva(0);
     setFormTotalSinIva(0);
     setFormTotalConIva(0);
+    setFormIsp('S/I');
+    setFormFechaIngreso(new Date().toISOString().split('T')[0]);
+    setFormFechaSalida('');
     setIsVariantModalOpen(true);
   };
 
@@ -414,6 +421,9 @@ const ConfigModule = () => {
     setFormValorConIva(variant.ultimo_valor_con_iva || 0);
     setFormTotalSinIva(variant.total_sin_iva || 0);
     setFormTotalConIva(variant.total_con_iva || 0);
+    setFormIsp(variant.isp || 'S/I');
+    setFormFechaIngreso(variant.fecha_ingreso || '');
+    setFormFechaSalida(variant.fecha_salida || '');
     setIsVariantModalOpen(true);
   };
 
@@ -429,7 +439,10 @@ const ConfigModule = () => {
       ultimo_valor_sin_iva: parseFloat(formValorSinIva) || 0,
       ultimo_valor_con_iva: parseFloat(formValorConIva) || 0,
       total_sin_iva: parseFloat(formTotalSinIva) || 0,
-      total_con_iva: parseFloat(formTotalConIva) || 0
+      total_con_iva: parseFloat(formTotalConIva) || 0,
+      isp: formIsp.trim().toUpperCase() || 'S/I',
+      fecha_ingreso: formFechaIngreso || null,
+      fecha_salida: formFechaSalida || null
     };
 
     try {
@@ -1011,9 +1024,14 @@ const ConfigModule = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                           <span style={{ fontWeight: '700', color: '#f8fafc' }}>Lote: {v.lote || 'S/L'}</span>
+                          {v.isp && (
+                            <span style={{ fontSize: '0.8rem', color: '#3b82f6', background: 'rgba(59,130,246,0.1)', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                              ISP: {v.isp}
+                            </span>
+                          )}
                           {v.vencimiento && (
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Calendar size={14} /> Vence: {v.vencimiento}
+                              <Calendar size={14} /> Vence: {formatDate(v.vencimiento)}
                             </span>
                           )}
                           <span style={{ 
@@ -1035,6 +1053,8 @@ const ConfigModule = () => {
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '0.8rem', color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '8px' }}>
                         <div><strong>Stock:</strong> <span style={{ color: v.cantidad > 0 ? '#10b981' : '#64748b' }}>{v.cantidad} u.</span></div>
+                        <div><strong>Fecha Ingreso:</strong> <span style={{ color: '#f8fafc' }}>{v.fecha_ingreso ? formatDate(v.fecha_ingreso) : 'S/I'}</span></div>
+                        <div><strong>Fecha Salida:</strong> <span style={{ color: '#f8fafc' }}>{v.fecha_salida ? formatDate(v.fecha_salida) : 'S/S'}</span></div>
                         <div><strong>Valor C/IVA:</strong> <span>${(v.ultimo_valor_con_iva || 0).toLocaleString('es-CL')}</span></div>
                         <div><strong>Total C/IVA:</strong> <span>${(v.total_con_iva || 0).toLocaleString('es-CL')}</span></div>
                         <div><strong>Carta Canje:</strong> <span>{v.carta_canje || 'NO'}</span></div>
@@ -1124,6 +1144,32 @@ const ConfigModule = () => {
                         type="date" className="input-field" 
                         value={formVencimiento}
                         onChange={(e) => setFormVencimiento(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>Registro ISP</label>
+                      <input 
+                        type="text" className="input-field" 
+                        value={formIsp}
+                        onChange={(e) => setFormIsp(e.target.value)}
+                        placeholder="Ej: F-12345, etc."
+                        style={{ textTransform: 'uppercase' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>Fecha Ingreso</label>
+                      <input 
+                        type="date" className="input-field" 
+                        value={formFechaIngreso}
+                        onChange={(e) => setFormFechaIngreso(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>Fecha Salida</label>
+                      <input 
+                        type="date" className="input-field" 
+                        value={formFechaSalida}
+                        onChange={(e) => setFormFechaSalida(e.target.value)}
                       />
                     </div>
                     <div>

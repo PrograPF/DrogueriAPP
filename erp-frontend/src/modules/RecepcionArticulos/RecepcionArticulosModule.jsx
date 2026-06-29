@@ -6,15 +6,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
-import { formatDate } from '../../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 
-const formatDateTime = (isoString) => {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  const dateStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const timeStr = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-  return `${dateStr} a las ${timeStr}`;
-};
+
 
 const RecepcionArticulosModule = () => {
   const [activeMode, setActiveMode] = useState('oc'); // 'oc' | 'cenabast'
@@ -491,9 +485,9 @@ const RecepcionArticulosModule = () => {
                                         const displayState = 
                                           entry.estado === 'recepcion completa' ? 'Recepción Completa' :
                                           entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                          entry.estado === 'recepcionado' ? 'Recepcionado' :
                                           entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                                          entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
-                                        
+                                          entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';                                        
                                         return (
                                           <div key={eIdx} style={{ fontSize: '0.71rem', color: '#8892b0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6' }}></span>
@@ -522,23 +516,19 @@ const RecepcionArticulosModule = () => {
                                     borderRadius: '8px',
                                     border: '1px solid rgba(255,255,255,0.1)',
                                     background: 
-                                      activeStatus === 'recepcion completa' ? 'rgba(16, 185, 129, 0.15)' :
-                                      activeStatus === 'recepcion incompleta' ? 'rgba(245, 158, 11, 0.15)' :
+                                      activeStatus === 'recepcionado' ? 'rgba(59, 130, 246, 0.15)' :
                                       activeStatus === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
                                       activeStatus === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
                                     color: 
-                                      activeStatus === 'recepcion completa' ? '#10b981' :
-                                      activeStatus === 'recepcion incompleta' ? '#f59e0b' :
+                                      activeStatus === 'recepcionado' ? '#3b82f6' :
                                       activeStatus?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
                                   }}
                                 >
                                   <option value="Pendiente" style={{ background: '#1e293b' }}>Pendiente</option>
-                                  <option value="recepcion completa" style={{ background: '#1e293b' }}>Recepción Completa</option>
-                                  <option value="recepcion incompleta" style={{ background: '#1e293b' }}>Recepción Incompleta</option>
+                                  <option value="recepcionado" style={{ background: '#1e293b' }}>Recepcionado</option>
                                   <option value="rechazado por vencimiento" style={{ background: '#1e293b' }}>Rechazado por Vencimiento</option>
                                   <option value="rechazado por calidad" style={{ background: '#1e293b' }}>Rechazado por Calidad</option>
-                                </select>
-                              </div>
+                                </select>                              </div>
                             </div>
                           );
                         })}

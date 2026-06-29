@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
 import { labelStyle, thStyle, tdStyle } from '../../styles/sharedStyles';
-import { formatDate } from '../../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 
 const RevisionBodegaModule = () => {
   const [activeTab, setActiveTab] = useState('nueva'); // 'nueva', 'historial'
@@ -27,19 +27,29 @@ const RevisionBodegaModule = () => {
     lote: '',
     vencimiento: '',
     isp: '',
-    cantidad: ''
+    cantidad: '',
+    carta_canje: false,
+    valor_sin_iva: '',
+    valor_con_iva: ''
   });
+
+  // OCs y selección
+  const [loadingOcs, setLoadingOcs] = useState(false);
+  const [ocs, setOcs] = useState([]);
+  const [ocSeleccionada, setOcSeleccionada] = useState(null);
+  const [articulosOc, setArticulosOc] = useState([]);
+  const [articulosCatalog, setArticulosCatalog] = useState({});
 
   const nombreArticulo = useArsenalLookup(form.codigo);
 
-  // Auto-detectar lote y vencimiento desde la tabla 'articulos_variantes' en Supabase
+  // Auto-detectar lote, vencimiento e ISP desde la tabla 'articulos_variantes' en Supabase
   useEffect(() => {
     if (form.codigo) {
       const timeoutId = setTimeout(async () => {
         try {
           const { data, error } = await supabase
             .from('articulos_variantes')
-            .select('lote, vencimiento')
+            .select('lote, vencimiento, isp')
             .eq('codigo_articulo', form.codigo)
             .order('vencimiento', { ascending: true })
             .limit(1)
@@ -49,17 +59,127 @@ const RevisionBodegaModule = () => {
             setForm(prev => ({
               ...prev,
               vencimiento: data.vencimiento || prev.vencimiento,
-              lote: prev.lote || data.lote || ''
+              lote: prev.lote || data.lote || '',
+              isp: prev.isp || data.isp || ''
             }));
           }
         } catch (err) {
-          console.error("Error auto-detectando lote/vencimiento:", err);
+          console.error("Error auto-detectando lote/vencimiento/isp:", err);
         }
       }, 500);
 
       return () => clearTimeout(timeoutId);
     }
   }, [form.codigo]);
+
+  // Cargar OCs disponibles (que estén en recepción completa o incompleta)
+  const cargarOcsDisponibles = async () => {
+    setLoadingOcs(true);
+    try {
+      const { data, error } = await supabase
+        .from('ordenes_compra')
+        .select(`
+          *,
+          ordenes_compra_articulos (
+            id,
+            codigo_articulo,
+            cantidad,
+            cantidad_recepcionada,
+            estado
+          )
+        `)
+        .order('fecha_envio', { ascending: false });
+      if (error) throw error;
+
+      // Filtrar las OCs que tienen al menos un artículo en estado recepcionado o recepcion incompleta
+      const filtradas = (data || []).filter(oc => 
+        (oc.ordenes_compra_articulos || []).some(art => 
+          art.state === 'recepcionado' || art.estado === 'recepcionado' || art.estado === 'recepcion incompleta'
+        )
+      );
+
+      setOcs(filtradas);
+    } catch (err) {
+      console.error('Error al cargar OCs disponibles:', err);
+    } finally {
+      setLoadingOcs(false);
+    }
+  };
+
+  // Seleccionar una OC y cargar sus artículos recepcionados
+  const seleccionarOc = async (oc) => {
+    setOcSeleccionada(oc);
+    
+    const artsRecepcionados = (oc.ordenes_compra_articulos || []).filter(
+      art => art.estado === 'recepcionado' || art.estado === 'recepcion incompleta'
+    );
+    if (artsRecepcionados.length === 0) {
+      setArticulosOc([]);
+      return;
+    }
+    
+    const codigos = artsRecepcionados.map(a => a.codigo_articulo);
+    try {
+      const { data, error } = await supabase
+        .from('articulos')
+        .select('codigo, descripcion')
+        .in('codigo', codigos);
+        
+      if (error) throw error;
+      
+      const mapping = {};
+      (data || []).forEach(a => {
+        mapping[a.codigo.trim()] = a.descripcion;
+      });
+      
+      setArticulosCatalog(mapping);
+      
+      const combinados = artsRecepcionados.map(art => ({
+        ...art,
+        descripcion: mapping[art.codigo_articulo?.trim()] || 'Artículo ' + art.codigo_articulo
+      }));
+      
+      setArticulosOc(combinados);
+      
+      // Inicializar el código seleccionado en el formulario
+      if (combinados.length > 0) {
+        setForm(prev => ({
+          ...prev,
+          codigo: combinados[0].codigo_articulo,
+          cantidad: combinados[0].cantidad_recepcionada || combinados[0].cantidad || ''
+        }));
+      }
+    } catch (err) {
+      console.error("Error al obtener descripciones de artículos de la OC:", err);
+      alert("Error al cargar artículos de la OC: " + err.message);
+    }
+  };
+
+  // Cálculo recíproco de IVA
+  const handleValorSinIvaChange = (val) => {
+    const vSin = parseFloat(val);
+    if (isNaN(vSin)) {
+      setForm(prev => ({ ...prev, valor_sin_iva: val, valor_con_iva: '' }));
+      return;
+    }
+    const vCon = Math.round(vSin * 1.19);
+    setForm(prev => ({ ...prev, valor_sin_iva: val, valor_con_iva: String(vCon) }));
+  };
+
+  const handleValorConIvaChange = (val) => {
+    const vCon = parseFloat(val);
+    if (isNaN(vCon)) {
+      setForm(prev => ({ ...prev, valor_con_iva: val, valor_sin_iva: '' }));
+      return;
+    }
+    const vSin = Math.round((vCon / 1.19) * 100) / 100;
+    setForm(prev => ({ ...prev, valor_con_iva: val, valor_sin_iva: String(vSin) }));
+  };
+
+  // Cargar OCs al iniciar
+  useEffect(() => {
+    cargarOcsDisponibles();
+  }, []);
 
   // Cargar Historial
   useEffect(() => {
@@ -109,7 +229,7 @@ const RevisionBodegaModule = () => {
         if (!grupos[item.session_id]) {
           grupos[item.session_id] = {
             session_id: item.session_id,
-            fecha: new Date(item.created_at || item.fecha).toLocaleString(),
+            fecha: formatDateTime(item.created_at || item.fecha),
             items: [],
             totalArticulos: 0,
             totalUnidades: 0
@@ -143,10 +263,9 @@ const RevisionBodegaModule = () => {
       setLoadingHistorial(false);
     }
   };
-
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleAddItem = () => {
@@ -154,25 +273,63 @@ const RevisionBodegaModule = () => {
       alert("Por favor ingrese al menos el Código y una Cantidad válida.");
       return;
     }
-    
+
+    if (!form.vencimiento) {
+      alert("Por favor ingrese la fecha de vencimiento.");
+      return;
+    }
+
+    // Validar Carta de Canje si tiene 14 meses o menos de vencimiento
+    const hoy = new Date();
+    const vencimiento = new Date(form.vencimiento);
+    const añosDiff = vencimiento.getFullYear() - hoy.getFullYear();
+    const mesesDiff = vencimiento.getMonth() - hoy.getMonth();
+    const totalMeses = añosDiff * 12 + mesesDiff;
+
+    if (totalMeses <= 14 && !form.carta_canje) {
+      alert("este articulo debe tener carta de canje");
+      return;
+    }
+
+    const valorSinIva = parseFloat(form.valor_sin_iva) || 0;
+    const valorConIva = parseFloat(form.valor_con_iva) || 0;
+    const cantidad = parseInt(form.cantidad) || 0;
+
     const newItem = {
       id: Date.now().toString(),
       codigo: form.codigo,
-      nombre: nombreArticulo || 'Desconocido',
+      nombre: articulosCatalog[form.codigo] || nombreArticulo || 'Desconocido',
       lote: form.lote || 'S/L',
-      vencimiento: form.vencimiento || '',
+      vencimiento: form.vencimiento,
       isp: form.isp || 'S/I',
-      cantidad: parseInt(form.cantidad),
+      cantidad: cantidad,
       tipo_documento: form.tipo_documento,
-      numero_documento: form.numero_documento || 'S/D'
+      numero_documento: form.numero_documento || 'S/D',
+      carta_canje: form.carta_canje ? 'SI' : 'NO',
+      valor_sin_iva: valorSinIva,
+      valor_con_iva: valorConIva,
+      total_sin_iva: cantidad * valorSinIva,
+      total_con_iva: cantidad * valorConIva
     };
 
     setItems(prev => [...prev, newItem]);
     
-    // No borramos tipo_documento ni numero_documento para que sirvan para el siguiente artículo escaneado en la misma guía/factura
-    setForm(prev => ({ ...prev, codigo: '', lote: '', vencimiento: '', isp: '', cantidad: '' }));
-  };
+    // Calcular el siguiente código disponible de la OC que no esté en items
+    const disponibles = articulosOc.filter(art => art.codigo_articulo !== form.codigo && !items.some(item => item.codigo === art.codigo_articulo));
+    const siguienteCodigo = disponibles[0]?.codigo_articulo || '';
 
+    setForm(prev => ({ 
+      ...prev, 
+      codigo: siguienteCodigo, 
+      lote: '', 
+      vencimiento: '', 
+      isp: '', 
+      cantidad: '',
+      carta_canje: false,
+      valor_sin_iva: '',
+      valor_con_iva: ''
+    }));
+  };
   const handleRemoveItem = (id) => {
     setItems(prev => prev.filter(item => item.id !== id));
   };
@@ -232,6 +389,7 @@ const RevisionBodegaModule = () => {
       const currentSessionId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
       setSessionId(currentSessionId);
 
+      // 1. Insertar en revisiones_bodega (historial)
       const insertData = items.map(item => ({
         session_id: currentSessionId,
         codigo_articulo: item.codigo,
@@ -244,6 +402,54 @@ const RevisionBodegaModule = () => {
 
       const { error: insertError } = await supabase.from('revisiones_bodega').insert(insertData);
       if (insertError) throw insertError;
+
+      // 2. Insertar en articulos_variantes (inventario físico de lotes)
+      const insertVariantes = items.map(item => ({
+        codigo_articulo: item.codigo,
+        lote: item.lote,
+        vencimiento: item.vencimiento || null,
+        cantidad: item.cantidad,
+        carta_canje: item.carta_canje || 'NO',
+        estado: 'VIGENTE',
+        comentario: `Ingreso desde Revisión Bodega (${item.tipo_documento} N° ${item.numero_documento})`,
+        ultimo_valor_sin_iva: item.valor_sin_iva || 0,
+        ultimo_valor_con_iva: item.valor_con_iva || 0,
+        total_sin_iva: item.total_sin_iva || 0,
+        total_con_iva: item.total_con_iva || 0,
+        isp: item.isp || 'S/I',
+        fecha_ingreso: new Date().toISOString().split('T')[0]
+      }));
+
+      const { error: insertVarError } = await supabase.from('articulos_variantes').insert(insertVariantes);
+      if (insertVarError) throw insertVarError;
+
+      // 3. Actualizar estado y cantidad_recepcionada en ordenes_compra_articulos
+      for (const item of items) {
+        const artOc = articulosOc.find(a => a.codigo_articulo === item.codigo);
+        if (artOc) {
+          const cantidadAnterior = artOc.cantidad_recepcionada || 0;
+          const nuevaCantidadRecepcionada = cantidadAnterior + item.cantidad;
+          const nuevoEstado = nuevaCantidadRecepcionada >= artOc.cantidad ? 'recepcion completa' : 'recepcion incompleta';
+          
+          const historialActual = Array.isArray(artOc.historial) ? artOc.historial : [];
+          const nuevoHistorial = [
+            ...historialActual,
+            { estado: nuevoEstado, fecha_almacenamiento: new Date().toISOString() }
+          ];
+
+          const { error: updateArtErr } = await supabase
+            .from('ordenes_compra_articulos')
+            .update({
+              cantidad_recepcionada: nuevaCantidadRecepcionada,
+              estado: nuevoEstado,
+              fecha_almacenamiento: new Date().toISOString(),
+              historial: nuevoHistorial
+            })
+            .eq('id', artOc.id);
+
+          if (updateArtErr) throw updateArtErr;
+        }
+      }
 
       const nuevasAlertas = await calcularCrucePendientes(items);
       setAlertas(nuevasAlertas);
@@ -434,124 +640,264 @@ const RevisionBodegaModule = () => {
       {/* PESTAÑA: NUEVA REVISIÓN (INGRESO O INFORME) */}
       {activeTab === 'nueva' && flowStep === 'ingreso' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="glass-card" style={{ padding: '30px', marginBottom: '30px' }}>
-            <div className="responsive-grid-auto" style={{ alignItems: 'end', marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div>
-                <label style={labelStyle}>Documento</label>
-                <select name="tipo_documento" value={form.tipo_documento} onChange={handleInputChange} className="input-field">
-                  <option value="Factura">Factura</option>
-                  <option value="Guía de Despacho">Guía de Despacho</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Nº de Documento</label>
-                <input name="numero_documento" value={form.numero_documento} onChange={handleInputChange} className="input-field" placeholder="Escriba el número..." />
-              </div>
-            </div>
-
-            <div className="responsive-grid-auto" style={{ alignItems: 'end' }}>
-              <div>
-                <label style={labelStyle}>Código Artículo</label>
-                <input name="codigo" value={form.codigo} onChange={handleInputChange} className="input-field" placeholder="Ej: 888" autoFocus />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Descripción (Auto)</label>
-                <div style={{ 
-                  padding: '12px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', 
-                  color: form.codigo ? '#3b82f6' : '#64748b', fontWeight: '600',
-                  border: '1px dashed var(--border-color)', minHeight: '45px', display: 'flex', alignItems: 'center'
-                }}>
-                  {nombreArticulo}
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Lote</label>
-                <input name="lote" value={form.lote} onChange={handleInputChange} className="input-field" placeholder="Lote..." />
-              </div>
-              <div>
-                <label style={labelStyle}>F. Vencimiento</label>
-                <input type="date" name="vencimiento" value={form.vencimiento} onChange={handleInputChange} className="input-field" />
-              </div>
-              <div>
-                <label style={labelStyle}>Registro ISP</label>
-                <input name="isp" value={form.isp} onChange={handleInputChange} className="input-field" placeholder="ISP..." />
-              </div>
-              <div>
-                <label style={labelStyle}>Cantidad</label>
-                <input type="number" name="cantidad" value={form.cantidad} onChange={handleInputChange} className="input-field" placeholder="0" />
-              </div>
-              <div>
-                <button onClick={handleAddItem} className="btn-primary" style={{ width: '100%', padding: '12px', background: '#3b82f6' }}>
-                  <Plus size={20} /> Añadir
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabla de Lista Actual */}
-          <div className="glass-card" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
-                Lista de Revisión Actual ({items.length} ítems)
+          {!ocSeleccionada ? (
+            <div className="glass-card" style={{ padding: '30px', marginBottom: '30px' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Seleccione la Orden de Compra (OC) a Revisar
               </h3>
-              {items.length > 0 && (
-                <button onClick={handleFinalizar} className="btn-primary" style={{ background: '#10b981' }} disabled={loading}>
-                  {loading ? 'Procesando...' : <><Save size={18} /> Guardar y Cotejar</>}
-                </button>
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px' }}>
+                Solo se muestran las OCs que han sido recepcionadas en bodega (con estado Recepción Completa o Incompleta).
+              </p>
+
+              {loadingOcs ? (
+                <p style={{ color: '#94a3b8' }}>Cargando órdenes de compra...</p>
+              ) : ocs.length === 0 ? (
+                <p style={{ color: '#64748b', fontStyle: 'italic' }}>No hay órdenes de compra recepcionadas listas para revisión física en bodega.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '5px' }}>
+                  {ocs.map(oc => (
+                    <div 
+                      key={oc.id} 
+                      onClick={() => seleccionarOc(oc)}
+                      style={{
+                        padding: '16px 20px',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.border = '1px solid rgba(59, 130, 246, 0.4)';
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontWeight: '800', color: '#3b82f6', fontSize: '1.05rem' }}>{oc.numero_oc}</span>
+                          <span style={{ 
+                            background: 'rgba(16, 185, 129, 0.15)', 
+                            color: '#10b981', 
+                            padding: '2px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: '700' 
+                          }}>
+                            {oc.estado}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '4px', fontWeight: '500' }}>
+                          {oc.proveedor}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'right' }}>
+                        <div><strong>Fecha:</strong> {formatDate(oc.fecha_envio)}</div>
+                        <div style={{ color: '#3b82f6', marginTop: '2px', fontWeight: '600' }}>
+                          {oc.ordenes_compra_articulos?.length || 0} ítems recepcionados
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                    <th style={thStyle}>CÓDIGO</th>
-                    <th style={thStyle}>DESCRIPCIÓN</th>
-                    <th style={thStyle}>LOTE / VENC.</th>
-                    <th style={thStyle}>DOC. / ISP</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>CANTIDAD</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>X</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <AnimatePresence>
-                    {items.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                          No hay artículos agregados todavía.
-                        </td>
+          ) : (
+            <>
+              <div className="glass-card" style={{ padding: '30px', marginBottom: '30px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase' }}>Orden de Compra seleccionada</span>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc', margin: '4px 0 0 0' }}>
+                      {ocSeleccionada.numero_oc} <span style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: '400' }}>({ocSeleccionada.proveedor})</span>
+                    </h3>
+                  </div>
+                  <button 
+                    onClick={() => { setOcSeleccionada(null); setArticulosOc([]); setItems([]); }} 
+                    className="btn-secondary" 
+                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                  >
+                    Cambiar OC
+                  </button>
+                </div>
+
+                <div className="responsive-grid-auto" style={{ alignItems: 'end', marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div>
+                    <label style={labelStyle}>Documento</label>
+                    <select name="tipo_documento" value={form.tipo_documento} onChange={handleInputChange} className="input-field">
+                      <option value="Factura">Factura</option>
+                      <option value="Guía de Despacho">Guía de Despacho</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={labelStyle}>Nº de Documento</label>
+                    <input name="numero_documento" value={form.numero_documento} onChange={handleInputChange} className="input-field" placeholder="Escriba el número..." />
+                  </div>
+                </div>
+
+                <div className="responsive-grid-auto" style={{ alignItems: 'end', gap: '15px 20px' }}>
+                  <div>
+                    <label style={labelStyle}>Código Artículo</label>
+                    <select 
+                      name="codigo" 
+                      value={form.codigo} 
+                      onChange={handleInputChange} 
+                      className="input-field"
+                    >
+                      {articulosOc
+                        .filter(art => !items.some(item => item.codigo === art.codigo_articulo))
+                        .map(art => (
+                          <option key={art.id} value={art.codigo_articulo}>
+                            {art.codigo_articulo}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={labelStyle}>Descripción (Auto)</label>
+                    <div style={{ 
+                      padding: '12px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', 
+                      color: form.codigo ? '#3b82f6' : '#64748b', fontWeight: '600',
+                      border: '1px dashed var(--border-color)', minHeight: '45px', display: 'flex', alignItems: 'center'
+                    }}>
+                      {nombreArticulo}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Lote</label>
+                    <input name="lote" value={form.lote} onChange={handleInputChange} className="input-field" placeholder="Lote..." />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>F. Vencimiento</label>
+                    <input type="date" name="vencimiento" value={form.vencimiento} onChange={handleInputChange} className="input-field" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Registro ISP</label>
+                    <input name="isp" value={form.isp} onChange={handleInputChange} className="input-field" placeholder="ISP..." />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Cantidad</label>
+                    <input type="number" name="cantidad" value={form.cantidad} onChange={handleInputChange} className="input-field" placeholder="0" />
+                  </div>
+
+                  {/* Campos nuevos */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '45px' }}>
+                    <input 
+                      type="checkbox" 
+                      name="carta_canje" 
+                      id="carta_canje"
+                      checked={form.carta_canje} 
+                      onChange={handleInputChange} 
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="carta_canje" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer', userSelect: 'none' }}>
+                      Carta de Canje
+                    </label>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>P. Unitario S/IVA ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      name="valor_sin_iva" 
+                      value={form.valor_sin_iva} 
+                      onChange={(e) => handleValorSinIvaChange(e.target.value)} 
+                      className="input-field" 
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>P. Unitario C/IVA ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      name="valor_con_iva" 
+                      value={form.valor_con_iva} 
+                      onChange={(e) => handleValorConIvaChange(e.target.value)} 
+                      className="input-field" 
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <button onClick={handleAddItem} className="btn-primary" style={{ width: '100%', padding: '12px', background: '#3b82f6' }}>
+                      <Plus size={20} /> Añadir
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabla de Lista Actual */}
+              <div className="glass-card" style={{ overflow: 'hidden' }}>
+                <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                    Lista de Revisión Actual ({items.length} ítems)
+                  </h3>
+                  {items.length > 0 && (
+                    <button onClick={handleFinalizar} className="btn-primary" style={{ background: '#10b981' }} disabled={loading}>
+                      {loading ? 'Procesando...' : <><Save size={18} /> Guardar y Cotejar</>}
+                    </button>
+                  )}
+                </div>
+                
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                        <th style={thStyle}>CÓDIGO</th>
+                        <th style={thStyle}>DESCRIPCIÓN</th>
+                        <th style={thStyle}>LOTE / VENC.</th>
+                        <th style={thStyle}>DOC. / ISP</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>CANTIDAD</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>X</th>
                       </tr>
-                    ) : (
-                      items.map((item) => (
-                        <motion.tr key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={tdStyle}><strong>{item.codigo}</strong></td>
-                          <td style={tdStyle}>{item.nombre}</td>
-                          <td style={tdStyle}>
-                            <div>{item.lote}</div>
-                            {item.vencimiento && <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Venc: {item.vencimiento}</div>}
-                          </td>
-                          <td style={tdStyle}>
-                            <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 'bold' }}>{item.tipo_documento} {item.numero_documento}</div>
-                            <div style={{ fontSize: '0.8rem' }}>ISP: {item.isp}</div>
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800', color: '#10b981' }}>{item.cantidad}</td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <button onClick={() => handleRemoveItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '5px' }}>
-                              <Trash2 size={18} />
-                            </button>
-                          </td>
-                        </motion.tr>
-                      ))
-                    )}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </thead>
+                    <tbody>
+                      <AnimatePresence>
+                        {items.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                              No hay artículos agregados todavía.
+                            </td>
+                          </tr>
+                        ) : (
+                          items.map((item) => (
+                            <motion.tr key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={tdStyle}><strong>{item.codigo}</strong></td>
+                              <td style={tdStyle}>{item.nombre}</td>
+                              <td style={tdStyle}>
+                                <div>{item.lote}</div>
+                                {item.vencimiento && <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Venc: {formatDate(item.vencimiento)}</div>}
+                              </td>
+                              <td style={tdStyle}>
+                                <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 'bold' }}>{item.tipo_documento} {item.numero_documento}</div>
+                                <div style={{ fontSize: '0.8rem' }}>ISP: {item.isp}</div>
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800', color: '#10b981' }}>{item.cantidad}</td>
+                              <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                <button onClick={() => handleRemoveItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '5px' }}>
+                                  <Trash2 size={18} />
+                                </button>
+                              </td>
+                            </motion.tr>
+                          ))
+                        )}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </motion.div>
       )}
-
       {/* PESTAÑA: NUEVA REVISIÓN -> VISTA INFORME */}
       {activeTab === 'nueva' && flowStep === 'informe' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="informes-container">
@@ -633,7 +979,7 @@ const RevisionBodegaModule = () => {
                     <td style={tdStyle}>{item?.nombre}</td>
                     <td style={tdStyle}>
                       <div>{item?.lote}</div>
-                      {item?.vencimiento && <div style={{ fontSize: '8pt', color: '#f59e0b' }}>Venc: {item?.vencimiento}</div>}
+                      {item?.vencimiento && <div style={{ fontSize: '8pt', color: '#f59e0b' }}>Venc: {formatDate(item?.vencimiento)}</div>}
                     </td>
                     <td style={tdStyle}>
                       <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{item?.tipo_documento} {item?.numero_documento}</div>

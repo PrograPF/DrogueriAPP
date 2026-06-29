@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
-import { formatDate } from '../../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 
 // Helper to get today's date formatted as yyyy-MM-dd
 const getTodayString = () => {
@@ -27,14 +27,7 @@ const getTodayDisplayString = () => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
-// Helper to format timestamps as DD/MM/YYYY hh:mm
-const formatDateTime = (isoString) => {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  const dateStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const timeStr = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-  return `${dateStr} a las ${timeStr}`;
-};
+
 
 // Check if DD/MM/YYYY is valid
 const isValidDateStr = (str) => {
@@ -1628,7 +1621,6 @@ const SeguimientoOCModule = () => {
                       const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
                       const cantSol = art.cantidad || 0;
                       const cantRec = art.cantidad_recepcionada || 0;
-                      
                       let deliveryState = art.estado || 'Pendiente';
                       let badgeBg = 'rgba(255,255,255,0.05)';
                       let badgeColor = '#94a3b8';
@@ -1639,6 +1631,9 @@ const SeguimientoOCModule = () => {
                       } else if (deliveryState === 'recepcion incompleta') {
                         badgeBg = 'rgba(245, 158, 11, 0.15)';
                         badgeColor = '#f59e0b';
+                      } else if (deliveryState === 'recepcionado') {
+                        badgeBg = 'rgba(59, 130, 246, 0.15)';
+                        badgeColor = '#3b82f6';
                       } else if (deliveryState?.startsWith('rechazado')) {
                         badgeBg = 'rgba(239, 68, 68, 0.15)';
                         badgeColor = '#ef4444';
@@ -1660,21 +1655,54 @@ const SeguimientoOCModule = () => {
                                 ? art.historial
                                 : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
                               
-                              if (historyEntries.length === 0) return null;
+                              const validEntries = historyEntries.filter(e => e.fecha_almacenamiento);
+                              if (validEntries.length === 0) return null;
 
                               return (
-                                <div style={{ marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid rgba(255,255,255,0.06)' }}>
-                                  {historyEntries.map((entry, eIdx) => {
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 14px', 
+                                  background: 'rgba(255,255,255,0.02)', 
+                                  borderRadius: '8px', 
+                                  border: '1px solid rgba(255,255,255,0.05)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '6px'
+                                }}>
+                                  <div style={{ fontSize: '0.73rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.5px' }}>
+                                    Historial de Estados
+                                  </div>
+                                  {validEntries.map((entry, eIdx) => {
                                     const displayState = 
                                       entry.estado === 'recepcion completa' ? 'Recepción Completa' :
                                       entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                      entry.estado === 'recepcionado' ? 'Recepcionado' :
                                       entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
                                       entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
                                     
+                                    let stateColor = '#94a3b8';
+                                    let stateDot = 'rgba(255,255,255,0.2)';
+                                    
+                                    if (entry.estado === 'recepcion completa') {
+                                      stateColor = '#10b981';
+                                      stateDot = '#10b981';
+                                    } else if (entry.estado === 'recepcion incompleta') {
+                                      stateColor = '#f59e0b';
+                                      stateDot = '#f59e0b';
+                                    } else if (entry.estado === 'recepcionado') {
+                                      stateColor = '#3b82f6';
+                                      stateDot = '#3b82f6';
+                                    } else if (entry.estado?.startsWith('rechazado')) {
+                                      stateColor = '#ef4444';
+                                      stateDot = '#ef4444';
+                                    }
+
                                     return (
-                                      <div key={eIdx} style={{ fontSize: '0.71rem', color: '#8892b0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: '#3b82f6' }}></span>
-                                        <strong style={{ color: '#cbd5e1' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
+                                      <div key={eIdx} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: stateDot }}></span>
+                                        <span style={{ color: stateColor, fontWeight: '700' }}>{displayState}</span>
+                                        <span style={{ color: '#64748b' }}>—</span>
+                                        <span style={{ color: '#cbd5e1', fontSize: '0.74rem' }}>{formatDateTime(entry.fecha_almacenamiento)}</span>
                                       </div>
                                     );
                                   })}
@@ -1695,6 +1723,7 @@ const SeguimientoOCModule = () => {
                             }}>
                               {deliveryState === 'recepcion completa' ? 'Recepción Completa' :
                                deliveryState === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                               deliveryState === 'recepcionado' ? 'Recepcionado' :
                                deliveryState === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
                                deliveryState === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente'}
                             </span>
