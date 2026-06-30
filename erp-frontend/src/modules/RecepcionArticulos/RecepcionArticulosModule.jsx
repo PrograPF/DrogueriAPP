@@ -11,15 +11,43 @@ import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 
 
 const RecepcionArticulosModule = () => {
-  const [activeMode, setActiveMode] = useState('oc'); // 'oc' | 'cenabast'
+  const [activeMode, setActiveMode] = useState('oc'); // 'oc' | 'cenabast' | 'lote'
   const [loading, setLoading] = useState(false);
   const [ocs, setOcs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [localStatuses, setLocalStatuses] = useState({}); // { [artId]: status }
   const [guardandoOcId, setGuardandoOcId] = useState(null);
   
+  // Trazabilidad de Lotes states
+  const [loteSearchQuery, setLoteSearchQuery] = useState('');
+  const [loteResults, setLoteResults] = useState([]);
+  const [loadingLotes, setLoadingLotes] = useState(false);
+
   // Articles catalog mapping for instant code -> name translation
   const [articulosCatalog, setArticulosCatalog] = useState({});
+
+  const buscarLotes = async () => {
+    if (!loteSearchQuery.trim()) {
+      setLoteResults([]);
+      return;
+    }
+    setLoadingLotes(true);
+    try {
+      const { data, error } = await supabase
+        .from('revisiones_bodega')
+        .select('*')
+        .ilike('lote', `%${loteSearchQuery.trim()}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setLoteResults(data || []);
+    } catch (err) {
+      console.error('Error al buscar lote:', err);
+      alert('Error al buscar lote: ' + err.message);
+    } finally {
+      setLoadingLotes(false);
+    }
+  };
 
   // Fetch articles base catalog
   const cargarArticulosCatalog = async () => {
@@ -219,10 +247,10 @@ const RecepcionArticulosModule = () => {
         </div>
       </div>
 
-      {/* Two Large Action Buttons */}
+      {/* Three Large Action Buttons */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
         gap: '20px', 
         marginBottom: '35px' 
       }}>
@@ -327,11 +355,62 @@ const RecepcionArticulosModule = () => {
             </p>
           </div>
         </button>
+
+        {/* Trazabilidad de Lotes Button */}
+        <button
+          onClick={() => setActiveMode('lote')}
+          style={{
+            background: activeMode === 'lote' 
+              ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%)' 
+              : 'rgba(30, 41, 59, 0.4)',
+            border: activeMode === 'lote' ? '2px solid #a855f7' : '2px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '16px',
+            padding: '24px',
+            textAlign: 'left',
+            cursor: 'pointer',
+            color: '#ffffff',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: activeMode === 'lote' ? '0 10px 25px -5px rgba(168, 85, 247, 0.15)' : 'none',
+            display: 'flex',
+            alignItems: 'start',
+            gap: '18px'
+          }}
+          onMouseOver={(e) => {
+            if (activeMode !== 'lote') {
+              e.currentTarget.style.border = '2px solid rgba(168, 85, 247, 0.4)';
+              e.currentTarget.style.background = 'rgba(30, 41, 59, 0.6)';
+            }
+          }}
+          onMouseOut={(e) => {
+            if (activeMode !== 'lote') {
+              e.currentTarget.style.border = '2px solid rgba(255, 255, 255, 0.05)';
+              e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)';
+            }
+          }}
+        >
+          <div style={{ 
+            padding: '12px', 
+            background: activeMode === 'lote' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255, 255, 255, 0.03)', 
+            borderRadius: '12px',
+            color: activeMode === 'lote' ? '#a855f7' : '#94a3b8',
+            transition: 'all 0.3s'
+          }}>
+            <Search size={28} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 6px 0', color: activeMode === 'lote' ? '#a855f7' : '#f8fafc' }}>
+              Trazabilidad de Lotes
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
+              Consultar en qué Orden de Compra (OC) y con qué documento ingresó un lote de artículo específico.
+            </p>
+          </div>
+        </button>
       </div>
 
       {/* Dynamic Content area */}
       <AnimatePresence mode="wait">
-        {activeMode === 'oc' ? (
+        {activeMode === 'oc' && (
           <motion.div
             key="oc-buscador"
             initial={{ opacity: 0, y: 15 }}
@@ -411,7 +490,7 @@ const RecepcionArticulosModule = () => {
                     {/* Top Row: N° OC, Proveedor, Status, Dates */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'start', gap: '15px' }}>
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#3b82f6' }}>{oc.numero_oc}</span>
                           <span style={{ 
                             padding: '2px 8px', 
@@ -427,6 +506,20 @@ const RecepcionArticulosModule = () => {
                           }}>
                             {oc.estado}
                           </span>
+                          {oc.tipo_oc === 'PEDIDO ESPECIAL' && (
+                            <span style={{ 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '700',
+                              background: 'rgba(168, 85, 247, 0.15)',
+                              color: '#c084fc',
+                              border: '1px solid rgba(168, 85, 247, 0.3)',
+                              letterSpacing: '0.5px'
+                            }}>
+                              PEDIDO ESPECIAL
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#cbd5e1', marginTop: '4px' }}>
                           {oc.proveedor} <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '400' }}>(RUT: {oc.rut_proveedor || 'S/R'})</span>
@@ -588,7 +681,9 @@ const RecepcionArticulosModule = () => {
               </div>
             )}
           </motion.div>
-        ) : (
+        )}
+
+        {activeMode === 'cenabast' && (
           <motion.div
             key="cenabast-buscador"
             initial={{ opacity: 0, y: 15 }}
@@ -620,6 +715,168 @@ const RecepcionArticulosModule = () => {
                 </p>
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {activeMode === 'lote' && (
+          <motion.div
+            key="lote-buscador"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="glass-card"
+            style={{ padding: '30px' }}
+          >
+            {/* Header info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '25px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Search size={22} color="#a855f7" /> Trazabilidad por Lote de Artículo
+                </h3>
+                <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
+                  Ingresa un lote para ver qué Orden de Compra (OC) y documento lo originó.
+                </p>
+              </div>
+            </div>
+
+            {/* Input Search Box */}
+            <div style={{ display: 'flex', gap: '12px', width: '100%', marginBottom: '25px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
+                <input
+                  type="text"
+                  value={loteSearchQuery}
+                  onChange={e => setLoteSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') buscarLotes(); }}
+                  placeholder="Escribe el lote exacto (ej: ABC1234)..."
+                  className="input-field"
+                  style={{ paddingLeft: '48px', width: '100%' }}
+                />
+              </div>
+              <button 
+                onClick={buscarLotes} 
+                className="btn-primary" 
+                style={{ 
+                  padding: '12px 24px', 
+                  background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', 
+                  border: 'none', 
+                  boxShadow: '0 4px 12px rgba(168, 85, 247, 0.25)', 
+                  fontWeight: '700',
+                  borderRadius: '10px'
+                }}
+                disabled={loadingLotes}
+              >
+                {loadingLotes ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+
+            {/* Results */}
+            {loadingLotes ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 10px auto' }} />
+                Consultando trazabilidad de lotes...
+              </div>
+            ) : loteResults.length === 0 ? (
+              loteSearchQuery.trim() ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '50px 20px', 
+                  color: '#64748b', 
+                  border: '1px dashed var(--border-color)', 
+                  borderRadius: '12px' 
+                }}>
+                  <Search size={40} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f8fafc', margin: '0 0 4px 0' }}>Sin resultados</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>No se encontraron revisiones de bodega con el lote "{loteSearchQuery}".</p>
+                </div>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '50px 20px', 
+                  color: '#64748b', 
+                  border: '1px dashed var(--border-color)', 
+                  borderRadius: '12px' 
+                }}>
+                  <HelpCircle size={40} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f8fafc', margin: '0 0 4px 0' }}>Búsqueda de trazabilidad</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>Escribe un lote y haz clic en "Buscar" para rastrear su origen.</p>
+                </div>
+              )
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {loteResults.map((res, idx) => {
+                  const artName = articulosCatalog[res.codigo_articulo] || `Código [${res.codigo_articulo}]`;
+                  return (
+                    <div 
+                      key={idx}
+                      className="table-row"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.015)',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#a855f7' }}>Lote: {res.lote}</span>
+                            {res.numero_oc ? (
+                              <span style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: '700',
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                color: '#3b82f6',
+                                border: '1px solid rgba(59, 130, 246, 0.3)'
+                              }}>
+                                OC N° {res.numero_oc}
+                              </span>
+                            ) : (
+                              <span style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: '700',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: '#94a3b8'
+                              }}>
+                                Sin OC asociada (Ingreso Directo)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#cbd5e1', marginTop: '6px' }}>
+                            {artName} <span style={{ fontSize: '0.8rem', color: '#64748b' }}>({res.codigo_articulo})</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#94a3b8' }}>
+                          <div><strong>Cantidad:</strong> {res.cantidad} uds.</div>
+                          <div style={{ marginTop: '2px' }}><strong>Fecha Ingreso:</strong> {formatDateTime(res.created_at || res.fecha_ingreso)}</div>
+                        </div>
+                      </div>
+                      <div style={{ 
+                        background: 'rgba(255, 255, 255, 0.01)', 
+                        border: '1px solid rgba(255, 255, 255, 0.02)', 
+                        borderRadius: '8px', 
+                        padding: '8px 12px',
+                        fontSize: '0.85rem',
+                        color: '#94a3b8',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <span>Documento de Bodega: <strong>{res.tipo_documento || 'S/D'} N° {res.numero_documento || 'S/N'}</strong></span>
+                        {res.isp && <span>ISP: <strong style={{ color: '#cbd5e1' }}>{res.isp}</strong></span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

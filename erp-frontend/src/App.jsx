@@ -6,6 +6,7 @@ import RevisionBodegaModule from './modules/RevisionBodega/RevisionBodegaModule'
 import ConfigModule from './modules/Config/ConfigModule';
 import SeguimientoOCModule from './modules/SeguimientoOC/SeguimientoOCModule';
 import RecepcionArticulosModule from './modules/RecepcionArticulos/RecepcionArticulosModule';
+import InventarioModule from './modules/Inventario/InventarioModule';
 
 const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
   const location = useLocation();
@@ -118,7 +119,7 @@ const AppContent = () => {
           <Route path="/seguimiento-oc" element={<SeguimientoOCModule />} />
           <Route path="/recepcion" element={<RecepcionArticulosModule />} />
           <Route path="/dashboard" element={<div style={{ padding: '20px' }}>Próximamente: Dashboard de Jefatura</div>} />
-          <Route path="/inventario" element={<div style={{ padding: '20px' }}>Módulo de Inventario en desarrollo...</div>} />
+          <Route path="/inventario" element={<InventarioModule />} />
           <Route path="/config" element={<ConfigModule />} />
         </Routes>
       </div>

@@ -397,7 +397,8 @@ const RevisionBodegaModule = () => {
         isp: item.isp,
         cantidad: item.cantidad,
         tipo_documento: item.tipo_documento,
-        numero_documento: item.numero_documento
+        numero_documento: item.numero_documento,
+        numero_oc: ocSeleccionada ? ocSeleccionada.numero_oc : null
       }));
 
       const { error: insertError } = await supabase.from('revisiones_bodega').insert(insertData);
