@@ -62,7 +62,8 @@ const DiferenciasHistorial = ({ onBack }) => {
         cod: item.codigo_articulo || 'S/C',
         centro: item.centros?.nombre || 'S/C',
         fecha: item.fecha,
-        detalle: item.diferencia
+        detalle: item.diferencia,
+        inventario_realizado: item.inventario_realizado || false
       }));
 
       setData(prev => reset ? mappedData : [...prev, ...mappedData]);
@@ -71,6 +72,28 @@ const DiferenciasHistorial = ({ onBack }) => {
       console.error('Error cargando diferencias:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleRealizado = async (id, currentVal) => {
+    try {
+      const newVal = !currentVal;
+      const { error } = await supabase
+        .from('diferencias')
+        .update({ inventario_realizado: newVal })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setData(prev => prev.map(item => {
+        if (item.id === id) {
+          return { ...item, inventario_realizado: newVal };
+        }
+        return item;
+      }));
+    } catch (err) {
+      console.error('Error al actualizar estado de inventario:', err);
+      alert('Error al actualizar estado: ' + err.message);
     }
   };
 
@@ -167,6 +190,7 @@ const DiferenciasHistorial = ({ onBack }) => {
               <th style={thStyle}>ARTÍCULO</th>
               <th style={thStyle}>CENTRO</th>
               <th style={thStyle}>FECHA</th>
+              <th style={{ ...thStyle, textAlign: 'center' }} className="no-print">ESTADO</th>
               <th style={thStyle}>DETALLE / OBSERVACIÓN</th>
               <th style={{ ...thStyle, textAlign: 'center' }} className="no-print">ACCIONES</th>
             </tr>
@@ -178,6 +202,41 @@ const DiferenciasHistorial = ({ onBack }) => {
                 <td style={tdStyle}>{item.nombre}</td>
                 <td style={tdStyle}>{item.centro}</td>
                 <td style={tdStyle}>{formatDate(item.fecha)}</td>
+                <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
+                  <button 
+                    onClick={() => handleToggleRealizado(item.id, item.inventario_realizado)}
+                    style={{
+                      background: item.inventario_realizado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.1)',
+                      border: `1px solid ${item.inventario_realizado ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                      color: item.inventario_realizado ? '#10b981' : '#f59e0b',
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '150px',
+                      transition: 'all 0.2s',
+                      outline: 'none'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = item.inventario_realizado ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.2)';
+                      e.currentTarget.style.borderColor = item.inventario_realizado ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.4)';
+                      e.currentTarget.style.color = item.inventario_realizado ? '#ef4444' : '#10b981';
+                      e.currentTarget.innerText = item.inventario_realizado ? 'Desmarcar' : '¡Realizado!';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = item.inventario_realizado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.1)';
+                      e.currentTarget.style.borderColor = item.inventario_realizado ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)';
+                      e.currentTarget.style.color = item.inventario_realizado ? '#10b981' : '#f59e0b';
+                      e.currentTarget.innerText = item.inventario_realizado ? 'Inventario Realizado' : 'Pendiente';
+                    }}
+                  >
+                    {item.inventario_realizado ? 'Inventario Realizado' : 'Pendiente'}
+                  </button>
+                </td>
                 <td style={{ ...tdStyle, color: '#f59e0b', fontStyle: 'italic' }}>{item.detalle}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
                   <button onClick={() => handleDelete(item.id, item.nombre)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
