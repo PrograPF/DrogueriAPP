@@ -1,7 +1,7 @@
 export const labelStyle = {
   fontSize: '0.85rem',
   fontWeight: '600',
-  color: '#94a3b8',
+  color: 'var(--text-secondary)',
   display: 'flex',
   alignItems: 'center',
   gap: '6px',
@@ -12,7 +12,7 @@ export const thStyle = {
   padding: '12px 16px',
   fontSize: '0.75rem',
   fontWeight: '700',
-  color: '#94a3b8',
+  color: 'var(--text-secondary)',
   textTransform: 'uppercase'
 };
 

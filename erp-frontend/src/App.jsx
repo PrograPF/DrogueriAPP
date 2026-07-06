@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList } from 'lucide-react';
+import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList, Sun, Moon } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
 import RevisionBodegaModule from './modules/RevisionBodega/RevisionBodegaModule';
 import ConfigModule from './modules/Config/ConfigModule';
@@ -18,7 +18,7 @@ const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
       alignItems: 'center', 
       gap: '12px', 
       padding: '12px 20px', 
-      color: active ? '#3b82f6' : '#94a3b8', 
+      color: active ? '#3b82f6' : 'var(--text-secondary)', 
       textDecoration: 'none',
       background: active ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
       borderRadius: '12px',
@@ -33,6 +33,16 @@ const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
 
 const AppContent = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -97,20 +107,43 @@ const AppContent = () => {
       <div className="main-content">
         <header className="no-print" style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', color: '#94a3b8' }}>¡Hola, Pablo!</h3>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>¡Hola, Pablo!</h3>
             <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Bienvenido al sistema de control de stock.</p>
           </div>
-          <div style={{ 
-            width: '40px', 
-            height: '40px', 
-            background: '#3b82f6', 
-            borderRadius: '50%', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            fontWeight: 'bold',
-            flexShrink: 0
-          }}>P</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <button 
+              onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+              style={{
+                background: theme === 'light' ? 'rgba(15, 23, 42, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--text-primary)',
+                transition: 'all 0.3s ease',
+                outline: 'none'
+              }}
+              title={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <div style={{ 
+              width: '40px', 
+              height: '40px', 
+              background: '#3b82f6', 
+              borderRadius: '50%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              fontWeight: 'bold',
+              color: '#f8fafc',
+              flexShrink: 0
+            }}>P</div>
+          </div>
         </header>
 
         <Routes>

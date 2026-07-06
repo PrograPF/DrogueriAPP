@@ -2,6 +2,7 @@
 
 :root {
   --bg-main: #0f172a;
+  --bg-main-gradient: radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%);
   --bg-card: rgba(30, 41, 59, 0.7);
   --accent-primary: #3b82f6;
   --accent-secondary: #10b981;
@@ -9,6 +10,22 @@
   --text-secondary: #94a3b8;
   --border-color: rgba(255, 255, 255, 0.1);
   --glass-effect: blur(12px) saturate(180%);
+  --input-bg: rgba(15, 23, 42, 0.5);
+  --btn-secondary-bg: rgba(255, 255, 255, 0.05);
+}
+
+body.light-theme {
+  --bg-main: #f8fafc;
+  --bg-main-gradient: radial-gradient(circle at top right, #e2e8f0 0%, #f1f5f9 100%);
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --accent-primary: #2563eb;
+  --accent-secondary: #059669;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.12);
+  --glass-effect: blur(12px) saturate(120%);
+  --input-bg: rgba(255, 255, 255, 0.95);
+  --btn-secondary-bg: rgba(15, 23, 42, 0.05);
 }
 
 * {
@@ -23,6 +40,7 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3 {
@@ -37,15 +55,16 @@ h1, h2, h3 {
   border: 1px solid var(--border-color);
   border-radius: 16px;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .input-field {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: white;
+  color: var(--text-primary);
   transition: all 0.3s ease;
 }
 
@@ -53,6 +72,10 @@ h1, h2, h3 {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+body.light-theme .input-field::placeholder {
+  color: #94a3b8;
 }
 
 .btn-primary {
@@ -76,8 +99,8 @@ h1, h2, h3 {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
+  background: var(--btn-secondary-bg);
+  color: var(--text-primary);
   padding: 12px 24px;
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -88,6 +111,10 @@ h1, h2, h3 {
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+body.light-theme .btn-secondary:hover {
+  background: rgba(15, 23, 42, 0.08);
 }
 
 /* Quitar las flechas (spinners) de los inputs numéricos */
@@ -110,22 +137,23 @@ input[type=number] {
 
 .sidebar {
   width: 280px;
-  background: rgba(30, 41, 59, 0.8);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-effect);
+  border-right: 1px solid var(--border-color);
   padding: 30px 20px;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background 0.3s ease, border-color 0.3s ease;
   z-index: 100;
 }
 
 .main-content {
   flex: 1;
   padding: 40px;
-  background: radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%);
+  background: var(--bg-main-gradient);
   overflow-y: auto;
   min-width: 0; /* Prevents flex items from overflowing */
+  transition: background 0.3s ease;
 }
 
 .responsive-grid-2 {
