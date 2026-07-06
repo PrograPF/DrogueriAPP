@@ -13,6 +13,7 @@ const DiferenciasHistorial = ({ onBack }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [estadoFilter, setEstadoFilter] = useState('todos'); // 'todos' | 'pendiente' | 'realizado'
 
   const [articulosCatalog, setArticulosCatalog] = useState({});
 
@@ -119,10 +120,17 @@ const DiferenciasHistorial = ({ onBack }) => {
   };
 
   const filteredData = useMemo(() => {
-    const mapped = data.map(item => ({
+    let mapped = data.map(item => ({
       ...item,
       nombre: articulosCatalog[item.cod?.trim()] || 'Cargando nombre...'
     }));
+
+    if (estadoFilter === 'pendiente') {
+      mapped = mapped.filter(item => !item.inventario_realizado);
+    } else if (estadoFilter === 'realizado') {
+      mapped = mapped.filter(item => item.inventario_realizado);
+    }
+
     if (!searchTerm) return mapped;
     const term = searchTerm.toLowerCase();
     return mapped.filter(item => 
@@ -131,7 +139,7 @@ const DiferenciasHistorial = ({ onBack }) => {
       item.centro.toLowerCase().includes(term) ||
       item.detalle.toLowerCase().includes(term)
     );
-  }, [searchTerm, data, articulosCatalog]);
+  }, [searchTerm, estadoFilter, data, articulosCatalog]);
 
   return (
     <motion.div 
@@ -168,8 +176,8 @@ const DiferenciasHistorial = ({ onBack }) => {
         </div>
       </div>
 
-      <div className="glass-card no-print" style={{ padding: '25px', marginBottom: '30px' }}>
-        <div style={{ position: 'relative' }}>
+      <div className="glass-card no-print" style={{ padding: '25px', marginBottom: '30px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
           <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
           <input 
             type="text"
@@ -177,8 +185,31 @@ const DiferenciasHistorial = ({ onBack }) => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="input-field"
-            style={{ paddingLeft: '45px', fontSize: '1rem' }}
+            style={{ paddingLeft: '45px', fontSize: '1rem', width: '100%' }}
           />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '250px' }}>
+          <label style={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: '600', whiteSpace: 'nowrap' }}>Filtrar por:</label>
+          <select
+            value={estadoFilter}
+            onChange={(e) => setEstadoFilter(e.target.value)}
+            className="input-field"
+            style={{ 
+              background: '#0f172a', 
+              border: '1px solid rgba(255,255,255,0.1)', 
+              color: '#cbd5e1', 
+              padding: '10px 16px', 
+              borderRadius: '8px', 
+              cursor: 'pointer',
+              outline: 'none',
+              fontSize: '0.9rem',
+              width: '100%'
+            }}
+          >
+            <option value="todos">Todos los registros</option>
+            <option value="pendiente">Pendientes de Inventario</option>
+            <option value="realizado">Inventario Realizado</option>
+          </select>
         </div>
       </div>
 
