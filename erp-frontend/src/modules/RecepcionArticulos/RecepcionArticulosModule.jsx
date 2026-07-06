@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Truck, ClipboardList, Search, Activity, Calendar, FileText, 
   RefreshCw, CheckCircle, Clock, AlertTriangle, ArrowRight, ShoppingBag, 
-  MapPin, HelpCircle
+  MapPin, HelpCircle, Save, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -17,6 +17,7 @@ const RecepcionArticulosModule = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [localStatuses, setLocalStatuses] = useState({}); // { [artId]: status }
   const [guardandoOcId, setGuardandoOcId] = useState(null);
+  const [selectedOcForModal, setSelectedOcForModal] = useState(null);
   
   // Trazabilidad de Lotes states
   const [loteSearchQuery, setLoteSearchQuery] = useState('');
@@ -204,6 +205,31 @@ const RecepcionArticulosModule = () => {
       setLocalStatuses(updatedLocalStatuses);
 
       await cargarOcs();
+      
+      try {
+        const { data: updatedFullOc } = await supabase
+          .from('ordenes_compra')
+          .select(`
+            *,
+            ordenes_compra_articulos (
+              id,
+              codigo_articulo,
+              cantidad,
+              cantidad_recepcionada,
+              estado,
+              fecha_almacenamiento,
+              historial
+            )
+          `)
+          .eq('id', oc.id)
+          .single();
+        
+        if (updatedFullOc) {
+          setSelectedOcForModal(updatedFullOc);
+        }
+      } catch (refreshErr) {
+        console.error('Error al refrescar modal de OC:', refreshErr);
+      }
     } catch (err) {
       console.error('Error al guardar recepción de OC:', err);
       alert('Error al guardar: ' + err.message);
@@ -476,6 +502,7 @@ const RecepcionArticulosModule = () => {
                   <div 
                     key={oc.id}
                     className="table-row"
+                    onClick={() => setSelectedOcForModal(oc)}
                     style={{
                       background: 'rgba(255, 255, 255, 0.015)',
                       border: '1px solid rgba(255, 255, 255, 0.04)',
@@ -484,7 +511,16 @@ const RecepcionArticulosModule = () => {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '15px',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.015)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
                     }}
                   >
                     {/* Top Row: N° OC, Proveedor, Status, Dates */}
@@ -531,151 +567,11 @@ const RecepcionArticulosModule = () => {
                         {oc.fecha_aceptacion && (
                           <div style={{ color: '#10b981', marginTop: '2px' }}><strong>Aceptada:</strong> {formatDate(oc.fecha_aceptacion)}</div>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Bottom Row: Articles list preview inside the card */}
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.01)', 
-                      border: '1px solid rgba(255, 255, 255, 0.02)', 
-                      borderRadius: '8px', 
-                      padding: '12px 16px'
-                    }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                        Artículos en esta OC ({oc.ordenes_compra_articulos?.length || 0})
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {(oc.ordenes_compra_articulos || []).map((art, idx) => {
-                          const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                          const hasFecha = art.fecha_almacenamiento;
-                          const activeStatus = localStatuses[art.id] !== undefined ? localStatuses[art.id] : (art.estado || 'Pendiente');
-                          
-                          return (
-                            <div key={idx} style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              fontSize: '0.85rem', 
-                              color: '#cbd5e1',
-                              padding: '8px 0',
-                              borderBottom: idx < oc.ordenes_compra_articulos.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none'
-                            }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
-                                  <span style={{ fontWeight: '500' }}>{artName}</span>
-                                </div>
-                                {(() => {
-                                  const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
-                                    ? art.historial
-                                    : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
-                                  
-                                  if (historyEntries.length === 0) return null;
-
-                                  return (
-                                    <div style={{ marginTop: '4px', paddingLeft: '6px', borderLeft: '2px solid rgba(255,255,255,0.06)' }}>
-                                      {historyEntries.map((entry, eIdx) => {
-                                        const displayState = 
-                                          entry.estado === 'recepcion completa' ? 'Recepción Completa' :
-                                          entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
-                                          entry.estado === 'recepcionado' ? 'Recepcionado' :
-                                          entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                                          entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';                                        
-                                        return (
-                                          <div key={eIdx} style={{ fontSize: '0.71rem', color: '#8892b0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6' }}></span>
-                                            <strong style={{ color: '#cbd5e1' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontWeight: '600', color: '#94a3b8' }}>
-                                  {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
-                                </span>
-                                <select
-                                  value={activeStatus}
-                                  onChange={(e) => handleStatusChange(art.id, e.target.value)}
-                                  className="input-field"
-                                  style={{
-                                    padding: '5px 10px',
-                                    fontSize: '0.8rem',
-                                    fontWeight: '600',
-                                    width: 'auto',
-                                    cursor: 'pointer',
-                                    borderRadius: '8px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    background: 
-                                      activeStatus === 'recepcionado' ? 'rgba(59, 130, 246, 0.15)' :
-                                      activeStatus === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
-                                      activeStatus === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
-                                    color: 
-                                      activeStatus === 'recepcionado' ? '#3b82f6' :
-                                      activeStatus?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
-                                  }}
-                                >
-                                  <option value="Pendiente" style={{ background: '#1e293b' }}>Pendiente</option>
-                                  <option value="recepcionado" style={{ background: '#1e293b' }}>Recepcionado</option>
-                                  <option value="rechazado por vencimiento" style={{ background: '#1e293b' }}>Rechazado por Vencimiento</option>
-                                  <option value="rechazado por calidad" style={{ background: '#1e293b' }}>Rechazado por Calidad</option>
-                                </select>                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    {/* Save Button for OC Card */}
-                    {(() => {
-                      const hasChanges = (oc.ordenes_compra_articulos || []).some(
-                        art => localStatuses[art.id] !== undefined && localStatuses[art.id] !== (art.estado || 'Pendiente')
-                      );
-                      if (!hasChanges) return null;
-                      return (
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'flex-end', 
-                          marginTop: '15px', 
-                          paddingTop: '15px', 
-                          borderTop: '1px solid rgba(255, 255, 255, 0.05)' 
-                        }}>
-                          <button
-                            onClick={() => handleSaveOcReception(oc)}
-                            disabled={guardandoOcId === oc.id}
-                            className="btn-primary"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '10px 20px',
-                              fontSize: '0.85rem',
-                              fontWeight: '700',
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                              border: 'none',
-                              color: '#ffffff',
-                              cursor: 'pointer',
-                              borderRadius: '10px',
-                              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {guardandoOcId === oc.id ? (
-                              <>
-                                <RefreshCw size={15} className="animate-spin" />
-                                Guardando...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle size={15} />
-                                Guardar Estado
-                              </>
-                            )}
-                          </button>
+                        <div style={{ marginTop: '5px', fontSize: '0.8rem', color: '#3b82f6', fontWeight: '600' }}>
+                          Artículos: {(oc.ordenes_compra_articulos || []).length} ➔ Gestionar Recepción
                         </div>
-                      );
-                    })()}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -878,6 +774,260 @@ const RecepcionArticulosModule = () => {
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP DETAIL MODAL FOR RECEPTION */}
+      <AnimatePresence>
+        {selectedOcForModal && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}
+            onClick={() => setSelectedOcForModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '750px',
+                padding: '28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+                position: 'relative',
+                maxHeight: '90vh',
+                overflowY: 'auto'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setSelectedOcForModal(null)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '50%',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              {/* Title */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '10px' }}>
+                  <Truck size={24} color="#3b82f6" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                    Recepción de OC: {selectedOcForModal.numero_oc}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Details Info Grid */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                gap: '15px', 
+                background: 'rgba(255,255,255,0.01)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '16px',
+                marginBottom: '25px',
+                fontSize: '0.9rem'
+              }}>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Proveedor</span>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{selectedOcForModal.proveedor}</strong>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '2px' }}>RUT: {selectedOcForModal.rut_proveedor || 'No registrado'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Estado de OC</span>
+                  <span style={{ 
+                    padding: '2px 8px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: '700',
+                    background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
+                                selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
+                                selectedOcForModal.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
+                    color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
+                           selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
+                           selectedOcForModal.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
+                    display: 'inline-block',
+                    marginTop: '4px'
+                  }}>
+                    {selectedOcForModal.estado}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Fechas</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>Envío: {formatDate(selectedOcForModal.fecha_envio)}</strong>
+                  {selectedOcForModal.fecha_aceptacion && (
+                    <span style={{ display: 'block', color: '#10b981', fontSize: '0.8rem', marginTop: '2px' }}>
+                      Aceptada: {formatDate(selectedOcForModal.fecha_aceptacion)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Articles list block */}
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.01)', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '8px', 
+                padding: '16px'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                  Artículos en esta OC ({(selectedOcForModal.ordenes_compra_articulos || []).length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
+                    const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
+                    const activeStatus = localStatuses[art.id] !== undefined ? localStatuses[art.id] : (art.estado || 'Pendiente');
+                    
+                    return (
+                      <div key={idx} style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        fontSize: '0.85rem', 
+                        color: 'var(--text-primary)',
+                        padding: '10px 0',
+                        borderBottom: idx < selectedOcForModal.ordenes_compra_articulos.length - 1 ? '1px solid var(--border-color)' : 'none'
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
+                            <span style={{ fontWeight: '600' }}>{artName}</span>
+                          </div>
+                          {(() => {
+                            const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
+                              ? art.historial
+                              : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
+                            
+                            if (historyEntries.length === 0) return null;
+
+                            return (
+                              <div style={{ marginTop: '4px', paddingLeft: '6px', borderLeft: '2px solid var(--border-color)' }}>
+                                {historyEntries.map((entry, eIdx) => {
+                                  const displayState = 
+                                    entry.estado === 'recepcion completa' ? 'Recepción Completa' :
+                                    entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                    entry.estado === 'recepcionado' ? 'Recepcionado' :
+                                    entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                                    entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';                                        
+                                  return (
+                                    <div key={eIdx} style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6' }}></span>
+                                      <strong style={{ color: 'var(--text-primary)' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>
+                            {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
+                          </span>
+                          <select
+                            value={activeStatus}
+                            onChange={(e) => handleStatusChange(art.id, e.target.value)}
+                            className="input-field"
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              width: 'auto',
+                              cursor: 'pointer',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              background: 
+                                activeStatus === 'recepcionado' ? 'rgba(59, 130, 246, 0.15)' :
+                                activeStatus === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
+                                activeStatus === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
+                              color: 
+                                activeStatus === 'recepcionado' ? '#3b82f6' :
+                                activeStatus?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
+                            }}
+                          >
+                            <option value="Pendiente" style={{ background: 'var(--bg-card)' }}>Pendiente</option>
+                            <option value="recepcionado" style={{ background: 'var(--bg-card)' }}>Recepcionado</option>
+                            <option value="rechazado por vencimiento" style={{ background: 'var(--bg-card)' }}>Rechazado por Vencimiento</option>
+                            <option value="rechazado por calidad" style={{ background: 'var(--bg-card)' }}>Rechazado por Calidad</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Save Button for Reception */}
+              {(() => {
+                const hasChanges = (selectedOcForModal.ordenes_compra_articulos || []).some(
+                  art => localStatuses[art.id] !== undefined && localStatuses[art.id] !== (art.estado || 'Pendiente')
+                );
+                return (
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'flex-end', 
+                    gap: '15px',
+                    marginTop: '25px', 
+                    paddingTop: '20px', 
+                    borderTop: '1px solid var(--border-color)' 
+                  }}>
+                    <button onClick={() => setSelectedOcForModal(null)} className="btn-secondary" style={{ minWidth: '100px' }}>
+                      Cerrar
+                    </button>
+                    <button
+                      onClick={() => handleSaveOcReception(selectedOcForModal)}
+                      disabled={guardandoOcId === selectedOcForModal.id || !hasChanges}
+                      className="btn-primary"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        minWidth: '180px',
+                        opacity: !hasChanges ? 0.6 : 1,
+                        cursor: !hasChanges ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <Save size={18} /> {guardandoOcId === selectedOcForModal.id ? 'Guardando...' : 'Guardar Recepción'}
+                    </button>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
