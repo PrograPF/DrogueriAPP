@@ -17,15 +17,68 @@
 body.light-theme {
   --bg-main: #f8fafc;
   --bg-main-gradient: radial-gradient(circle at top right, #e2e8f0 0%, #f1f5f9 100%);
-  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card: rgba(255, 255, 255, 0.95);
   --accent-primary: #2563eb;
   --accent-secondary: #059669;
   --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --border-color: rgba(15, 23, 42, 0.12);
+  --text-secondary: #334155;
+  --border-color: rgba(15, 23, 42, 0.08);
   --glass-effect: blur(12px) saturate(120%);
   --input-bg: rgba(255, 255, 255, 0.95);
   --btn-secondary-bg: rgba(15, 23, 42, 0.05);
+}
+
+/* Force high-contrast text colors for elements with inline dark-theme styles in Light Mode */
+body.light-theme [style*="color: #cbd5e1"],
+body.light-theme [style*="color: rgb(203, 213, 225)"],
+body.light-theme [style*="color: #cbd5e1"] {
+  color: var(--text-primary) !important;
+}
+
+body.light-theme [style*="color: #94a3b8"],
+body.light-theme [style*="color: rgb(148, 163, 184)"],
+body.light-theme [style*="color: #64748b"],
+body.light-theme [style*="color: rgb(100, 116, 139)"] {
+  color: var(--text-secondary) !important;
+}
+
+body.light-theme [style*="color: #f8fafc"],
+body.light-theme [style*="color: rgb(248, 250, 252)"],
+body.light-theme [style*="color: #ffffff"],
+body.light-theme [style*="color: rgb(255, 255, 255)"],
+body.light-theme [style*="color: white"] {
+  color: var(--text-primary);
+}
+
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]) > [style*="color: #f8fafc"],
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]) > [style*="color: #ffffff"],
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]) > [style*="color: white"] {
+  color: var(--text-primary) !important;
+}
+
+/* Override inline dark backgrounds on card containers/buttons to keep them light and clean */
+body.light-theme [style*="rgba(30, 41, 59"],
+body.light-theme [style*="background: rgba(30, 41, 59"],
+body.light-theme [style*="background-color: rgba(30, 41, 59"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.light-theme [style*="rgba(30, 41, 59"]:hover,
+body.light-theme [style*="background: rgba(30, 41, 59"]:hover {
+  background: rgba(15, 23, 42, 0.03) !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Force dark border-colors instead of faint transparent white borders in Light Mode */
+body.light-theme [style*="border-color: rgba(255, 255, 255"],
+body.light-theme [style*="border: 1px solid rgba(255, 255, 255"],
+body.light-theme [style*="border-bottom: 1px solid rgba(255, 255, 255"],
+body.light-theme [style*="border-right: 1px solid rgba(255, 255, 255"],
+body.light-theme [style*="border-bottom: 1px solid rgba(255,255,255"] {
+  border-color: var(--border-color) !important;
 }
 
 * {
