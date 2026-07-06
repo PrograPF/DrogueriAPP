@@ -121,6 +121,11 @@ const SeguimientoOCModule = () => {
   
   // Modal State
   const [selectedOcForModal, setSelectedOcForModal] = useState(null);
+  const [modalTab, setModalTab] = useState('articulos'); // 'articulos' | 'bitacora'
+  const [comentarios, setComentarios] = useState([]);
+  const [loadingComentarios, setLoadingComentarios] = useState(false);
+  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [guardandoComentario, setGuardandoComentario] = useState(false);
 
   // Articles catalog mapping for instant code -> name translation
   const [articulosCatalog, setArticulosCatalog] = useState({});
@@ -221,6 +226,67 @@ const SeguimientoOCModule = () => {
       setLoading(false);
     }
   };
+
+  // Load comments for a specific OC
+  const fetchComentarios = async (ocId) => {
+    if (!ocId) return;
+    setLoadingComentarios(true);
+    try {
+      const { data, error } = await supabase
+        .from('ordenes_compra_comentarios')
+        .select('*')
+        .eq('oc_id', ocId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setComentarios(data || []);
+    } catch (err) {
+      console.error('Error al cargar comentarios:', err);
+    } finally {
+      setLoadingComentarios(false);
+    }
+  };
+
+  // Add new comment to Supabase
+  const handleAddComentario = async (e) => {
+    if (e) e.preventDefault();
+    if (!nuevoComentario.trim() || !selectedOcForModal) return;
+
+    setGuardandoComentario(true);
+    try {
+      const { data, error } = await supabase
+        .from('ordenes_compra_comentarios')
+        .insert([
+          {
+            oc_id: selectedOcForModal.id,
+            comentario: nuevoComentario.trim()
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+      
+      // Update local comments list
+      setComentarios(prev => [...prev, ...(data || [])]);
+      setNuevoComentario('');
+    } catch (err) {
+      console.error('Error al guardar comentario:', err);
+      alert('Error al guardar comentario: ' + err.message);
+    } finally {
+      setGuardandoComentario(false);
+    }
+  };
+
+  // Automatically fetch comments and reset tab when modal selected OC changes
+  useEffect(() => {
+    if (selectedOcForModal) {
+      setModalTab('articulos');
+      fetchComentarios(selectedOcForModal.id);
+    } else {
+      setComentarios([]);
+      setModalTab('articulos');
+    }
+  }, [selectedOcForModal]);
 
   const cargarProveedores = async () => {
     setLoadingProveedores(true);
@@ -1606,134 +1672,259 @@ const SeguimientoOCModule = () => {
                 );
               })()}
 
-              {/* Modal Articles Table */}
-              <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '12px', color: '#f8fafc' }}>Detalle de Artículos</h4>
-              <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.8rem' }}>
-                      <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO / DETALLE</th>
-                      <th style={{ padding: '10px 12px', color: '#94a3b8', width: '160px', textAlign: 'right' }}>ESTADO</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
-                      const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                      const cantSol = art.cantidad || 0;
-                      const cantRec = art.cantidad_recepcionada || 0;
-                      let deliveryState = art.estado || 'Pendiente';
-                      let badgeBg = 'rgba(255,255,255,0.05)';
-                      let badgeColor = '#94a3b8';
-
-                      if (deliveryState === 'recepcion completa') {
-                        badgeBg = 'rgba(16, 185, 129, 0.15)';
-                        badgeColor = '#10b981';
-                      } else if (deliveryState === 'recepcion incompleta') {
-                        badgeBg = 'rgba(245, 158, 11, 0.15)';
-                        badgeColor = '#f59e0b';
-                      } else if (deliveryState === 'recepcionado') {
-                        badgeBg = 'rgba(59, 130, 246, 0.15)';
-                        badgeColor = '#3b82f6';
-                      } else if (deliveryState?.startsWith('rechazado')) {
-                        badgeBg = 'rgba(239, 68, 68, 0.15)';
-                        badgeColor = '#ef4444';
-                      }
-
-                      return (
-                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
-                          <td style={{ padding: '12px 12px', verticalAlign: 'top' }}>
-                            <div style={{ fontWeight: '600', color: '#f8fafc', lineHeight: '1.4' }}>{nombreArt}</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
-                              <span style={{ color: '#64748b' }}>Cód: {art.codigo_articulo}</span>
-                              <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
-                              <span>Solicitado: <strong style={{ color: '#cbd5e1' }}>{cantSol} uds.</strong></span>
-                              <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
-                              <span>Recibido: <strong style={{ color: cantRec >= cantSol ? '#10b981' : '#f59e0b' }}>{cantRec} uds.</strong></span>
-                            </div>
-                            {(() => {
-                              const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
-                                ? art.historial
-                                : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
-                              
-                              const validEntries = historyEntries.filter(e => e.fecha_almacenamiento);
-                              if (validEntries.length === 0) return null;
-
-                              return (
-                                <div style={{ 
-                                  marginTop: '10px', 
-                                  padding: '10px 14px', 
-                                  background: 'rgba(255,255,255,0.02)', 
-                                  borderRadius: '8px', 
-                                  border: '1px solid rgba(255,255,255,0.05)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '6px'
-                                }}>
-                                  <div style={{ fontSize: '0.73rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.5px' }}>
-                                    Historial de Estados
-                                  </div>
-                                  {validEntries.map((entry, eIdx) => {
-                                    const displayState = 
-                                      entry.estado === 'recepcion completa' ? 'Recepción Completa' :
-                                      entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
-                                      entry.estado === 'recepcionado' ? 'Recepcionado' :
-                                      entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                                      entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
-                                    
-                                    let stateColor = '#94a3b8';
-                                    let stateDot = 'rgba(255,255,255,0.2)';
-                                    
-                                    if (entry.estado === 'recepcion completa') {
-                                      stateColor = '#10b981';
-                                      stateDot = '#10b981';
-                                    } else if (entry.estado === 'recepcion incompleta') {
-                                      stateColor = '#f59e0b';
-                                      stateDot = '#f59e0b';
-                                    } else if (entry.estado === 'recepcionado') {
-                                      stateColor = '#3b82f6';
-                                      stateDot = '#3b82f6';
-                                    } else if (entry.estado?.startsWith('rechazado')) {
-                                      stateColor = '#ef4444';
-                                      stateDot = '#ef4444';
-                                    }
-
-                                    return (
-                                      <div key={eIdx} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: stateDot }}></span>
-                                        <span style={{ color: stateColor, fontWeight: '700' }}>{displayState}</span>
-                                        <span style={{ color: '#64748b' }}>—</span>
-                                        <span style={{ color: '#cbd5e1', fontSize: '0.74rem' }}>{formatDateTime(entry.fecha_almacenamiento)}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })()}
-                          </td>
-                          <td style={{ padding: '12px 12px', verticalAlign: 'top', textAlign: 'right' }}>
-                            <span style={{ 
-                              padding: '4px 8px', 
-                              borderRadius: '6px', 
-                              fontSize: '0.75rem', 
-                              fontWeight: '700',
-                              background: badgeBg,
-                              color: badgeColor,
-                              textTransform: 'capitalize',
-                              display: 'inline-block'
-                            }}>
-                              {deliveryState === 'recepcion completa' ? 'Recepción Completa' :
-                               deliveryState === 'recepcion incompleta' ? 'Recepción Incompleta' :
-                               deliveryState === 'recepcionado' ? 'Recepcionado' :
-                               deliveryState === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                               deliveryState === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              {/* Tabs navigation */}
+              <div style={{ 
+                display: 'flex', 
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
+                marginBottom: '20px',
+                gap: '10px'
+              }}>
+                <button 
+                  onClick={() => setModalTab('articulos')}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: modalTab === 'articulos' ? '2px solid #3b82f6' : '2px solid transparent',
+                    color: modalTab === 'articulos' ? '#3b82f6' : '#94a3b8',
+                    fontWeight: '700',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    marginBottom: '-1px'
+                  }}
+                >
+                  Artículos ({(selectedOcForModal.ordenes_compra_articulos || []).length})
+                </button>
+                <button 
+                  onClick={() => setModalTab('bitacora')}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: modalTab === 'bitacora' ? '2px solid #3b82f6' : '2px solid transparent',
+                    color: modalTab === 'bitacora' ? '#3b82f6' : '#94a3b8',
+                    fontWeight: '700',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    marginBottom: '-1px'
+                  }}
+                >
+                  Bitácora ({comentarios.length})
+                </button>
               </div>
+
+              {/* Conditional content */}
+              {modalTab === 'articulos' ? (
+                <>
+                  {/* Modal Articles Table */}
+                  <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '12px', color: '#f8fafc' }}>Detalle de Artículos</h4>
+                  <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.8rem' }}>
+                          <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO / DETALLE</th>
+                          <th style={{ padding: '10px 12px', color: '#94a3b8', width: '160px', textAlign: 'right' }}>ESTADO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
+                          const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
+                          const cantSol = art.cantidad || 0;
+                          const cantRec = art.cantidad_recepcionada || 0;
+                          let deliveryState = art.estado || 'Pendiente';
+                          let badgeBg = 'rgba(255,255,255,0.05)';
+                          let badgeColor = '#94a3b8';
+
+                          if (deliveryState === 'recepcion completa') {
+                            badgeBg = 'rgba(16, 185, 129, 0.15)';
+                            badgeColor = '#10b981';
+                          } else if (deliveryState === 'recepcion incompleta') {
+                            badgeBg = 'rgba(245, 158, 11, 0.15)';
+                            badgeColor = '#f59e0b';
+                          } else if (deliveryState === 'recepcionado') {
+                            badgeBg = 'rgba(59, 130, 246, 0.15)';
+                            badgeColor = '#3b82f6';
+                          } else if (deliveryState?.startsWith('rechazado')) {
+                            badgeBg = 'rgba(239, 68, 68, 0.15)';
+                            badgeColor = '#ef4444';
+                          }
+
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
+                              <td style={{ padding: '12px 12px', verticalAlign: 'top' }}>
+                                <div style={{ fontWeight: '600', color: '#f8fafc', lineHeight: '1.4' }}>{nombreArt}</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
+                                  <span style={{ color: '#64748b' }}>Cód: {art.codigo_articulo}</span>
+                                  <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                  <span>Solicitado: <strong style={{ color: '#cbd5e1' }}>{cantSol} uds.</strong></span>
+                                  <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                  <span>Recibido: <strong style={{ color: cantRec >= cantSol ? '#10b981' : '#f59e0b' }}>{cantRec} uds.</strong></span>
+                                </div>
+                                {(() => {
+                                  const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
+                                    ? art.historial
+                                    : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
+                                  
+                                  const validEntries = historyEntries.filter(e => e.fecha_almacenamiento);
+                                  if (validEntries.length === 0) return null;
+
+                                  return (
+                                    <div style={{ 
+                                      marginTop: '10px', 
+                                      padding: '10px 14px', 
+                                      background: 'rgba(255,255,255,0.02)', 
+                                      borderRadius: '8px', 
+                                      border: '1px solid rgba(255,255,255,0.05)',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '6px'
+                                    }}>
+                                      <div style={{ fontSize: '0.73rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.5px' }}>
+                                        Historial de Estados
+                                      </div>
+                                      {validEntries.map((entry, eIdx) => {
+                                        const displayState = 
+                                          entry.estado === 'recepcion completa' ? 'Recepción Completa' :
+                                          entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                          entry.estado === 'recepcionado' ? 'Recepcionado' :
+                                          entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                                          entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
+                                        
+                                        let stateColor = '#94a3b8';
+                                        let stateDot = 'rgba(255,255,255,0.2)';
+                                        
+                                        if (entry.estado === 'recepcion completa') {
+                                          stateColor = '#10b981';
+                                          stateDot = '#10b981';
+                                        } else if (entry.estado === 'recepcion incompleta') {
+                                          stateColor = '#f59e0b';
+                                          stateDot = '#f59e0b';
+                                        } else if (entry.estado === 'recepcionado') {
+                                          stateColor = '#3b82f6';
+                                          stateDot = '#3b82f6';
+                                        } else if (entry.estado?.startsWith('rechazado')) {
+                                          stateColor = '#ef4444';
+                                          stateDot = '#ef4444';
+                                        }
+
+                                        return (
+                                          <div key={eIdx} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: stateDot }}></span>
+                                            <span style={{ color: stateColor, fontWeight: '700' }}>{displayState}</span>
+                                            <span style={{ color: '#64748b' }}>—</span>
+                                            <span style={{ color: '#cbd5e1', fontSize: '0.74rem' }}>{formatDateTime(entry.fecha_almacenamiento)}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+                              </td>
+                              <td style={{ padding: '12px 12px', verticalAlign: 'top', textAlign: 'right' }}>
+                                <span style={{ 
+                                  padding: '4px 8px', 
+                                  borderRadius: '6px', 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: '700',
+                                  background: badgeBg,
+                                  color: badgeColor,
+                                  textTransform: 'capitalize',
+                                  display: 'inline-block'
+                                }}>
+                                  {deliveryState === 'recepcion completa' ? 'Recepción Completa' :
+                                   deliveryState === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                   deliveryState === 'recepcionado' ? 'Recepcionado' :
+                                   deliveryState === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                                   deliveryState === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Listado de Anotaciones */}
+                  <div style={{ 
+                    maxHeight: '230px', 
+                    overflowY: 'auto', 
+                    background: 'rgba(0,0,0,0.15)', 
+                    borderRadius: '10px', 
+                    padding: '16px',
+                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {loadingComentarios ? (
+                      <div style={{ color: '#94a3b8', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>
+                        Cargando bitácora...
+                      </div>
+                    ) : comentarios.length === 0 ? (
+                      <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '30px' }}>
+                        No hay anotaciones registradas en la bitácora de esta OC.
+                      </div>
+                    ) : (
+                      comentarios.map((com, index) => (
+                        <div key={com.id || index} style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          borderRadius: '8px',
+                          padding: '12px',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.75rem', color: '#64748b' }}>
+                            <span style={{ fontWeight: '700', color: '#3b82f6' }}>Anotación #{index + 1}</span>
+                            <span>{formatDateTime(com.created_at)}</span>
+                          </div>
+                          <div style={{ color: '#cbd5e1', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                            {com.comentario}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Formulario de Nueva Anotación */}
+                  <form onSubmit={handleAddComentario} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <textarea
+                      placeholder="Escribe una observación o comentario sobre el estado de esta OC..."
+                      value={nuevoComentario}
+                      onChange={(e) => setNuevoComentario(e.target.value)}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        background: '#0f172a',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#f8fafc',
+                        fontSize: '0.85rem',
+                        resize: 'none',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                      onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                      required
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button 
+                        type="submit" 
+                        className="btn-primary" 
+                        style={{ padding: '8px 16px', fontSize: '0.8rem', minWidth: '130px' }} 
+                        disabled={guardandoComentario || !nuevoComentario.trim()}
+                      >
+                        {guardandoComentario ? 'Guardando...' : 'Agregar Anotación'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Close Bottom Button */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '25px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
