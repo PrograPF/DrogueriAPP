@@ -18,6 +18,11 @@ const RecepcionArticulosModule = () => {
   const [localStatuses, setLocalStatuses] = useState({}); // { [artId]: status }
   const [guardandoOcId, setGuardandoOcId] = useState(null);
   const [selectedOcForModal, setSelectedOcForModal] = useState(null);
+  const [activeTab, setActiveTab] = useState('articulos'); // 'articulos' | 'bitacora'
+  const [comentarios, setComentarios] = useState([]);
+  const [loadingComentarios, setLoadingComentarios] = useState(false);
+  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [guardandoComentario, setGuardandoComentario] = useState(false);
   
   // Trazabilidad de Lotes states
   const [loteSearchQuery, setLoteSearchQuery] = useState('');
@@ -237,6 +242,63 @@ const RecepcionArticulosModule = () => {
       setGuardandoOcId(null);
     }
   };
+
+  const fetchComentarios = async (ocId) => {
+    if (!ocId) return;
+    setLoadingComentarios(true);
+    try {
+      const { data, error } = await supabase
+        .from('ordenes_compra_comentarios')
+        .select('*')
+        .eq('oc_id', ocId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setComentarios(data || []);
+    } catch (err) {
+      console.error('Error al cargar comentarios:', err);
+    } finally {
+      setLoadingComentarios(false);
+    }
+  };
+
+  const handleAddComentario = async (e) => {
+    if (e) e.preventDefault();
+    if (!nuevoComentario.trim() || !selectedOcForModal) return;
+
+    setGuardandoComentario(true);
+    try {
+      const { data, error } = await supabase
+        .from('ordenes_compra_comentarios')
+        .insert([
+          {
+            oc_id: selectedOcForModal.id,
+            comentario: nuevoComentario.trim()
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+      
+      setComentarios(prev => [...prev, ...(data || [])]);
+      setNuevoComentario('');
+    } catch (err) {
+      console.error('Error al guardar comentario:', err);
+      alert('Error al guardar comentario: ' + err.message);
+    } finally {
+      setGuardandoComentario(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedOcForModal) {
+      fetchComentarios(selectedOcForModal.id);
+      setActiveTab('articulos');
+    } else {
+      setComentarios([]);
+      setNuevoComentario('');
+    }
+  }, [selectedOcForModal]);
 
   useEffect(() => {
     cargarOcs();
@@ -897,135 +959,268 @@ const RecepcionArticulosModule = () => {
                 </div>
               </div>
 
-              {/* Articles list block */}
+              {/* Tabs Navigation */}
               <div style={{ 
-                background: 'rgba(255, 255, 255, 0.01)', 
-                border: '1px solid var(--border-color)', 
-                borderRadius: '8px', 
-                padding: '16px'
+                display: 'flex', 
+                gap: '20px', 
+                borderBottom: '1px solid var(--border-color)', 
+                marginBottom: '20px',
+                paddingBottom: '2px'
               }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
-                  Artículos en esta OC ({(selectedOcForModal.ordenes_compra_articulos || []).length})
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
-                    const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                    const activeStatus = localStatuses[art.id] !== undefined ? localStatuses[art.id] : (art.estado || 'Pendiente');
-                    
-                    return (
-                      <div key={idx} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        fontSize: '0.85rem', 
-                        color: 'var(--text-primary)',
-                        padding: '10px 0',
-                        borderBottom: idx < selectedOcForModal.ordenes_compra_articulos.length - 1 ? '1px solid var(--border-color)' : 'none'
-                      }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
-                            <span style={{ fontWeight: '600' }}>{artName}</span>
-                          </div>
-                          {(() => {
-                            const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
-                              ? art.historial
-                              : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
-                            
-                            if (historyEntries.length === 0) return null;
-
-                            return (
-                              <div style={{ marginTop: '4px', paddingLeft: '6px', borderLeft: '2px solid var(--border-color)' }}>
-                                {historyEntries.map((entry, eIdx) => {
-                                  const displayState = 
-                                    entry.estado === 'recepcion completa' ? 'Recepción Completa' :
-                                    entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
-                                    entry.estado === 'recepcionado' ? 'Recepcionado' :
-                                    entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                                    entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';                                        
-                                  return (
-                                    <div key={eIdx} style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6' }}></span>
-                                      <strong style={{ color: 'var(--text-primary)' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>
-                            {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
-                          </span>
-                          <select
-                            value={activeStatus}
-                            onChange={(e) => handleStatusChange(art.id, e.target.value)}
-                            className="input-field"
-                            style={{
-                              padding: '5px 10px',
-                              fontSize: '0.8rem',
-                              fontWeight: '600',
-                              width: 'auto',
-                              cursor: 'pointer',
-                              borderRadius: '8px',
-                              border: '1px solid var(--border-color)',
-                              background: 
-                                activeStatus === 'recepcionado' ? 'rgba(59, 130, 246, 0.15)' :
-                                activeStatus === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
-                                activeStatus === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
-                              color: 
-                                activeStatus === 'recepcionado' ? '#3b82f6' :
-                                activeStatus?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
-                            }}
-                          >
-                            <option value="Pendiente" style={{ background: 'var(--bg-card)' }}>Pendiente</option>
-                            <option value="recepcionado" style={{ background: 'var(--bg-card)' }}>Recepcionado</option>
-                            <option value="rechazado por vencimiento" style={{ background: 'var(--bg-card)' }}>Rechazado por Vencimiento</option>
-                            <option value="rechazado por calidad" style={{ background: 'var(--bg-card)' }}>Rechazado por Calidad</option>
-                          </select>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <button 
+                  onClick={() => setActiveTab('articulos')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: activeTab === 'articulos' ? '2px solid #3b82f6' : '2px solid transparent',
+                    color: activeTab === 'articulos' ? '#3b82f6' : 'var(--text-secondary)',
+                    padding: '8px 4px',
+                    fontWeight: '700',
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    outline: 'none'
+                  }}
+                >
+                  Artículos ({(selectedOcForModal.ordenes_compra_articulos || []).length})
+                </button>
+                <button 
+                  onClick={() => setActiveTab('bitacora')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: activeTab === 'bitacora' ? '2px solid #3b82f6' : '2px solid transparent',
+                    color: activeTab === 'bitacora' ? '#3b82f6' : 'var(--text-secondary)',
+                    padding: '8px 4px',
+                    fontWeight: '700',
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    outline: 'none'
+                  }}
+                >
+                  Bitácora ({comentarios.length})
+                </button>
               </div>
 
-              {/* Save Button for Reception */}
-              {(() => {
-                const hasChanges = (selectedOcForModal.ordenes_compra_articulos || []).some(
-                  art => localStatuses[art.id] !== undefined && localStatuses[art.id] !== (art.estado || 'Pendiente')
-                );
-                return (
+              {activeTab === 'articulos' ? (
+                <>
+                  {/* Articles list block */}
                   <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'flex-end', 
-                    gap: '15px',
-                    marginTop: '25px', 
-                    paddingTop: '20px', 
-                    borderTop: '1px solid var(--border-color)' 
+                    background: 'rgba(255, 255, 255, 0.01)', 
+                    border: '1px solid var(--border-color)', 
+                    borderRadius: '8px', 
+                    padding: '16px'
                   }}>
-                    <button onClick={() => setSelectedOcForModal(null)} className="btn-secondary" style={{ minWidth: '100px' }}>
-                      Cerrar
-                    </button>
-                    <button
-                      onClick={() => handleSaveOcReception(selectedOcForModal)}
-                      disabled={guardandoOcId === selectedOcForModal.id || !hasChanges}
-                      className="btn-primary"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        minWidth: '180px',
-                        opacity: !hasChanges ? 0.6 : 1,
-                        cursor: !hasChanges ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <Save size={18} /> {guardandoOcId === selectedOcForModal.id ? 'Guardando...' : 'Guardar Recepción'}
-                    </button>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                      Artículos en esta OC ({(selectedOcForModal.ordenes_compra_articulos || []).length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
+                        const artName = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
+                        const activeStatus = localStatuses[art.id] !== undefined ? localStatuses[art.id] : (art.estado || 'Pendiente');
+                        
+                        return (
+                          <div key={idx} style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            fontSize: '0.85rem', 
+                            color: 'var(--text-primary)',
+                            padding: '10px 0',
+                            borderBottom: idx < selectedOcForModal.ordenes_compra_articulos.length - 1 ? '1px solid var(--border-color)' : 'none'
+                          }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>[{art.codigo_articulo}]</span>
+                                <span style={{ fontWeight: '600' }}>{artName}</span>
+                              </div>
+                              {(() => {
+                                const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
+                                  ? art.historial
+                                  : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
+                                
+                                if (historyEntries.length === 0) return null;
+
+                                return (
+                                  <div style={{ marginTop: '4px', paddingLeft: '6px', borderLeft: '2px solid var(--border-color)' }}>
+                                    {historyEntries.map((entry, eIdx) => {
+                                      const displayState = 
+                                        entry.estado === 'recepcion completa' ? 'Recepción Completa' :
+                                        entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
+                                        entry.estado === 'recepcionado' ? 'Recepcionado' :
+                                        entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
+                                        entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';                                        
+                                      return (
+                                        <div key={eIdx} style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6' }}></span>
+                                          <strong style={{ color: 'var(--text-primary)' }}>{displayState}:</strong> {formatDateTime(entry.fecha_almacenamiento)}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>
+                                {art.cantidad_recepcionada || 0} / {art.cantidad} uds.
+                              </span>
+                              <select
+                                value={activeStatus}
+                                onChange={(e) => handleStatusChange(art.id, e.target.value)}
+                                className="input-field"
+                                style={{
+                                  padding: '5px 10px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  width: 'auto',
+                                  cursor: 'pointer',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--border-color)',
+                                  background: 
+                                    activeStatus === 'recepcionado' ? 'rgba(59, 130, 246, 0.15)' :
+                                    activeStatus === 'rechazado por vencimiento' ? 'rgba(239, 68, 68, 0.15)' :
+                                    activeStatus === 'rechazado por calidad' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.05)',
+                                  color: 
+                                    activeStatus === 'recepcionado' ? '#3b82f6' :
+                                    activeStatus?.startsWith('rechazado') ? '#ef4444' : '#94a3b8'
+                                }}
+                              >
+                                <option value="Pendiente" style={{ background: 'var(--bg-card)' }}>Pendiente</option>
+                                <option value="recepcionado" style={{ background: 'var(--bg-card)' }}>Recepcionado</option>
+                                <option value="rechazado por vencimiento" style={{ background: 'var(--bg-card)' }}>Rechazado por Vencimiento</option>
+                                <option value="rechazado por calidad" style={{ background: 'var(--bg-card)' }}>Rechazado por Calidad</option>
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                );
-              })()}
+
+                  {/* Save Button for Reception */}
+                  {(() => {
+                    const hasChanges = (selectedOcForModal.ordenes_compra_articulos || []).some(
+                      art => localStatuses[art.id] !== undefined && localStatuses[art.id] !== (art.estado || 'Pendiente')
+                    );
+                    return (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'flex-end', 
+                        gap: '15px',
+                        marginTop: '25px', 
+                        paddingTop: '20px', 
+                        borderTop: '1px solid var(--border-color)' 
+                      }}>
+                        <button onClick={() => setSelectedOcForModal(null)} className="btn-secondary" style={{ minWidth: '100px' }}>
+                          Cerrar
+                        </button>
+                        <button
+                          onClick={() => handleSaveOcReception(selectedOcForModal)}
+                          disabled={guardandoOcId === selectedOcForModal.id || !hasChanges}
+                          className="btn-primary"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            minWidth: '180px',
+                            opacity: !hasChanges ? 0.6 : 1,
+                            cursor: !hasChanges ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          <Save size={18} /> {guardandoOcId === selectedOcForModal.id ? 'Guardando...' : 'Guardar Recepción'}
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Listado de Anotaciones */}
+                  <div style={{ 
+                    maxHeight: '230px', 
+                    overflowY: 'auto', 
+                    background: 'rgba(0,0,0,0.15)', 
+                    borderRadius: '10px', 
+                    padding: '16px',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {loadingComentarios ? (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>
+                        Cargando bitácora...
+                      </div>
+                    ) : comentarios.length === 0 ? (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '30px' }}>
+                        No hay anotaciones registradas en la bitácora de esta OC.
+                      </div>
+                    ) : (
+                      comentarios.map((com, index) => (
+                        <div key={com.id || index} style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '12px',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontWeight: '700', color: '#3b82f6' }}>Anotación #{index + 1}</span>
+                            <span>{formatDateTime(com.created_at)}</span>
+                          </div>
+                          <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                            {com.comentario}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Formulario de Nueva Anotación */}
+                  <form onSubmit={handleAddComentario} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <textarea
+                      placeholder="Escribe una observación o comentario sobre el estado de esta OC..."
+                      value={nuevoComentario}
+                      onChange={(e) => setNuevoComentario(e.target.value)}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        background: 'var(--input-bg)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem',
+                        resize: 'none',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                      onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                      required
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedOcForModal(null)} 
+                        className="btn-secondary" 
+                        style={{ padding: '8px 20px', fontSize: '0.8rem' }}
+                      >
+                        Cerrar
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="btn-primary" 
+                        style={{ padding: '8px 16px', fontSize: '0.8rem', minWidth: '130px' }} 
+                        disabled={guardandoComentario || !nuevoComentario.trim()}
+                      >
+                        {guardandoComentario ? 'Guardando...' : 'Agregar Anotación'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
