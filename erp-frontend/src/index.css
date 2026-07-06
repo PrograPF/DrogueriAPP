@@ -59,7 +59,15 @@ body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"
 /* Override inline dark backgrounds on card containers/buttons to keep them light and clean */
 body.light-theme [style*="rgba(30, 41, 59"],
 body.light-theme [style*="background: rgba(30, 41, 59"],
-body.light-theme [style*="background-color: rgba(30, 41, 59"] {
+body.light-theme [style*="background-color: rgba(30, 41, 59"],
+body.light-theme [style*="#1e293b"],
+body.light-theme [style*="background: #1e293b"],
+body.light-theme [style*="background-color: #1e293b"],
+body.light-theme [style*="#0f172a"],
+body.light-theme [style*="background: #0f172a"],
+body.light-theme [style*="background-color: #0f172a"],
+body.light-theme [style*="rgb(30, 41, 59)"],
+body.light-theme [style*="rgb(15, 23, 42)"] {
   background: var(--bg-card) !important;
   border-color: var(--border-color) !important;
   color: var(--text-primary) !important;

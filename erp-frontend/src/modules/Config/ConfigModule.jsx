@@ -117,7 +117,10 @@ const ConfigModule = () => {
   };
 
   const handleAddCentro = async () => {
-    if (!newCentro.trim()) return;
+    if (!newCentro.trim()) {
+      alert('Por favor, escribe el nombre del centro en la casilla de texto antes de hacer clic en Añadir Centro.');
+      return;
+    }
     try {
       const { error } = await supabase
         .from('centros')
@@ -176,7 +179,10 @@ const ConfigModule = () => {
   };
 
   const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
+    if (!newCategoryName.trim()) {
+      alert('Por favor, escribe el nombre de la categoría en la casilla de texto antes de hacer clic en Añadir Categoría.');
+      return;
+    }
     try {
       const { error } = await supabase
         .from('categorias')
