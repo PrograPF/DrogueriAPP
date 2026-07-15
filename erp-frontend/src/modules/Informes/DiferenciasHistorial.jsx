@@ -3,7 +3,7 @@ import { Search, AlertCircle, Trash2, Printer } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
-import { formatDate } from '../../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 
 const PAGE_SIZE = 50;
 
@@ -64,7 +64,10 @@ const DiferenciasHistorial = ({ onBack }) => {
         centro: item.centros?.nombre || 'S/C',
         fecha: item.fecha,
         detalle: item.diferencia,
-        inventario_realizado: item.inventario_realizado || false
+        inventario_realizado: item.inventario_realizado || false,
+        inventario_ajustado: item.inventario_ajustado || false,
+        fecha_realizado: item.fecha_inventario_realizado,
+        fecha_ajustado: item.fecha_inventario_ajustado
       }));
 
       setData(prev => reset ? mappedData : [...prev, ...mappedData]);
@@ -79,22 +82,60 @@ const DiferenciasHistorial = ({ onBack }) => {
   const handleToggleRealizado = async (id, currentVal) => {
     try {
       const newVal = !currentVal;
+      const fechaRealizado = newVal ? new Date().toISOString() : null;
       const { error } = await supabase
         .from('diferencias')
-        .update({ inventario_realizado: newVal })
+        .update({ 
+          inventario_realizado: newVal,
+          fecha_inventario_realizado: fechaRealizado
+        })
         .eq('id', id);
 
       if (error) throw error;
       
       setData(prev => prev.map(item => {
         if (item.id === id) {
-          return { ...item, inventario_realizado: newVal };
+          return { 
+            ...item, 
+            inventario_realizado: newVal,
+            fecha_realizado: fechaRealizado
+          };
         }
         return item;
       }));
     } catch (err) {
       console.error('Error al actualizar estado de inventario:', err);
       alert('Error al actualizar estado: ' + err.message);
+    }
+  };
+
+  const handleToggleAjustado = async (id, currentVal) => {
+    try {
+      const newVal = !currentVal;
+      const fechaAjustado = newVal ? new Date().toISOString() : null;
+      const { error } = await supabase
+        .from('diferencias')
+        .update({ 
+          inventario_ajustado: newVal,
+          fecha_inventario_ajustado: fechaAjustado
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setData(prev => prev.map(item => {
+        if (item.id === id) {
+          return { 
+            ...item, 
+            inventario_ajustado: newVal,
+            fecha_ajustado: fechaAjustado
+          };
+        }
+        return item;
+      }));
+    } catch (err) {
+      console.error('Error al actualizar estado de ajuste:', err);
+      alert('Error al actualizar estado de ajuste: ' + err.message);
     }
   };
 
@@ -129,6 +170,10 @@ const DiferenciasHistorial = ({ onBack }) => {
       mapped = mapped.filter(item => !item.inventario_realizado);
     } else if (estadoFilter === 'realizado') {
       mapped = mapped.filter(item => item.inventario_realizado);
+    } else if (estadoFilter === 'sin_ajustar') {
+      mapped = mapped.filter(item => !item.inventario_ajustado);
+    } else if (estadoFilter === 'ajustado') {
+      mapped = mapped.filter(item => item.inventario_ajustado);
     }
 
     if (!searchTerm) return mapped;
@@ -209,6 +254,8 @@ const DiferenciasHistorial = ({ onBack }) => {
             <option value="todos">Todos los registros</option>
             <option value="pendiente">Pendientes de Inventario</option>
             <option value="realizado">Inventario Realizado</option>
+            <option value="sin_ajustar">Sin Ajustar (Jefatura)</option>
+            <option value="ajustado">Ajustado (Jefatura)</option>
           </select>
         </div>
       </div>
@@ -220,8 +267,9 @@ const DiferenciasHistorial = ({ onBack }) => {
               <th style={thStyle}>CÓDIGO</th>
               <th style={thStyle}>ARTÍCULO</th>
               <th style={thStyle}>CENTRO</th>
-              <th style={thStyle}>FECHA</th>
-              <th style={{ ...thStyle, textAlign: 'center' }} className="no-print">ESTADO</th>
+              <th style={thStyle}>FECHA REGISTRO</th>
+              <th style={{ ...thStyle, textAlign: 'center', width: '180px' }} className="no-print">INVENTARIO</th>
+              <th style={{ ...thStyle, textAlign: 'center', width: '180px' }} className="no-print">AJUSTE JEFE</th>
               <th style={thStyle}>DETALLE / OBSERVACIÓN</th>
               <th style={{ ...thStyle, textAlign: 'center' }} className="no-print">ACCIONES</th>
             </tr>
@@ -234,39 +282,88 @@ const DiferenciasHistorial = ({ onBack }) => {
                 <td style={tdStyle}>{item.centro}</td>
                 <td style={tdStyle}>{formatDate(item.fecha)}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
-                  <button 
-                    onClick={() => handleToggleRealizado(item.id, item.inventario_realizado)}
-                    style={{
-                      background: item.inventario_realizado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.1)',
-                      border: `1px solid ${item.inventario_realizado ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
-                      color: item.inventario_realizado ? '#10b981' : '#f59e0b',
-                      padding: '5px 12px',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minWidth: '150px',
-                      transition: 'all 0.2s',
-                      outline: 'none'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = item.inventario_realizado ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.2)';
-                      e.currentTarget.style.borderColor = item.inventario_realizado ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.4)';
-                      e.currentTarget.style.color = item.inventario_realizado ? '#ef4444' : '#10b981';
-                      e.currentTarget.innerText = item.inventario_realizado ? 'Desmarcar' : '¡Realizado!';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = item.inventario_realizado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.1)';
-                      e.currentTarget.style.borderColor = item.inventario_realizado ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)';
-                      e.currentTarget.style.color = item.inventario_realizado ? '#10b981' : '#f59e0b';
-                      e.currentTarget.innerText = item.inventario_realizado ? 'Inventario Realizado' : 'Pendiente';
-                    }}
-                  >
-                    {item.inventario_realizado ? 'Inventario Realizado' : 'Pendiente'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <button 
+                      onClick={() => handleToggleRealizado(item.id, item.inventario_realizado)}
+                      style={{
+                        background: item.inventario_realizado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.1)',
+                        border: `1px solid ${item.inventario_realizado ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                        color: item.inventario_realizado ? '#10b981' : '#f59e0b',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '150px',
+                        transition: 'all 0.2s',
+                        outline: 'none'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = item.inventario_realizado ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.2)';
+                        e.currentTarget.style.borderColor = item.inventario_realizado ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.4)';
+                        e.currentTarget.style.color = item.inventario_realizado ? '#ef4444' : '#10b981';
+                        e.currentTarget.innerText = item.inventario_realizado ? 'Desmarcar' : '¡Realizado!';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = item.inventario_realizado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.1)';
+                        e.currentTarget.style.borderColor = item.inventario_realizado ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)';
+                        e.currentTarget.style.color = item.inventario_realizado ? '#10b981' : '#f59e0b';
+                        e.currentTarget.innerText = item.inventario_realizado ? 'Inventario Realizado' : 'Pendiente';
+                      }}
+                    >
+                      {item.inventario_realizado ? 'Inventario Realizado' : 'Pendiente'}
+                    </button>
+                    {item.inventario_realizado && item.fecha_realizado && (
+                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                        {formatDateTime(item.fecha_realizado)}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <button 
+                      onClick={() => handleToggleAjustado(item.id, item.inventario_ajustado)}
+                      style={{
+                        background: item.inventario_ajustado ? 'rgba(168, 85, 247, 0.15)' : 'rgba(71, 85, 105, 0.1)',
+                        border: `1px solid ${item.inventario_ajustado ? 'rgba(168, 85, 247, 0.3)' : 'rgba(71, 85, 105, 0.3)'}`,
+                        color: item.inventario_ajustado ? '#a855f7' : '#94a3b8',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '150px',
+                        transition: 'all 0.2s',
+                        outline: 'none'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = item.inventario_ajustado ? 'rgba(239, 68, 68, 0.15)' : 'rgba(168, 85, 247, 0.2)';
+                        e.currentTarget.style.borderColor = item.inventario_ajustado ? 'rgba(239, 68, 68, 0.3)' : 'rgba(168, 85, 247, 0.4)';
+                        e.currentTarget.style.color = item.inventario_ajustado ? '#ef4444' : '#a855f7';
+                        e.currentTarget.innerText = item.inventario_ajustado ? 'Desmarcar' : '¡Ajustar!';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = item.inventario_ajustado ? 'rgba(168, 85, 247, 0.15)' : 'rgba(71, 85, 105, 0.1)';
+                        e.currentTarget.style.borderColor = item.inventario_ajustado ? 'rgba(168, 85, 247, 0.3)' : 'rgba(71, 85, 105, 0.3)';
+                        e.currentTarget.style.color = item.inventario_ajustado ? '#a855f7' : '#94a3b8';
+                        e.currentTarget.innerText = item.inventario_ajustado ? 'Ajustado' : 'Sin Ajustar';
+                      }}
+                    >
+                      {item.inventario_ajustado ? 'Ajustado' : 'Sin Ajustar'}
+                    </button>
+                    {item.inventario_ajustado && item.fecha_ajustado && (
+                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                        {formatDateTime(item.fecha_ajustado)}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td style={{ ...tdStyle, color: '#f59e0b', fontStyle: 'italic' }}>{item.detalle}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }} className="no-print">
