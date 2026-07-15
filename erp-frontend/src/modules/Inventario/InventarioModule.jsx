@@ -17,6 +17,13 @@ const InventarioModule = () => {
   const [revisiones, setRevisiones] = useState([]);
   const [ordenesCompra, setOrdenesCompra] = useState([]);
   const [categorias, setCategorias] = useState([]);
+
+  // Estados para comentarios de lotes/variantes
+  const [comentariosVariantes, setComentariosVariantes] = useState([]);
+  const [selectedLoteForModal, setSelectedLoteForModal] = useState(null);
+  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [usuarioFirma, setUsuarioFirma] = useState(localStorage.getItem('firma_operador') || '');
+  const [guardandoComentario, setGuardandoComentario] = useState(false);
   
   // Buscadores
   const [stockSearchQuery, setStockSearchQuery] = useState('');
@@ -63,11 +70,19 @@ const InventarioModule = () => {
         .select('*');
       if (catErr) throw catErr;
 
+      // 6. Obtener comentarios de variantes (lotes)
+      const { data: comData, error: comErr } = await supabase
+        .from('articulos_variantes_comentarios')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (comErr) throw comErr;
+
       setArticulos(artsData || []);
       setVariantes(varData || []);
       setRevisiones(revData || []);
       setOrdenesCompra(ocData || []);
       setCategorias(catData || []);
+      setComentariosVariantes(comData || []);
     } catch (err) {
       console.error('Error al cargar datos de inventario:', err);
       alert('Error al cargar los datos: ' + err.message);
@@ -79,6 +94,49 @@ const InventarioModule = () => {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  const handleAbrirBitacoraLote = (lote) => {
+    setSelectedLoteForModal(lote);
+    setNuevoComentario('');
+  };
+
+  const handleAddComentarioLote = async (e) => {
+    e.preventDefault();
+    if (!nuevoComentario.trim() || !usuarioFirma.trim() || !selectedLoteForModal) return;
+
+    setGuardandoComentario(true);
+    try {
+      // Guardar firma en localStorage
+      localStorage.setItem('firma_operador', usuarioFirma.trim());
+
+      const { error } = await supabase
+        .from('articulos_variantes_comentarios')
+        .insert([
+          {
+            variante_id: selectedLoteForModal.id,
+            comentario: nuevoComentario.trim(),
+            usuario: usuarioFirma.trim()
+          }
+        ]);
+
+      if (error) throw error;
+
+      // Recargar comentarios
+      const { data: newComData, error: newComErr } = await supabase
+        .from('articulos_variantes_comentarios')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (newComErr) throw newComErr;
+
+      setComentariosVariantes(newComData || []);
+      setNuevoComentario('');
+    } catch (err) {
+      console.error('Error al guardar comentario del lote:', err);
+      alert('Error al guardar el comentario: ' + err.message);
+    } finally {
+      setGuardandoComentario(false);
+    }
+  };
 
   const toggleExpandArticle = (codigo) => {
     setExpandedArticles(prev => ({
@@ -127,6 +185,18 @@ const InventarioModule = () => {
         variantesPorArticulo[codigo] = [];
       }
       variantesPorArticulo[codigo].push(v);
+    }
+  });
+
+  // Agrupar comentarios por variante_id
+  const comentariosPorVariante = {};
+  comentariosVariantes.forEach(c => {
+    const varId = c.variante_id;
+    if (varId) {
+      if (!comentariosPorVariante[varId]) {
+        comentariosPorVariante[varId] = [];
+      }
+      comentariosPorVariante[varId].push(c);
     }
   });
 
@@ -463,11 +533,15 @@ const InventarioModule = () => {
                                         <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'center' }}>CARTA CANJE</th>
                                         <th style={{ padding: '10px 8px', fontWeight: '700' }}>ISP</th>
                                         <th style={{ padding: '10px 8px', fontWeight: '700' }}>TIPO</th>
+                                        <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'center', width: '80px' }}>NOTAS</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {art.variantes.map((v, vIdx) => {
                                         const status = getVencimientoStatus(v.vencimiento);
+                                        const comentariosLote = comentariosPorVariante[v.id] || [];
+                                        const tieneComentarios = comentariosLote.length > 0;
+                                        const ultimoComentario = tieneComentarios ? comentariosLote[comentariosLote.length - 1] : null;
                                         
                                         return (
                                           <tr 
@@ -525,6 +599,31 @@ const InventarioModule = () => {
                                               }}>
                                                 {art.categoriaNombre || 'Sin Categoría'}
                                               </span>
+                                            </td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                                              <button
+                                                onClick={() => handleAbrirBitacoraLote(v)}
+                                                title={ultimoComentario ? `Último comentario (${formatDate(ultimoComentario.created_at)} por ${ultimoComentario.usuario}): ${ultimoComentario.comentario}` : 'Agregar anotación'}
+                                                style={{
+                                                  background: 'none',
+                                                  border: 'none',
+                                                  cursor: 'pointer',
+                                                  color: tieneComentarios ? '#a855f7' : '#475569',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '4px',
+                                                  padding: '4px 8px',
+                                                  borderRadius: '4px',
+                                                  transition: 'all 0.2s',
+                                                }}
+                                              >
+                                                <ClipboardList size={16} />
+                                                {tieneComentarios && (
+                                                  <span style={{ fontSize: '0.75rem', fontWeight: '700' }}>
+                                                    ({comentariosLote.length})
+                                                  </span>
+                                                )}
+                                              </button>
                                             </td>
                                           </tr>
                                         );
@@ -734,6 +833,197 @@ const InventarioModule = () => {
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Bitácora del Lote */}
+      <AnimatePresence>
+        {selectedLoteForModal && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}
+            onClick={() => setSelectedLoteForModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              style={{
+                background: '#1e293b',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '600px',
+                padding: '28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+                position: 'relative'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setSelectedLoteForModal(null)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '50%',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.color = '#f8fafc';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                  e.currentTarget.style.color = '#94a3b8';
+                }}
+              >
+                ✕
+              </button>
+
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc', marginBottom: '4px' }}>
+                Bitácora de Lote
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '20px' }}>
+                {articulosMap[selectedLoteForModal.codigo_articulo?.trim()] || 'Artículo'} <br />
+                <span style={{ fontWeight: '700', color: '#a855f7' }}>Lote: {selectedLoteForModal.lote || 'S/L'}</span>
+                {selectedLoteForModal.vencimiento && ` • Vencimiento: ${formatDate(selectedLoteForModal.vencimiento)}`}
+              </p>
+
+              {/* Historial de Comentarios */}
+              <div style={{
+                maxHeight: '220px',
+                overflowY: 'auto',
+                marginBottom: '20px',
+                paddingRight: '4px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                {(comentariosPorVariante[selectedLoteForModal.id] || []).length === 0 ? (
+                  <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '30px' }}>
+                    No hay anotaciones registradas para este lote.
+                  </div>
+                ) : (
+                  (comentariosPorVariante[selectedLoteForModal.id] || []).map((com, index) => (
+                    <div key={com.id || index} style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.75rem', color: '#64748b' }}>
+                        <span style={{ fontWeight: '700', color: '#a855f7' }}>Anotación #{index + 1} por {com.usuario}</span>
+                        <span>{formatDateTime(com.created_at)}</span>
+                      </div>
+                      <div style={{ color: '#cbd5e1', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                        {com.comentario}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Formulario de Nueva Anotación */}
+              <form onSubmit={handleAddComentarioLote} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8' }}>Tu Firma / Nombre:</label>
+                  <input
+                    type="text"
+                    placeholder="Escribe tu nombre o iniciales (Ej: Juan P.)"
+                    value={usuarioFirma}
+                    onChange={(e) => {
+                      setUsuarioFirma(e.target.value);
+                      localStorage.setItem('firma_operador', e.target.value);
+                    }}
+                    required
+                    style={{
+                      background: '#0f172a',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      color: '#f8fafc',
+                      fontSize: '0.85rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8' }}>Comentario / Nota:</label>
+                  <textarea
+                    placeholder="Escribe una observación sobre este lote (ej. cuarentena, estado, ubicación, etc.)..."
+                    value={nuevoComentario}
+                    onChange={(e) => setNuevoComentario(e.target.value)}
+                    rows={3}
+                    required
+                    style={{
+                      width: '100%',
+                      background: '#0f172a',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      color: '#f8fafc',
+                      fontSize: '0.85rem',
+                      resize: 'none',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <button 
+                    type="submit" 
+                    style={{ 
+                      padding: '10px 20px', 
+                      fontSize: '0.85rem', 
+                      minWidth: '150px',
+                      background: '#a855f7',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      opacity: (guardandoComentario || !nuevoComentario.trim() || !usuarioFirma.trim()) ? 0.6 : 1,
+                      transition: 'all 0.2s',
+                    }} 
+                    disabled={guardandoComentario || !nuevoComentario.trim() || !usuarioFirma.trim()}
+                    onMouseOver={(e) => {
+                      if (!guardandoComentario && nuevoComentario.trim() && usuarioFirma.trim()) {
+                        e.currentTarget.style.background = '#9333ea';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#a855f7';
+                    }}
+                  >
+                    {guardandoComentario ? 'Guardando...' : 'Agregar Anotación'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
