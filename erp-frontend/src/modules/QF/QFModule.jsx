@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Search, Trash2, Calendar, Edit2, 
-  ArrowLeft, RefreshCw, CheckCircle, Clock, AlertTriangle, 
+  ArrowLeft, ArrowRight, RefreshCw, CheckCircle, Clock, AlertTriangle, 
   Building2, Tag, X, Save, DollarSign, Package, Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,8 +29,8 @@ const formatNumeroSolicitud = (val) => {
 };
 
 const QFModule = () => {
-  // Main view state: 'list' | 'create'
-  const [view, setView] = useState('list');
+  // Main view state: 'selection' | 'list' | 'create'
+  const [view, setView] = useState('selection');
   const [editingSolicitudId, setEditingSolicitudId] = useState(null);
 
   // Solicitudes state
@@ -57,7 +57,6 @@ const QFModule = () => {
   const [assignedOcsMap, setAssignedOcsMap] = useState({});
 
   // Form State (Dynamic Article Rows)
-  // Row structure: { key, codigo, descripcion, cantidad, sub_centro_costo, suggestions: [], showSuggestions: false }
   const [articulosForm, setArticulosForm] = useState([
     { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
   ]);
@@ -73,7 +72,6 @@ const QFModule = () => {
   const fetchSolicitudes = async () => {
     setLoading(true);
     try {
-      // 1. Fetch parent solicitudes with children
       let solData = [];
       const { data, error } = await supabase
         .from('solicitudes_compra')
@@ -100,7 +98,6 @@ const QFModule = () => {
         solData = data || [];
       }
 
-      // 2. Fetch OCs to check assigned status and numbers (excluding cancelled OCs)
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select('id, numero_oc, solicitud_compra, estado')
@@ -133,7 +130,7 @@ const QFModule = () => {
       const { data, error } = await supabase
         .from('sub_centros_costo')
         .select('nombre')
-        .order('nombre');
+        .order('nombre', { ascending: true });
 
       if (!error && data && data.length > 0) {
         setSubCentrosOptions(data.map(d => d.nombre));
@@ -149,7 +146,7 @@ const QFModule = () => {
       const { data, error } = await supabase
         .from('centros_costo')
         .select('*')
-        .order('nombre');
+        .order('nombre', { ascending: true });
 
       if (error) throw error;
       setCentrosCosto(data || []);
@@ -179,7 +176,6 @@ const QFModule = () => {
     setFormFechaCreacion(item.fecha_creacion || getTodayDateString());
     setFormObservaciones(item.observaciones || '');
 
-    // Map existing child articles
     if (item.solicitudes_compra_articulos && item.solicitudes_compra_articulos.length > 0) {
       setArticulosForm(
         item.solicitudes_compra_articulos.map(c => ({
@@ -192,29 +188,14 @@ const QFModule = () => {
           showSuggestions: false
         }))
       );
-    } else if (item.codigo_articulo) {
-      // Legacy single article format fallback
-      setArticulosForm([
-        {
-          key: Date.now(),
-          codigo: item.codigo_articulo || '',
-          descripcion: item.descripcion_articulo || '',
-          cantidad: item.cantidad || 1,
-          sub_centro_costo: 'UAPO',
-          suggestions: [],
-          showSuggestions: false
-        }
-      ]);
     } else {
       setArticulosForm([
-        { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
+        { key: Date.now(), codigo: item.codigo_articulo || '', descripcion: item.descripcion_articulo || '', cantidad: item.cantidad || 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
       ]);
     }
-
     setView('create');
   };
 
-  // Dynamic Row Handlers
   const handleAddArticleRow = () => {
     setArticulosForm(prev => [
       ...prev,
@@ -238,7 +219,6 @@ const QFModule = () => {
       return row;
     }));
 
-    // Auto-suggest for codigo input
     if (field === 'codigo') {
       const term = value.trim();
       if (term.length >= 2) {
@@ -289,14 +269,12 @@ const QFModule = () => {
     }));
   };
 
-  // Save Solicitud (Parent + Children)
   const handleSaveSolicitud = async () => {
     if (!formNumero.trim()) {
       alert('Por favor, ingresa el número de solicitud.');
       return;
     }
 
-    // Filter valid article rows
     const validArticles = articulosForm.filter(a => a.codigo.trim() !== '');
     if (validArticles.length === 0) {
       alert('Debes ingresar al menos un código de artículo válido.');
@@ -317,16 +295,14 @@ const QFModule = () => {
         fecha_creacion: formFechaCreacion || getTodayDateString(),
         estado: calculatedEstado,
         observaciones: formObservaciones.trim(),
-        // Keep first article as legacy fallback
         codigo_articulo: validArticles[0].codigo.trim().toUpperCase(),
         descripcion_articulo: validArticles[0].descripcion.trim().toUpperCase(),
         cantidad: parseInt(validArticles[0].cantidad) || 1
       };
 
-      let targetId = editingSolicitudId;
+      let parentId = editingSolicitudId;
 
       if (!editingSolicitudId) {
-        // Insert new parent
         const { data: dup } = await supabase
           .from('solicitudes_compra')
           .select('numero_solicitud')
@@ -346,7 +322,6 @@ const QFModule = () => {
         if (parentErr) throw parentErr;
         parentId = insertedParent[0].id;
       } else {
-        // Update parent
         const { error: updateErr } = await supabase
           .from('solicitudes_compra')
           .update(parentPayload)
@@ -354,30 +329,25 @@ const QFModule = () => {
 
         if (updateErr) throw updateErr;
 
-        // Delete existing child items for refresh
         await supabase
           .from('solicitudes_compra_articulos')
           .delete()
           .eq('solicitud_id', editingSolicitudId);
       }
 
-      // Insert child articles into solicitudes_compra_articulos
       const childPayloads = validArticles.map(a => ({
         solicitud_id: parentId,
         codigo_articulo: a.codigo.trim().toUpperCase(),
         descripcion_articulo: a.descripcion.trim().toUpperCase(),
-        cantidad: parseInt(a.cantidad) || 1
+        cantidad: parseInt(a.cantidad) || 1,
+        sub_centro_costo: isResolutividad ? a.sub_centro_costo : null
       }));
 
-      const { error: childErr } = await supabase
+      await supabase
         .from('solicitudes_compra_articulos')
         .insert(childPayloads);
 
-      if (childErr) {
-        console.warn('Aviso: No se pudieron guardar los detalles en solicitudes_compra_articulos (verificar si la tabla fue creada en Supabase):', childErr.message);
-      }
-
-      alert('¡Solicitud de compra guardada exitosamente con todos sus artículos!');
+      alert('¡Solicitud de compra guardada exitosamente!');
       setView('list');
       fetchSolicitudes();
 
@@ -386,14 +356,11 @@ const QFModule = () => {
     }
   };
 
-  // Delete Solicitud
   const handleDeleteSolicitud = async (item) => {
     if (!window.confirm(`¿Seguro que deseas eliminar la solicitud ${item.numero_solicitud}?`)) return;
     try {
-      const { error } = await supabase
-        .from('solicitudes_compra')
-        .delete()
-        .eq('id', item.id);
+      await supabase.from('solicitudes_compra_articulos').delete().eq('solicitud_id', item.id);
+      const { error } = await supabase.from('solicitudes_compra').delete().eq('id', item.id);
 
       if (error) throw error;
       alert('Solicitud eliminada.');
@@ -403,7 +370,6 @@ const QFModule = () => {
     }
   };
 
-  // Filtered solicitudes
   const filteredSolicitudes = solicitudes.filter(s => {
     const term = searchQuery.toLowerCase();
     const matchHeader = (
@@ -412,12 +378,10 @@ const QFModule = () => {
       (s.codigo_articulo && s.codigo_articulo.toLowerCase().includes(term)) ||
       (s.descripcion_articulo && s.descripcion_articulo.toLowerCase().includes(term))
     );
-
     const matchChildren = (s.solicitudes_compra_articulos || []).some(art => 
       (art.codigo_articulo && art.codigo_articulo.toLowerCase().includes(term)) ||
       (art.descripcion_articulo && art.descripcion_articulo.toLowerCase().includes(term))
     );
-
     return matchHeader || matchChildren;
   });
 
@@ -428,17 +392,60 @@ const QFModule = () => {
       style={{ maxWidth: '1200px', margin: '0 auto' }}
     >
       <AnimatePresence mode="wait">
-        {view === 'list' ? (
-          /* ==========================================
-             VISTA 1: LISTADO DE SOLICITUDES
-             ========================================== */
+        {view === 'selection' && (
+          <motion.div
+            key="selection-view"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            style={{ maxWidth: '1000px', margin: '30px auto', display: 'flex', flexDirection: 'column', gap: '24px' }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: '800', color: '#f8fafc', margin: 0 }}>
+                Módulo Químico Farmacéutico (QF)
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '1rem', marginTop: '8px' }}>
+                Selecciona la sección o herramienta que deseas gestionar.
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+              <motion.div 
+                whileHover={{ scale: 1.02, backgroundColor: 'rgba(59, 130, 246, 0.08)', borderColor: 'rgba(59, 130, 246, 0.4)', transition: { duration: 0.2 } }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('list')}
+                className="glass-card"
+                style={{ padding: '36px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '20px', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.03)' }}
+              >
+                <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%' }}>
+                  <FileText size={48} color="#3b82f6" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: '#f8fafc' }}>Solicitudes de Compra</h2>
+                  <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>Registro, control y seguimiento de requerimientos de compra por centro de costo.</p>
+                </div>
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontWeight: '600', fontSize: '0.95rem' }}>
+                  Abrir Solicitudes <ArrowRight size={18} />
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        {view === 'list' && (
           <motion.div
             key="list-view"
             initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 15 }}
           >
-            {/* Header principal */}
+            <button 
+              onClick={() => setView('selection')} 
+              className="btn-secondary" 
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '20px', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#cbd5e1', fontSize: '0.88rem', fontWeight: '600' }}
+            >
+              <ArrowLeft size={16} /> Volver al Menú QF
+            </button>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 <FileText size={32} color="#3b82f6" />
@@ -644,7 +651,9 @@ const QFModule = () => {
               )}
             </div>
           </motion.div>
-        ) : (
+        )}
+
+        {view === 'create' && (
           /* ==========================================
              VISTA 2: FORMULARIO CREAR / EDITAR SOLICITUD
              ========================================== */
