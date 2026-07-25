@@ -341,14 +341,11 @@ const SeguimientoOCModule = () => {
   const evaluarYActualizarEstadoSolicitud = async (solNumero) => {
     if (!solNumero) return;
     try {
-      // Build both possible formats to search with
-      const raw = solNumero.trim().toUpperCase();
-      const withPrefix = raw.startsWith('S-') ? raw : `S-${raw}`;
-      const withoutPrefix = raw.startsWith('S-') ? raw.substring(2) : raw;
-      const possibleValues = [raw, withPrefix, withoutPrefix];
-
-      // 1. Fetch child articles of the Solicitud (try all possible formats)
-      const { data: solList } = await supabase
+      // Step 1: Find the Solicitud. Try exact match first, then variations.
+      let solData = null;
+      
+      // Try exact match
+      const { data: exactMatch } = await supabase
         .from('solicitudes_compra')
         .select(`
           id,
@@ -358,15 +355,61 @@ const SeguimientoOCModule = () => {
             codigo_articulo
           )
         `)
-        .in('numero_solicitud', possibleValues);
+        .eq('numero_solicitud', solNumero.trim())
+        .maybeSingle();
+      
+      if (exactMatch) {
+        solData = exactMatch;
+      } else {
+        // Try with S- prefix
+        const withPrefix = solNumero.trim().toUpperCase().startsWith('S-') 
+          ? solNumero.trim() 
+          : `S-${solNumero.trim()}`;
+        
+        const { data: prefixMatch } = await supabase
+          .from('solicitudes_compra')
+          .select(`
+            id,
+            numero_solicitud,
+            codigo_articulo,
+            solicitudes_compra_articulos (
+              codigo_articulo
+            )
+          `)
+          .eq('numero_solicitud', withPrefix)
+          .maybeSingle();
+        
+        if (prefixMatch) {
+          solData = prefixMatch;
+        } else {
+          // Try without prefix
+          const withoutPrefix = solNumero.trim().toUpperCase().startsWith('S-') 
+            ? solNumero.trim().substring(2) 
+            : solNumero.trim();
+          
+          const { data: noPrefix } = await supabase
+            .from('solicitudes_compra')
+            .select(`
+              id,
+              numero_solicitud,
+              codigo_articulo,
+              solicitudes_compra_articulos (
+                codigo_articulo
+              )
+            `)
+            .eq('numero_solicitud', withoutPrefix)
+            .maybeSingle();
+          
+          solData = noPrefix;
+        }
+      }
 
-      const solData = solList?.[0];
       if (!solData) {
-        console.warn('evaluarYActualizarEstadoSolicitud: Solicitud no encontrada para:', solNumero);
+        console.warn('[evaluarEstadoSolicitud] Solicitud no encontrada para:', solNumero);
         return;
       }
 
-      // Use the EXACT numero_solicitud from the DB for all subsequent queries
+      // Use EXACT numero_solicitud from DB
       const exactNumSol = solData.numero_solicitud;
 
       const requestedCodes = new Set();
@@ -380,7 +423,7 @@ const SeguimientoOCModule = () => {
 
       if (requestedCodes.size === 0) return;
 
-      // 2. Fetch ALL OCs for this Solicitud (no PostgREST filter on estado)
+      // Step 2: Fetch ALL OCs that reference this solicitud (no filters on estado)
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select(`
@@ -391,9 +434,9 @@ const SeguimientoOCModule = () => {
             codigo_articulo
           )
         `)
-        .in('solicitud_compra', possibleValues);
+        .eq('solicitud_compra', exactNumSol);
 
-      // Filter out cancelled OCs entirely in JavaScript
+      // Filter out cancelled OCs in JavaScript
       const activeOcs = (ocsData || []).filter(oc => 
         oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada'
       );
@@ -405,7 +448,7 @@ const SeguimientoOCModule = () => {
         });
       });
 
-      // 3. Determine status
+      // Step 3: Determine status
       let assignedCount = 0;
       requestedCodes.forEach(code => {
         if (assignedCodes.has(code)) assignedCount++;
@@ -418,16 +461,16 @@ const SeguimientoOCModule = () => {
         nuevoEstado = 'OC asignada parcial';
       }
 
-      console.log(`[evaluarEstadoSolicitud] ${exactNumSol}: ${assignedCount}/${requestedCodes.size} asignados en ${activeOcs.length} OCs activas -> ${nuevoEstado}`);
+      console.log(`[evaluarEstadoSolicitud] ${exactNumSol}: Total OCs=${(ocsData||[]).length}, Activas=${activeOcs.length}, Asignados=${assignedCount}/${requestedCodes.size} -> ${nuevoEstado}`);
 
-      // 4. Update status in database using exact value from DB
+      // Step 4: Update status using the EXACT numero_solicitud from the DB
       const { error: updateErr } = await supabase
         .from('solicitudes_compra')
         .update({ estado: nuevoEstado })
-        .eq('numero_solicitud', exactNumSol);
+        .eq('id', solData.id);
 
       if (updateErr) {
-        console.error('Error al actualizar estado solicitud:', updateErr);
+        console.error('[evaluarEstadoSolicitud] Error en update:', updateErr);
       }
 
     } catch (err) {
