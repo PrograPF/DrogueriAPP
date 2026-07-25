@@ -158,6 +158,9 @@ const SeguimientoOCModule = () => {
   const [solicitudesOptions, setSolicitudesOptions] = useState([]);
   const [showSolicitudSuggestions, setShowSolicitudSuggestions] = useState(false);
 
+  // Option A state: Items already assigned in other OCs for the same request
+  const [articulosYaAsignados, setArticulosYaAsignados] = useState([]);
+
   const handleDateDisplayChange = (e) => {
     const val = e.target.value;
     // Keep only digits and slash
@@ -230,6 +233,77 @@ const SeguimientoOCModule = () => {
       }
     } catch (err) {
       console.error('Error al cargar solicitudes options:', err);
+    }
+  };
+
+  // Option A: Select Solicitud, check assigned items in other OCs, filter available vs assigned
+  const handleSeleccionarSolicitud = async (s) => {
+    setFormData(prev => ({ ...prev, solicitud_compra: s.numero_solicitud }));
+    setShowSolicitudSuggestions(false);
+
+    try {
+      // Fetch OCs already created for this solicitud
+      const { data: ocsData } = await supabase
+        .from('ordenes_compra')
+        .select(`
+          id,
+          numero_oc,
+          ordenes_compra_articulos (
+            codigo_articulo
+          )
+        `)
+        .eq('solicitud_compra', s.numero_solicitud);
+
+      // Map assigned codes -> OC number
+      const assignedCodesMap = {};
+      (ocsData || []).forEach(oc => {
+        (oc.ordenes_compra_articulos || []).forEach(art => {
+          if (art.codigo_articulo) {
+            assignedCodesMap[art.codigo_articulo.trim().toUpperCase()] = oc.numero_oc;
+          }
+        });
+      });
+
+      const childItems = s.solicitudes_compra_articulos || [];
+      const allItems = childItems.length > 0 ? childItems : (s.codigo_articulo ? [{
+        codigo_articulo: s.codigo_articulo,
+        descripcion_articulo: s.descripcion_articulo || articulosCatalog[s.codigo_articulo] || '',
+        cantidad: s.cantidad || 1
+      }] : []);
+
+      const disponibles = [];
+      const yaAsignados = [];
+
+      allItems.forEach(item => {
+        const codeUpper = (item.codigo_articulo || '').trim().toUpperCase();
+        if (assignedCodesMap[codeUpper]) {
+          yaAsignados.push({
+            codigo: item.codigo_articulo,
+            descripcion: item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '',
+            cantidad: item.cantidad || 1,
+            ocAsignada: assignedCodesMap[codeUpper]
+          });
+        } else {
+          disponibles.push({
+            key: Date.now() + Math.random(),
+            codigo: item.codigo_articulo || '',
+            nombre: item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '',
+            cantidad: item.cantidad || 1,
+            isNew: false,
+            tempName: ''
+          });
+        }
+      });
+
+      setArticulosYaAsignados(yaAsignados);
+      if (disponibles.length > 0) {
+        setArticulosForm(disponibles);
+      } else {
+        setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
+      }
+
+    } catch (err) {
+      console.error('Error al verificar artículos asignados de la solicitud:', err);
     }
   };
 
@@ -414,6 +488,7 @@ const SeguimientoOCModule = () => {
   const handleStartCreate = () => {
     setFormData({
       numero_oc: '',
+      solicitud_compra: '',
       proveedor: '',
       rut_proveedor: '',
       tipo_oc: 'AG',
@@ -423,6 +498,8 @@ const SeguimientoOCModule = () => {
     });
     setProveedorSearch('');
     setShowProveedorSuggestions(false);
+    setShowSolicitudSuggestions(false);
+    setArticulosYaAsignados([]);
     setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
     setView('create');
   };
@@ -1498,33 +1575,7 @@ const SeguimientoOCModule = () => {
                           return (
                             <div
                               key={s.id}
-                              onMouseDown={() => {
-                                setFormData(prev => ({ ...prev, solicitud_compra: s.numero_solicitud }));
-                                setShowSolicitudSuggestions(false);
-
-                                // Auto-fill articles from this solicitud
-                                if (childItems.length > 0) {
-                                  setArticulosForm(
-                                    childItems.map(c => ({
-                                      key: c.id || Date.now() + Math.random(),
-                                      codigo: c.codigo_articulo || '',
-                                      nombre: c.descripcion_articulo || articulosCatalog[c.codigo_articulo] || '',
-                                      cantidad: c.cantidad || 1,
-                                      isNew: false,
-                                      tempName: ''
-                                    }))
-                                  );
-                                } else if (s.codigo_articulo) {
-                                  setArticulosForm([{
-                                    key: Date.now(),
-                                    codigo: s.codigo_articulo,
-                                    nombre: s.descripcion_articulo || articulosCatalog[s.codigo_articulo] || '',
-                                    cantidad: s.cantidad || 1,
-                                    isNew: false,
-                                    tempName: ''
-                                  }]);
-                                }
-                              }}
+                              onMouseDown={() => handleSeleccionarSolicitud(s)}
                               style={{
                                 padding: '10px 14px',
                                 cursor: 'pointer',
@@ -1740,6 +1791,54 @@ const SeguimientoOCModule = () => {
                 </div>
               </div>
             </div>
+
+            {/* ALERTA EN ROJO (OPCIÓN A): ARTÍCULOS YA ASIGNADOS EN OTRAS OCs DE ESTA MISMA SOLICITUD */}
+            {articulosYaAsignados.length > 0 && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: '12px',
+                padding: '18px',
+                marginBottom: '25px'
+              }}>
+                <h4 style={{ color: '#ef4444', fontSize: '0.95rem', fontWeight: '800', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={20} /> Artículos Ya Asignados en Otras OCs de la Solicitud {formData.solicitud_compra}
+                </h4>
+                <p style={{ fontSize: '0.82rem', color: '#f87171', margin: '0 0 12px 0' }}>
+                  Los siguientes productos de la Solicitud <strong>{formData.solicitud_compra}</strong> ya fueron incluidos en otra Orden de Compra previa. Se han omitido de esta lista para prevenir pedidos duplicados:
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {articulosYaAsignados.map(item => (
+                    <div key={item.codigo} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(239, 68, 68, 0.15)',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem'
+                    }}>
+                      <div>
+                        <strong style={{ color: '#f87171' }}>Cód {item.codigo}</strong>
+                        <span style={{ color: '#cbd5e1', marginLeft: '10px' }}>{item.descripcion}</span>
+                        <span style={{ color: '#94a3b8', fontSize: '0.75rem', marginLeft: '10px' }}>({item.cantidad} uds)</span>
+                      </div>
+                      <span style={{ 
+                        background: 'rgba(239, 68, 68, 0.2)', 
+                        color: '#ef4444', 
+                        padding: '3px 10px', 
+                        borderRadius: '6px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: '700' 
+                      }}>
+                        Ya asignado en {item.ocAsignada}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ARTICULOS DE LA OC */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '30px', marginBottom: '30px' }}>
