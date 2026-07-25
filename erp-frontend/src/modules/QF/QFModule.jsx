@@ -475,11 +475,21 @@ const QFModule = () => {
                         const items = s.solicitudes_compra_articulos || [];
                         const totalItems = items.length > 0 ? items.length : 1;
                         const matchingOcs = assignedOcsMap[s.numero_solicitud.toUpperCase()] || [];
-                        const hasOc = matchingOcs.length > 0 || s.estado === 'OC asignada';
+                        const currentStatus = s.estado || (matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada');
 
-                        const badgeBg = hasOc ? 'rgba(59, 130, 246, 0.15)' : 'rgba(234, 179, 8, 0.15)';
-                        const badgeColor = hasOc ? '#3b82f6' : '#eab308';
-                        const displayStateText = hasOc ? 'OC asignada' : 'Sin OC asignada';
+                        let badgeBg = 'rgba(234, 179, 8, 0.15)';
+                        let badgeColor = '#eab308';
+                        let displayStateText = 'Sin OC asignada';
+
+                        if (currentStatus === 'OC asignada completa') {
+                          badgeBg = 'rgba(16, 185, 129, 0.15)';
+                          badgeColor = '#10b981';
+                          displayStateText = 'OC asignada completa';
+                        } else if (currentStatus === 'OC asignada parcial' || matchingOcs.length > 0) {
+                          badgeBg = 'rgba(59, 130, 246, 0.15)';
+                          badgeColor = '#3b82f6';
+                          displayStateText = currentStatus === 'OC asignada completa' ? 'OC asignada completa' : 'OC asignada parcial';
+                        }
 
                         return (
                           <tr 

@@ -233,6 +233,78 @@ const SeguimientoOCModule = () => {
     }
   };
 
+  // Helper function to calculate request status: 'Sin OC asignada', 'OC asignada parcial', 'OC asignada completa'
+  const evaluarYActualizarEstadoSolicitud = async (solNumero) => {
+    if (!solNumero) return;
+    try {
+      // 1. Fetch child articles of the Solicitud
+      const { data: solData } = await supabase
+        .from('solicitudes_compra')
+        .select(`
+          id,
+          codigo_articulo,
+          solicitudes_compra_articulos (
+            codigo_articulo
+          )
+        `)
+        .eq('numero_solicitud', solNumero)
+        .maybeSingle();
+
+      if (!solData) return;
+
+      const requestedCodes = new Set();
+      if (solData.solicitudes_compra_articulos && solData.solicitudes_compra_articulos.length > 0) {
+        solData.solicitudes_compra_articulos.forEach(a => {
+          if (a.codigo_articulo) requestedCodes.add(a.codigo_articulo.trim().toUpperCase());
+        });
+      } else if (solData.codigo_articulo) {
+        requestedCodes.add(solData.codigo_articulo.trim().toUpperCase());
+      }
+
+      if (requestedCodes.size === 0) return;
+
+      // 2. Fetch all articles assigned across all OCs for this Solicitud
+      const { data: ocsData } = await supabase
+        .from('ordenes_compra')
+        .select(`
+          id,
+          ordenes_compra_articulos (
+            codigo_articulo
+          )
+        `)
+        .eq('solicitud_compra', solNumero);
+
+      const assignedCodes = new Set();
+      (ocsData || []).forEach(oc => {
+        (oc.ordenes_compra_articulos || []).forEach(art => {
+          if (art.codigo_articulo) assignedCodes.add(art.codigo_articulo.trim().toUpperCase());
+        });
+      });
+
+      // 3. Determine status
+      let assignedCount = 0;
+      requestedCodes.forEach(code => {
+        if (assignedCodes.has(code)) assignedCount++;
+      });
+
+      let nuevoEstado = 'Sin OC asignada';
+      if (assignedCount >= requestedCodes.size) {
+        nuevoEstado = 'OC asignada completa';
+      } else if (assignedCount > 0) {
+        nuevoEstado = 'OC asignada parcial';
+      }
+
+      // 4. Update status in database
+      await supabase
+        .from('solicitudes_compra')
+        .update({ estado: nuevoEstado })
+        .eq('numero_solicitud', solNumero);
+
+    } catch (err) {
+      console.error('Error al evaluar estado de la solicitud:', err);
+    }
+  };
+
   // Load active OCs from Supabase
   const cargarOcs = async () => {
     setLoading(true);
@@ -523,14 +595,6 @@ const SeguimientoOCModule = () => {
       if (insertOCErr) throw insertOCErr;
       const newOCId = insertedOC[0].id;
 
-      // Update matched solicitud_compra status to 'OC asignada'
-      if (formattedSol) {
-        await supabase
-          .from('solicitudes_compra')
-          .update({ estado: 'OC asignada' })
-          .eq('numero_solicitud', formattedSol);
-      }
-
       // 3. Insert child articles
       const childItems = validArticles.map(art => ({
         oc_id: newOCId,
@@ -542,6 +606,13 @@ const SeguimientoOCModule = () => {
       const { error: insertItemsErr } = await supabase
         .from('ordenes_compra_articulos')
         .insert(childItems);
+
+      if (insertItemsErr) throw insertItemsErr;
+
+      // Update matched solicitud_compra status automatically
+      if (formattedSol) {
+        await evaluarYActualizarEstadoSolicitud(formattedSol);
+      }
 
       if (insertItemsErr) throw insertItemsErr;
 
@@ -917,7 +988,7 @@ const SeguimientoOCModule = () => {
                         className="btn-primary" 
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', height: '46px', flexShrink: 0 }}
                       >
-                        <Plus size={20} /> Crear Nueva OC
+                        <Plus size={20} /> Asignar OC
                       </button>
                     </div>
 
@@ -1352,7 +1423,7 @@ const SeguimientoOCModule = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Truck size={28} color="#3b82f6" />
-                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0 }}>Nueva Orden de Compra (OC)</h2>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0 }}>Asignar Orden de Compra (OC)</h2>
               </div>
               <button onClick={() => setView('list')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ArrowLeft size={16} /> Volver
@@ -1363,18 +1434,18 @@ const SeguimientoOCModule = () => {
             <div className="responsive-grid-2" style={{ marginBottom: '30px' }}>
               {/* Lado Izquierdo - Datos Generales */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <label style={labelStyle}><FileText size={16} /> Número de OC</label>
-                  <input
-                    type="text"
-                    value={formData.numero_oc}
-                    onChange={e => setFormData(prev => ({ ...prev, numero_oc: e.target.value }))}
-                    placeholder="Ej: 10452-87-SE26"
-                    className="input-field"
-                  />
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <label style={labelStyle}><FileText size={16} /> Solicitud de Compra (Asociada)</label>
+                
+                {/* PASO 1: BÚSQUEDA Y ASIGNACIÓN DE SOLICITUD DE COMPRA */}
+                <div style={{
+                  background: 'rgba(59, 130, 246, 0.06)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  position: 'relative'
+                }}>
+                  <label style={{ ...labelStyle, color: '#3b82f6', fontWeight: '700', marginBottom: '8px' }}>
+                    <FileText size={16} /> Paso 1: Buscar y Seleccionar Solicitud QF *
+                  </label>
                   <input
                     type="text"
                     value={formData.solicitud_compra}
@@ -1387,9 +1458,13 @@ const SeguimientoOCModule = () => {
                     onBlur={() => {
                       setTimeout(() => setShowSolicitudSuggestions(false), 200);
                     }}
-                    placeholder="Escribe o selecciona (ej: 1234 -> S-1234)..."
+                    placeholder="Buscar por N° Solicitud (ej: 1234 -> S-1234) o Centro de Costo..."
                     className="input-field"
+                    style={{ borderColor: formData.solicitud_compra ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}
                   />
+                  <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '6px', display: 'block' }}>
+                    Al seleccionar la solicitud, sus artículos se cargarán automáticamente en la OC.
+                  </small>
 
                   {/* Dropdown suggestions for Solicitudes */}
                   {showSolicitudSuggestions && (
@@ -1398,13 +1473,13 @@ const SeguimientoOCModule = () => {
                       top: '100%',
                       left: 0,
                       right: 0,
-                      background: '#1e293b',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      background: '#0f172a',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
                       borderRadius: '8px',
-                      maxHeight: '180px',
+                      maxHeight: '200px',
                       overflowY: 'auto',
                       zIndex: 100,
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.6)',
                       marginTop: '4px'
                     }}>
                       {solicitudesOptions.filter(s => 
@@ -1412,7 +1487,7 @@ const SeguimientoOCModule = () => {
                         (s.centro_costo_nombre || '').toLowerCase().includes((formData.solicitud_compra || '').toLowerCase())
                       ).length === 0 ? (
                         <div style={{ padding: '10px 14px', color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                          No se encontraron solicitudes
+                          No se encontraron solicitudes registradas
                         </div>
                       ) : (
                         solicitudesOptions.filter(s => 
@@ -1484,6 +1559,17 @@ const SeguimientoOCModule = () => {
                       )}
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <label style={labelStyle}><FileText size={16} /> Número de OC *</label>
+                  <input
+                    type="text"
+                    value={formData.numero_oc}
+                    onChange={e => setFormData(prev => ({ ...prev, numero_oc: e.target.value }))}
+                    placeholder="Ej: 10452-87-SE26"
+                    className="input-field"
+                  />
                 </div>
                 <div style={{ position: 'relative' }}>
                   <label style={labelStyle}>Proveedor</label>
