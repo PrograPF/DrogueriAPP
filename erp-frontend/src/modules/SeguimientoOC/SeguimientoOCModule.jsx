@@ -338,7 +338,8 @@ const SeguimientoOCModule = () => {
   };
 
   // Helper function to calculate request status: 'Sin OC asignada', 'OC asignada parcial', 'OC asignada completa'
-  const evaluarYActualizarEstadoSolicitud = async (solNumero) => {
+  // excludeOcIds: array of OC IDs to treat as cancelled (handles race condition with Supabase)
+  const evaluarYActualizarEstadoSolicitud = async (solNumero, excludeOcIds = []) => {
     if (!solNumero) return;
     try {
       // Step 1: Find the Solicitud. Try exact match first, then variations.
@@ -436,9 +437,10 @@ const SeguimientoOCModule = () => {
         `)
         .eq('solicitud_compra', exactNumSol);
 
-      // Filter out cancelled OCs in JavaScript
+      // Filter out cancelled OCs in JavaScript + explicitly exclude the OC(s) just cancelled
+      const excludeSet = new Set(excludeOcIds.map(id => String(id)));
       const activeOcs = (ocsData || []).filter(oc => 
-        oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada'
+        oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && !excludeSet.has(String(oc.id))
       );
 
       const assignedCodes = new Set();
@@ -645,7 +647,8 @@ const SeguimientoOCModule = () => {
 
       // Re-evaluate and update linked Solicitud status immediately (frees up articles if Cancelado)
       if (targetSol) {
-        await evaluarYActualizarEstadoSolicitud(targetSol);
+        const isCancelling = (nuevoEstado === 'Cancelado' || nuevoEstado === 'Cancelada');
+        await evaluarYActualizarEstadoSolicitud(targetSol, isCancelling ? [ocId] : []);
       }
 
       alert('Estado de la OC actualizado correctamente.');
