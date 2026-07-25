@@ -136,7 +136,7 @@ const useArsenalAutoSuggest = (codigo) => {
 };
 
 const SeguimientoOCModule = () => {
-  const [view, setView] = useState('list'); // 'list' | 'create'
+  const [view, setView] = useState('selection'); // 'selection' | 'list' | 'create'
   const [activeDept, setActiveDept] = useState('drogueria'); // 'drogueria' | 'resolutividad'
   const [activeSubTab, setActiveSubTab] = useState('list'); // 'list' | 'alertas' | 'recepcion'
   const [filtroEstadoList, setFiltroEstadoList] = useState('TODOS');
