@@ -236,7 +236,7 @@ const SeguimientoOCModule = () => {
     }
   };
 
-  // Option A: Select Solicitud, check assigned items in other OCs, filter available vs assigned
+  // Option A: Select Solicitud, check assigned items in other OCs, mark previously assigned ones in red
   const handleSeleccionarSolicitud = async (s) => {
     setFormData(prev => ({ ...prev, solicitud_compra: s.numero_solicitud }));
     setShowSolicitudSuggestions(false);
@@ -271,35 +271,25 @@ const SeguimientoOCModule = () => {
         cantidad: s.cantidad || 1
       }] : []);
 
-      const disponibles = [];
-      const yaAsignados = [];
-
-      allItems.forEach(item => {
+      const formRows = allItems.map(item => {
         const codeUpper = (item.codigo_articulo || '').trim().toUpperCase();
-        if (assignedCodesMap[codeUpper]) {
-          yaAsignados.push({
-            codigo: item.codigo_articulo,
-            descripcion: item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '',
-            cantidad: item.cantidad || 1,
-            ocAsignada: assignedCodesMap[codeUpper]
-          });
-        } else {
-          disponibles.push({
-            key: Date.now() + Math.random(),
-            codigo: item.codigo_articulo || '',
-            nombre: item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '',
-            cantidad: item.cantidad || 1,
-            isNew: false,
-            tempName: ''
-          });
-        }
+        const ocPrevia = assignedCodesMap[codeUpper] || null;
+
+        return {
+          key: Date.now() + Math.random(),
+          codigo: item.codigo_articulo || '',
+          nombre: item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '',
+          cantidad: item.cantidad || 1,
+          isNew: false,
+          tempName: '',
+          yaAsignadoEnOc: ocPrevia
+        };
       });
 
-      setArticulosYaAsignados(yaAsignados);
-      if (disponibles.length > 0) {
-        setArticulosForm(disponibles);
+      if (formRows.length > 0) {
+        setArticulosForm(formRows);
       } else {
-        setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
+        setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '', yaAsignadoEnOc: null }]);
       }
 
     } catch (err) {
@@ -1792,54 +1782,6 @@ const SeguimientoOCModule = () => {
               </div>
             </div>
 
-            {/* ALERTA EN ROJO (OPCIÓN A): ARTÍCULOS YA ASIGNADOS EN OTRAS OCs DE ESTA MISMA SOLICITUD */}
-            {articulosYaAsignados.length > 0 && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: '12px',
-                padding: '18px',
-                marginBottom: '25px'
-              }}>
-                <h4 style={{ color: '#ef4444', fontSize: '0.95rem', fontWeight: '800', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertTriangle size={20} /> Artículos Ya Asignados en Otras OCs de la Solicitud {formData.solicitud_compra}
-                </h4>
-                <p style={{ fontSize: '0.82rem', color: '#f87171', margin: '0 0 12px 0' }}>
-                  Los siguientes productos de la Solicitud <strong>{formData.solicitud_compra}</strong> ya fueron incluidos en otra Orden de Compra previa. Se han omitido de esta lista para prevenir pedidos duplicados:
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {articulosYaAsignados.map(item => (
-                    <div key={item.codigo} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: 'rgba(0,0,0,0.3)',
-                      border: '1px solid rgba(239, 68, 68, 0.15)',
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem'
-                    }}>
-                      <div>
-                        <strong style={{ color: '#f87171' }}>Cód {item.codigo}</strong>
-                        <span style={{ color: '#cbd5e1', marginLeft: '10px' }}>{item.descripcion}</span>
-                        <span style={{ color: '#94a3b8', fontSize: '0.75rem', marginLeft: '10px' }}>({item.cantidad} uds)</span>
-                      </div>
-                      <span style={{ 
-                        background: 'rgba(239, 68, 68, 0.2)', 
-                        color: '#ef4444', 
-                        padding: '3px 10px', 
-                        borderRadius: '6px', 
-                        fontSize: '0.75rem', 
-                        fontWeight: '700' 
-                      }}>
-                        Ya asignado en {item.ocAsignada}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* ARTICULOS DE LA OC */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '30px', marginBottom: '30px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -2301,6 +2243,7 @@ const SeguimientoOCModule = () => {
 // Isolated Sub-component to manage single article row state lookup
 const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
   const { nombre, loading, exists } = useArsenalAutoSuggest(row.codigo);
+  const isAssignedRed = !!row.yaAsignadoEnOc;
 
   // Sync auto-suggest back to parent row state
   useEffect(() => {
@@ -2323,24 +2266,28 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
       gridTemplateColumns: '150px 1fr 120px auto', 
       gap: '15px', 
       alignItems: 'start',
-      background: 'rgba(255,255,255,0.01)',
-      border: '1px solid var(--border-color)',
+      background: isAssignedRed ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.01)',
+      border: isAssignedRed ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid var(--border-color)',
       padding: '15px',
-      borderRadius: '8px'
+      borderRadius: '8px',
+      transition: 'all 0.2s ease'
     }}>
       <div>
-        <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>CÓDIGO</label>
+        <label style={{ fontSize: '0.8rem', color: isAssignedRed ? '#f87171' : '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+          CÓDIGO {isAssignedRed && '⚠️'}
+        </label>
         <input
           type="text"
           value={row.codigo}
           onChange={e => onChange(rowKey, 'codigo', e.target.value)}
           placeholder="Ej: 1227"
           className="input-field"
+          style={{ borderColor: isAssignedRed ? 'rgba(239, 68, 68, 0.5)' : undefined }}
         />
       </div>
 
       <div>
-        <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>NOMBRE / DESCRIPCIÓN</label>
+        <label style={{ fontSize: '0.8rem', color: isAssignedRed ? '#f87171' : '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>NOMBRE / DESCRIPCIÓN</label>
         {row.codigo.trim() === '' ? (
           <div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed var(--border-color)', color: '#64748b', fontSize: '0.85rem' }}>
             Ingrese código para buscar o registrar...
@@ -2348,8 +2295,8 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
         ) : loading ? (
           <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '10px 0' }}>Buscando en catálogo base...</div>
         ) : exists && nombre ? (
-          <div style={{ padding: '10px 16px', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#10b981', fontWeight: '600', fontSize: '0.9rem' }}>
-            {nombre} (Registrado)
+          <div style={{ padding: '10px 16px', background: isAssignedRed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: isAssignedRed ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.2)', color: isAssignedRed ? '#ef4444' : '#10b981', fontWeight: '600', fontSize: '0.9rem' }}>
+            {nombre} {isAssignedRed ? '(Ya asignado previamente)' : '(Registrado)'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2364,6 +2311,25 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
               className="input-field"
               style={{ borderColor: '#f59e0b' }}
             />
+          </div>
+        )}
+
+        {/* ALERTA EN ROJO CON EL NÚMERO DE OC ASIGNADA Y ROL DE ELIMINACIÓN */}
+        {isAssignedRed && (
+          <div style={{
+            marginTop: '8px',
+            padding: '6px 12px',
+            background: 'rgba(239, 68, 68, 0.18)',
+            borderRadius: '6px',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            color: '#f87171',
+            fontSize: '0.8rem',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <AlertTriangle size={14} color="#ef4444" /> Ya fue asignado previamente en la {row.yaAsignadoEnOc} (Puedes eliminarlo manualmente con el botón papelera de la derecha)
           </div>
         )}
       </div>
