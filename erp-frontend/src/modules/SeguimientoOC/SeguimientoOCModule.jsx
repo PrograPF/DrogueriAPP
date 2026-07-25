@@ -787,14 +787,14 @@ const SeguimientoOCModule = () => {
       return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, alertMessage: 'Recepción Conforme en Bodega' };
     }
     if (oc.estado === 'Recepción Con Multa') {
-      return { statusType: 'multa', badgeBg: 'rgba(249, 115, 22, 0.15)', badgeColor: '#f97316', isExpired: false, isYellow: false, alertMessage: 'Recepción Con Multa (Entregado del Día 11 hábil en adelante)' };
+      return { statusType: 'multa', badgeBg: 'rgba(249, 115, 22, 0.2)', badgeColor: '#f97316', isExpired: false, isYellow: false, alertMessage: 'Recepción Con Multa (Entregado del Día 11 hábil en adelante)' };
     }
 
     const isEspecial = oc.tipo_oc === 'OC ESPECIAL';
     
-    // Limits in business days
-    const maxEnviadaAceptada = isEspecial ? (parseInt(oc.dias_enviada_aceptada) || 4) : 4;
-    const alertaEnviadaAceptada = isEspecial ? (parseInt(oc.dias_alerta_aceptada) || 4) : 4;
+    // Limits in days
+    const maxEnviadaAceptada = isEspecial ? (parseInt(oc.dias_enviada_aceptada) || 1) : 4;
+    const alertaEnviadaAceptada = isEspecial ? (parseInt(oc.dias_alerta_aceptada) || parseInt(oc.dias_enviada_aceptada) || 1) : 4;
     
     const maxAceptadaRecepcion = isEspecial ? (parseInt(oc.dias_aceptada_recepcion) || 10) : 10;
     const alertaAceptadaRecepcion = isEspecial ? (parseInt(oc.dias_alerta_recepcion) || 7) : 7;
@@ -804,7 +804,12 @@ const SeguimientoOCModule = () => {
     const fechaAceptacion = oc.fecha_aceptacion ? new Date(oc.fecha_aceptacion) : null;
 
     const diasHabilesEnvio = calcularDiasHabiles(fechaEnvio, hoy);
+    const diffCalEnvio = Math.floor((hoy - fechaEnvio) / (1000 * 60 * 60 * 24));
+    const conteoEnvio = isEspecial ? Math.max(diasHabilesEnvio, diffCalEnvio) : diasHabilesEnvio;
+
     const diasHabilesAceptacion = fechaAceptacion ? calcularDiasHabiles(fechaAceptacion, hoy) : 0;
+    const diffCalAceptacion = fechaAceptacion ? Math.floor((hoy - fechaAceptacion) / (1000 * 60 * 60 * 24)) : 0;
+    const conteoAceptacion = isEspecial ? Math.max(diasHabilesAceptacion, diffCalAceptacion) : diasHabilesAceptacion;
 
     let isExpired = false;
     let isYellow = false;
@@ -813,30 +818,30 @@ const SeguimientoOCModule = () => {
     let badgeColor = '#3b82f6';
 
     if (oc.estado === 'Enviada') {
-      if (diasHabilesEnvio >= alertaEnviadaAceptada) {
+      if (conteoEnvio >= alertaEnviadaAceptada) {
         isYellow = true;
-        badgeBg = 'rgba(234, 179, 8, 0.2)';
+        badgeBg = 'rgba(234, 179, 8, 0.25)';
         badgeColor = '#eab308';
-        alertMessage = `Alerta Amarilla Aceptación: Llevas ${diasHabilesEnvio} días hábiles en estado Enviada (Límite: ${maxEnviadaAceptada} días hábiles).`;
+        alertMessage = `Alerta Amarilla Aceptación: Llevas ${conteoEnvio} día(s) en estado Enviada (Límite: ${maxEnviadaAceptada} día(s)).`;
       } else {
-        alertMessage = `Enviada hace ${diasHabilesEnvio} días hábiles (Sin contar fines de semana).`;
+        alertMessage = `Enviada hace ${conteoEnvio} día(s).`;
       }
     } else if (oc.estado === 'Aceptada') {
       badgeBg = 'rgba(16, 185, 129, 0.15)';
       badgeColor = '#10b981';
 
-      if (diasHabilesAceptacion >= maxAceptadaRecepcion) {
+      if (conteoAceptacion >= maxAceptadaRecepcion) {
         isExpired = true;
-        badgeBg = 'rgba(239, 68, 68, 0.2)';
+        badgeBg = 'rgba(239, 68, 68, 0.25)';
         badgeColor = '#ef4444';
-        alertMessage = `⚠️ Excedido de Plazo: Llevas ${diasHabilesAceptacion} días hábiles desde Aceptada (Límite: ${maxAceptadaRecepcion} días hábiles). Aplicará Recepción Con Multa al entregar.`;
-      } else if (diasHabilesAceptacion >= alertaAceptadaRecepcion) {
+        alertMessage = `⚠️ Excedido de Plazo: Llevas ${conteoAceptacion} día(s) desde Aceptada (Límite: ${maxAceptadaRecepcion} día(s)). Aplicará Recepción Con Multa al entregar.`;
+      } else if (conteoAceptacion >= alertaAceptadaRecepcion) {
         isYellow = true;
-        badgeBg = 'rgba(234, 179, 8, 0.2)';
+        badgeBg = 'rgba(234, 179, 8, 0.25)';
         badgeColor = '#eab308';
-        alertMessage = `Alerta Amarilla Entrega: Llevas ${diasHabilesAceptacion} días hábiles desde Aceptada (Alerta activa a partir del Día ${alertaAceptadaRecepcion} hábil).`;
+        alertMessage = `Alerta Amarilla Entrega: Llevas ${conteoAceptacion} día(s) desde Aceptada (Alerta activa a partir del Día ${alertaAceptadaRecepcion}).`;
       } else {
-        alertMessage = `Aceptada hace ${diasHabilesAceptacion} días hábiles (Sin contar fines de semana).`;
+        alertMessage = `Aceptada hace ${conteoAceptacion} día(s).`;
       }
     }
 
@@ -1243,8 +1248,16 @@ const SeguimientoOCModule = () => {
                                         Acept.: {formatDate(oc.fecha_aceptacion)}
                                       </div>
                                     )}
-                                    {plazos.isExpired && (
-                                      <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontWeight: '600' }}>
+                                    {(plazos.isYellow || plazos.isExpired) && (
+                                      <div style={{ 
+                                        color: plazos.isYellow ? '#eab308' : '#ef4444', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '4px', 
+                                        marginTop: '4px', 
+                                        fontWeight: '600',
+                                        fontSize: '0.78rem' 
+                                      }}>
                                         <AlertTriangle size={14} /> {plazos.alertMessage}
                                       </div>
                                     )}
@@ -1257,25 +1270,19 @@ const SeguimientoOCModule = () => {
                                       style={{ 
                                         padding: '6px 12px', 
                                         fontSize: '0.85rem', 
-                                        fontWeight: '600',
+                                        fontWeight: '700',
                                         width: 'auto',
                                         cursor: 'pointer',
-                                        background: oc.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.1)' : 
-                                                    oc.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.1)' : 
-                                                    oc.estado === 'Cancelada' ? 'rgba(239, 68, 68, 0.1)' : 
-                                                    oc.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.1)',
-                                        color: oc.estado === 'Enviada' ? '#3b82f6' : 
-                                               oc.estado === 'Aceptada' ? '#10b981' : 
-                                               oc.estado === 'Cancelada' ? '#ef4444' : 
-                                               oc.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
-                                        border: '1px solid rgba(255,255,255,0.1)'
+                                        background: plazos.badgeBg,
+                                        color: plazos.badgeColor,
+                                        border: `1px solid ${plazos.isYellow ? '#eab308' : plazos.isExpired ? '#ef4444' : 'rgba(255,255,255,0.15)'}`
                                       }}
                                     >
-                                      <option value="Enviada" style={{ background: '#1e293b' }}>Enviada</option>
-                                      <option value="Aceptada" style={{ background: '#1e293b' }}>Aceptada</option>
-                                      <option value="Cancelada" style={{ background: '#1e293b' }}>Cancelada</option>
-                                      <option value="Aceptada con multa" style={{ background: '#1e293b' }}>Aceptada con multa (Atrasada)</option>
-                                      <option value="Recepcionado" style={{ background: '#1e293b' }}>Recepcionado</option>
+                                      <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
+                                      <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
+                                      <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
+                                      <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
+                                      <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                                     </select>
                                   </td>
                                   <td style={{ padding: '16px', textAlign: 'center' }}>
