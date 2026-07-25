@@ -688,27 +688,45 @@ const SeguimientoOCModule = () => {
           : `S-${formData.solicitud_compra.trim().toUpperCase()}`
       ) : null;
 
-      const ocInsert = {
+      const baseOcInsert = {
         numero_oc: formData.numero_oc.trim(),
         solicitud_compra: formattedSol,
         proveedor: formData.proveedor.trim(),
         rut_proveedor: formData.rut_proveedor.trim(),
         tipo_oc: formData.tipo_oc,
-        dias_enviada_aceptada: parseInt(formData.dias_enviada_aceptada) || 4,
-        dias_alerta_aceptada: parseInt(formData.dias_alerta_aceptada) || 4,
-        dias_aceptada_recepcion: parseInt(formData.dias_aceptada_recepcion) || 10,
-        dias_alerta_recepcion: parseInt(formData.dias_alerta_recepcion) || 7,
         estado: formData.estado,
         fecha_envio: parseDisplayDate(formData.fecha_envio_display),
         fecha_aceptacion: formData.fecha_aceptacion_display ? parseDisplayDate(formData.fecha_aceptacion_display) : (formData.estado === 'Aceptada' ? new Date().toISOString() : null)
       };
 
-      const { data: insertedOC, error: insertOCErr } = await supabase
+      const ocInsertWithCustom = {
+        ...baseOcInsert,
+        dias_enviada_aceptada: parseInt(formData.dias_enviada_aceptada) || 4,
+        dias_alerta_aceptada: parseInt(formData.dias_alerta_aceptada) || 4,
+        dias_aceptada_recepcion: parseInt(formData.dias_aceptada_recepcion) || 10,
+        dias_alerta_recepcion: parseInt(formData.dias_alerta_recepcion) || 7
+      };
+
+      let insertedOC = null;
+
+      const resWithCustom = await supabase
         .from('ordenes_compra')
-        .insert([ocInsert])
+        .insert([ocInsertWithCustom])
         .select();
 
-      if (insertOCErr) throw insertOCErr;
+      if (resWithCustom.error) {
+        console.warn('Reintentando guardar OC sin columnas personalizadas (fallback):', resWithCustom.error.message);
+        const resBase = await supabase
+          .from('ordenes_compra')
+          .insert([baseOcInsert])
+          .select();
+
+        if (resBase.error) throw resBase.error;
+        insertedOC = resBase.data;
+      } else {
+        insertedOC = resWithCustom.data;
+      }
+
       const newOCId = insertedOC[0].id;
 
       // 3. Insert child articles
