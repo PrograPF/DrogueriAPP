@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList, Sun, Moon, FileText } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
-import RevisionBodegaModule from './modules/RevisionBodega/RevisionBodegaModule';
+import RecepcionRevisionModule from './modules/RecepcionRevision/RecepcionRevisionModule';
 import ConfigModule from './modules/Config/ConfigModule';
 import SeguimientoOCModule from './modules/SeguimientoOC/SeguimientoOCModule';
-import RecepcionArticulosModule from './modules/RecepcionArticulos/RecepcionArticulosModule';
 import InventarioModule from './modules/Inventario/InventarioModule';
 import QFModule from './modules/QF/QFModule';
 
@@ -94,8 +93,7 @@ const AppContent = () => {
           <SidebarItem icon={FilePlus} label="Diferencias de Inventario" to="/" onClick={closeSidebar} />
           <SidebarItem icon={FileText} label="Módulo QF" to="/qf" onClick={closeSidebar} />
           <SidebarItem icon={Truck} label="Seguimiento OC" to="/seguimiento-oc" onClick={closeSidebar} />
-          <SidebarItem icon={ClipboardList} label="Recepción Artículos" to="/recepcion" onClick={closeSidebar} />
-          <SidebarItem icon={ClipboardCheck} label="Revisión Bodega" to="/revision" onClick={closeSidebar} />
+          <SidebarItem icon={ClipboardCheck} label="Recepción y Revisión" to="/recepcion-revision" onClick={closeSidebar} />
           <SidebarItem icon={PackageSearch} label="Inventario" to="/inventario" onClick={closeSidebar} />
           <SidebarItem icon={Settings} label="Configuración" to="/config" onClick={closeSidebar} />
         </div>
@@ -151,9 +149,10 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<PendientesDiferenciasModule />} />
           <Route path="/qf" element={<QFModule />} />
-          <Route path="/revision" element={<RevisionBodegaModule />} />
           <Route path="/seguimiento-oc" element={<SeguimientoOCModule />} />
-          <Route path="/recepcion" element={<RecepcionArticulosModule />} />
+          <Route path="/recepcion-revision" element={<RecepcionRevisionModule />} />
+          <Route path="/recepcion" element={<RecepcionRevisionModule />} />
+          <Route path="/revision" element={<RecepcionRevisionModule />} />
           <Route path="/dashboard" element={<div style={{ padding: '20px' }}>Próximamente: Dashboard de Jefatura</div>} />
           <Route path="/inventario" element={<InventarioModule />} />
           <Route path="/config" element={<ConfigModule />} />
