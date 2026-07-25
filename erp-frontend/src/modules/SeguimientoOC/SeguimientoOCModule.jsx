@@ -341,11 +341,13 @@ const SeguimientoOCModule = () => {
   const evaluarYActualizarEstadoSolicitud = async (solNumero) => {
     if (!solNumero) return;
     try {
-      const formattedSol = solNumero.trim().toUpperCase().startsWith('S-')
-        ? solNumero.trim().toUpperCase()
-        : `S-${solNumero.trim().toUpperCase()}`;
+      // Build both possible formats to search with
+      const raw = solNumero.trim().toUpperCase();
+      const withPrefix = raw.startsWith('S-') ? raw : `S-${raw}`;
+      const withoutPrefix = raw.startsWith('S-') ? raw.substring(2) : raw;
+      const possibleValues = [raw, withPrefix, withoutPrefix];
 
-      // 1. Fetch child articles of the Solicitud
+      // 1. Fetch child articles of the Solicitud (try all possible formats)
       const { data: solList } = await supabase
         .from('solicitudes_compra')
         .select(`
@@ -356,10 +358,16 @@ const SeguimientoOCModule = () => {
             codigo_articulo
           )
         `)
-        .or(`numero_solicitud.eq.${solNumero},numero_solicitud.eq.${formattedSol}`);
+        .in('numero_solicitud', possibleValues);
 
       const solData = solList?.[0];
-      if (!solData) return;
+      if (!solData) {
+        console.warn('evaluarYActualizarEstadoSolicitud: Solicitud no encontrada para:', solNumero);
+        return;
+      }
+
+      // Use the EXACT numero_solicitud from the DB for all subsequent queries
+      const exactNumSol = solData.numero_solicitud;
 
       const requestedCodes = new Set();
       if (solData.solicitudes_compra_articulos && solData.solicitudes_compra_articulos.length > 0) {
@@ -372,7 +380,7 @@ const SeguimientoOCModule = () => {
 
       if (requestedCodes.size === 0) return;
 
-      // 2. Fetch all articles assigned across all non-cancelled OCs for this Solicitud
+      // 2. Fetch ALL OCs for this Solicitud (no PostgREST filter on estado)
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select(`
@@ -383,10 +391,12 @@ const SeguimientoOCModule = () => {
             codigo_articulo
           )
         `)
-        .or(`solicitud_compra.eq.${solNumero},solicitud_compra.eq.${formattedSol}`);
+        .in('solicitud_compra', possibleValues);
 
-      // Filter out cancelled OCs in JS
-      const activeOcs = (ocsData || []).filter(oc => oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada');
+      // Filter out cancelled OCs entirely in JavaScript
+      const activeOcs = (ocsData || []).filter(oc => 
+        oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada'
+      );
 
       const assignedCodes = new Set();
       activeOcs.forEach(oc => {
@@ -408,11 +418,17 @@ const SeguimientoOCModule = () => {
         nuevoEstado = 'OC asignada parcial';
       }
 
-      // 4. Update status in database
-      await supabase
+      console.log(`[evaluarEstadoSolicitud] ${exactNumSol}: ${assignedCount}/${requestedCodes.size} asignados en ${activeOcs.length} OCs activas -> ${nuevoEstado}`);
+
+      // 4. Update status in database using exact value from DB
+      const { error: updateErr } = await supabase
         .from('solicitudes_compra')
         .update({ estado: nuevoEstado })
-        .or(`numero_solicitud.eq.${solNumero},numero_solicitud.eq.${formattedSol}`);
+        .eq('numero_solicitud', exactNumSol);
+
+      if (updateErr) {
+        console.error('Error al actualizar estado solicitud:', updateErr);
+      }
 
     } catch (err) {
       console.error('Error al evaluar estado de la solicitud:', err);
