@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList, Sun, Moon } from 'lucide-react';
+import { FilePlus, Settings, LogOut, PackageSearch, Menu, X, ClipboardCheck, Truck, ClipboardList, Sun, Moon, FileText } from 'lucide-react';
 import PendientesDiferenciasModule from './modules/Pendientes/PendientesDiferenciasModule';
 import RevisionBodegaModule from './modules/RevisionBodega/RevisionBodegaModule';
 import ConfigModule from './modules/Config/ConfigModule';
 import SeguimientoOCModule from './modules/SeguimientoOC/SeguimientoOCModule';
 import RecepcionArticulosModule from './modules/RecepcionArticulos/RecepcionArticulosModule';
 import InventarioModule from './modules/Inventario/InventarioModule';
+import QFModule from './modules/QF/QFModule';
 
 const SidebarItem = ({ icon: Icon, label, to, onClick }) => {
   const location = useLocation();
@@ -91,6 +92,7 @@ const AppContent = () => {
 
         <div style={{ flex: 1 }}>
           <SidebarItem icon={FilePlus} label="Diferencias de Inventario" to="/" onClick={closeSidebar} />
+          <SidebarItem icon={FileText} label="Módulo QF" to="/qf" onClick={closeSidebar} />
           <SidebarItem icon={Truck} label="Seguimiento OC" to="/seguimiento-oc" onClick={closeSidebar} />
           <SidebarItem icon={ClipboardList} label="Recepción Artículos" to="/recepcion" onClick={closeSidebar} />
           <SidebarItem icon={ClipboardCheck} label="Revisión Bodega" to="/revision" onClick={closeSidebar} />
@@ -148,6 +150,7 @@ const AppContent = () => {
 
         <Routes>
           <Route path="/" element={<PendientesDiferenciasModule />} />
+          <Route path="/qf" element={<QFModule />} />
           <Route path="/revision" element={<RevisionBodegaModule />} />
           <Route path="/seguimiento-oc" element={<SeguimientoOCModule />} />
           <Route path="/recepcion" element={<RecepcionArticulosModule />} />

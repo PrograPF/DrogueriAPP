@@ -139,6 +139,7 @@ const SeguimientoOCModule = () => {
   // Form state
   const [formData, setFormData] = useState({
     numero_oc: '',
+    solicitud_compra: '',
     proveedor: '',
     rut_proveedor: '',
     tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1', 'PEDIDO ESPECIAL'
@@ -152,6 +153,10 @@ const SeguimientoOCModule = () => {
   const [loadingProveedores, setLoadingProveedores] = useState(false);
   const [proveedorSearch, setProveedorSearch] = useState('');
   const [showProveedorSuggestions, setShowProveedorSuggestions] = useState(false);
+
+  // States for solicitudes searchable dropdown
+  const [solicitudesOptions, setSolicitudesOptions] = useState([]);
+  const [showSolicitudSuggestions, setShowSolicitudSuggestions] = useState(false);
 
   const handleDateDisplayChange = (e) => {
     const val = e.target.value;
@@ -195,6 +200,36 @@ const SeguimientoOCModule = () => {
       setArticulosCatalog(mapping);
     } catch (err) {
       console.error('Error al cargar catálogo de artículos:', err);
+    }
+  };
+
+  // Load solicitudes options for auto-filling OC items
+  const cargarSolicitudesOptions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('solicitudes_compra')
+        .select(`
+          *,
+          solicitudes_compra_articulos (
+            id,
+            codigo_articulo,
+            descripcion_articulo,
+            cantidad
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        const { data: simple } = await supabase
+          .from('solicitudes_compra')
+          .select('*')
+          .order('created_at', { ascending: false });
+        setSolicitudesOptions(simple || []);
+      } else {
+        setSolicitudesOptions(data || []);
+      }
+    } catch (err) {
+      console.error('Error al cargar solicitudes options:', err);
     }
   };
 
@@ -324,6 +359,7 @@ const SeguimientoOCModule = () => {
     cargarOcs();
     cargarArticulosCatalog();
     cargarProveedores();
+    cargarSolicitudesOptions();
   }, []);
 
   // Update status directly from table
@@ -458,8 +494,15 @@ const SeguimientoOCModule = () => {
       }
 
       // 2. Insert parent OC (with manual date selection support)
+      const formattedSol = formData.solicitud_compra.trim() ? (
+        formData.solicitud_compra.trim().toUpperCase().startsWith('S-') 
+          ? formData.solicitud_compra.trim().toUpperCase() 
+          : `S-${formData.solicitud_compra.trim().toUpperCase()}`
+      ) : null;
+
       const ocInsert = {
         numero_oc: formData.numero_oc.trim(),
+        solicitud_compra: formattedSol,
         proveedor: formData.proveedor.trim(),
         rut_proveedor: formData.rut_proveedor.trim(),
         tipo_oc: formData.tipo_oc,
@@ -480,6 +523,14 @@ const SeguimientoOCModule = () => {
       if (insertOCErr) throw insertOCErr;
       const newOCId = insertedOC[0].id;
 
+      // Update matched solicitud_compra status to 'OC asignada'
+      if (formattedSol) {
+        await supabase
+          .from('solicitudes_compra')
+          .update({ estado: 'OC asignada' })
+          .eq('numero_solicitud', formattedSol);
+      }
+
       // 3. Insert child articles
       const childItems = validArticles.map(art => ({
         oc_id: newOCId,
@@ -499,6 +550,7 @@ const SeguimientoOCModule = () => {
       // Reset form
       setFormData({
         numero_oc: '',
+        solicitud_compra: '',
         proveedor: '',
         rut_proveedor: '',
         tipo_oc: 'AG',
@@ -929,6 +981,11 @@ const SeguimientoOCModule = () => {
                                     >
                                       {oc.numero_oc}
                                     </button>
+                                    {oc.solicitud_compra && (
+                                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
+                                        Solicitud: <strong style={{ color: '#3b82f6' }}>{oc.solicitud_compra}</strong>
+                                      </div>
+                                    )}
                                   </td>
                                   <td style={{ padding: '16px' }}>
                                     <div style={{ fontWeight: '600', color: '#f8fafc' }}>{oc.proveedor}</div>
@@ -1315,6 +1372,118 @@ const SeguimientoOCModule = () => {
                     placeholder="Ej: 10452-87-SE26"
                     className="input-field"
                   />
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <label style={labelStyle}><FileText size={16} /> Solicitud de Compra (Asociada)</label>
+                  <input
+                    type="text"
+                    value={formData.solicitud_compra}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setFormData(prev => ({ ...prev, solicitud_compra: val }));
+                      setShowSolicitudSuggestions(true);
+                    }}
+                    onFocus={() => setShowSolicitudSuggestions(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowSolicitudSuggestions(false), 200);
+                    }}
+                    placeholder="Escribe o selecciona (ej: 1234 -> S-1234)..."
+                    className="input-field"
+                  />
+
+                  {/* Dropdown suggestions for Solicitudes */}
+                  {showSolicitudSuggestions && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: '#1e293b',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      maxHeight: '180px',
+                      overflowY: 'auto',
+                      zIndex: 100,
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      marginTop: '4px'
+                    }}>
+                      {solicitudesOptions.filter(s => 
+                        (s.numero_solicitud || '').toLowerCase().includes((formData.solicitud_compra || '').toLowerCase()) ||
+                        (s.centro_costo_nombre || '').toLowerCase().includes((formData.solicitud_compra || '').toLowerCase())
+                      ).length === 0 ? (
+                        <div style={{ padding: '10px 14px', color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                          No se encontraron solicitudes
+                        </div>
+                      ) : (
+                        solicitudesOptions.filter(s => 
+                          (s.numero_solicitud || '').toLowerCase().includes((formData.solicitud_compra || '').toLowerCase()) ||
+                          (s.centro_costo_nombre || '').toLowerCase().includes((formData.solicitud_compra || '').toLowerCase())
+                        ).map(s => {
+                          const childItems = s.solicitudes_compra_articulos || [];
+                          return (
+                            <div
+                              key={s.id}
+                              onMouseDown={() => {
+                                setFormData(prev => ({ ...prev, solicitud_compra: s.numero_solicitud }));
+                                setShowSolicitudSuggestions(false);
+
+                                // Auto-fill articles from this solicitud
+                                if (childItems.length > 0) {
+                                  setArticulosForm(
+                                    childItems.map(c => ({
+                                      key: c.id || Date.now() + Math.random(),
+                                      codigo: c.codigo_articulo || '',
+                                      nombre: c.descripcion_articulo || articulosCatalog[c.codigo_articulo] || '',
+                                      cantidad: c.cantidad || 1,
+                                      isNew: false,
+                                      tempName: ''
+                                    }))
+                                  );
+                                } else if (s.codigo_articulo) {
+                                  setArticulosForm([{
+                                    key: Date.now(),
+                                    codigo: s.codigo_articulo,
+                                    nombre: s.descripcion_articulo || articulosCatalog[s.codigo_articulo] || '',
+                                    cantidad: s.cantidad || 1,
+                                    isNew: false,
+                                    tempName: ''
+                                  }]);
+                                }
+                              }}
+                              style={{
+                                padding: '10px 14px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                color: '#cbd5e1',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                                e.currentTarget.style.color = '#3b82f6';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = '#cbd5e1';
+                              }}
+                            >
+                              <div>
+                                <strong style={{ color: '#3b82f6' }}>{s.numero_solicitud}</strong>
+                                <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                  ({s.centro_costo_nombre || 'Sin CC'})
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600' }}>
+                                {childItems.length || 1} prod.
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ position: 'relative' }}>
                   <label style={labelStyle}>Proveedor</label>

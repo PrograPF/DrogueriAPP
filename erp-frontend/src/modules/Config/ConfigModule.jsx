@@ -19,6 +19,15 @@ const ConfigModule = () => {
   const [newCentro, setNewCentro] = useState('');
 
   // ==========================================
+  // ESTADO: GESTIÓN DE CENTROS DE COSTO
+  // ==========================================
+  const [centrosCosto, setCentrosCosto] = useState([]);
+  const [loadingCentrosCosto, setLoadingCentrosCosto] = useState(true);
+  const [editingCentroCostoId, setEditingCentroCostoId] = useState(null);
+  const [editCentroCostoValue, setEditCentroCostoValue] = useState('');
+  const [newCentroCosto, setNewCentroCosto] = useState('');
+
+  // ==========================================
   // ESTADO: GESTIÓN DE CATEGORÍAS
   // ==========================================
   const [categories, setCategories] = useState([]);
@@ -78,6 +87,7 @@ const ConfigModule = () => {
   // ==========================================
   useEffect(() => {
     fetchCentros();
+    fetchCentrosCosto();
     fetchCategories();
   }, []);
 
@@ -156,6 +166,68 @@ const ConfigModule = () => {
       fetchCentros();
     } catch (err) {
       alert('Error al eliminar centro: ' + err.message);
+    }
+  };
+
+  // ==========================================
+  // MÉTODOS: CENTROS DE COSTO
+  // ==========================================
+  const fetchCentrosCosto = async () => {
+    setLoadingCentrosCosto(true);
+    try {
+      const { data, error } = await supabase
+        .from('centros_costo')
+        .select('*')
+        .order('nombre');
+      if (error) throw error;
+      setCentrosCosto(data || []);
+    } catch (err) {
+      console.error('Error al cargar centros de costo:', err);
+    } finally {
+      setLoadingCentrosCosto(false);
+    }
+  };
+
+  const handleAddCentroCosto = async () => {
+    if (!newCentroCosto.trim()) {
+      alert('Por favor, escribe el nombre del centro de costo antes de hacer clic en Añadir.');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('centros_costo')
+        .insert([{ nombre: newCentroCosto.toUpperCase().trim() }]);
+      if (error) throw error;
+      setNewCentroCosto('');
+      fetchCentrosCosto();
+    } catch (err) {
+      alert('Error al añadir centro de costo: ' + err.message);
+    }
+  };
+
+  const handleUpdateCentroCosto = async (id) => {
+    if (!editCentroCostoValue.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('centros_costo')
+        .update({ nombre: editCentroCostoValue.toUpperCase().trim() })
+        .eq('id', id);
+      if (error) throw error;
+      setEditingCentroCostoId(null);
+      fetchCentrosCosto();
+    } catch (err) {
+      alert('Error al actualizar centro de costo: ' + err.message);
+    }
+  };
+
+  const handleDeleteCentroCosto = async (id, nombre) => {
+    if (!window.confirm(`¿Seguro que deseas eliminar el centro de costo "${nombre}"?`)) return;
+    try {
+      const { error } = await supabase.from('centros_costo').delete().eq('id', id);
+      if (error) throw error;
+      fetchCentrosCosto();
+    } catch (err) {
+      alert('Error al eliminar centro de costo: ' + err.message);
     }
   };
 
@@ -522,6 +594,13 @@ const ConfigModule = () => {
           <MapPin size={18} /> Centros de Salud
         </button>
         <button 
+          onClick={() => setActiveTab('centros_costo')}
+          className={activeTab === 'centros_costo' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <DollarSign size={18} /> Centros de Costo
+        </button>
+        <button 
           onClick={() => setActiveTab('catalog')}
           className={activeTab === 'catalog' ? 'btn-primary' : 'btn-secondary'}
           style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -612,6 +691,87 @@ const ConfigModule = () => {
                         </button>
                         <button 
                           onClick={() => handleDeleteCentro(centro.id, centro.nombre)}
+                          style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      {/* ==========================================
+          VISTA: GESTIÓN DE CENTROS DE COSTO
+          ========================================== */}
+      {activeTab === 'centros_costo' && (
+        <div className="glass-card" style={{ padding: '30px' }}>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '700' }}>
+            <DollarSign size={22} color="#3b82f6" /> Gestión de Centros de Costo
+          </h3>
+
+          {/* Formulario Añadir Centro de Costo */}
+          <div className="btn-group-responsive" style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
+            <input 
+              type="text" 
+              placeholder="Nombre del nuevo centro de costo..." 
+              className="input-field"
+              value={newCentroCosto}
+              onChange={(e) => setNewCentroCosto(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleAddCentroCosto()}
+            />
+            <button onClick={handleAddCentroCosto} className="btn-primary" style={{ whiteSpace: 'nowrap' }}>
+              <Plus size={20} /> Añadir Centro de Costo
+            </button>
+          </div>
+
+          {/* Lista de Centros de Costo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {loadingCentrosCosto ? (
+              <p style={{ color: '#94a3b8' }}>Cargando centros de costo...</p>
+            ) : centrosCosto.length === 0 ? (
+              <p style={{ color: '#64748b', fontStyle: 'italic' }}>No hay centros de costo registrados.</p>
+            ) : (
+              centrosCosto.map(cc => (
+                <div key={cc.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  padding: '12px 20px',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}>
+                  {editingCentroCostoId === cc.id ? (
+                    <div style={{ display: 'flex', gap: '10px', flex: 1 }}>
+                      <input 
+                        className="input-field" 
+                        value={editCentroCostoValue} 
+                        onChange={(e) => setEditCentroCostoValue(e.target.value)}
+                        autoFocus
+                      />
+                      <button onClick={() => handleUpdateCentroCosto(cc.id)} style={{ color: '#10b981', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <Save size={20} />
+                      </button>
+                      <button onClick={() => setEditingCentroCostoId(null)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <X size={20} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span style={{ fontWeight: '500' }}>{cc.nombre}</span>
+                      <div style={{ display: 'flex', gap: '15px' }}>
+                        <button 
+                          onClick={() => { setEditingCentroCostoId(cc.id); setEditCentroCostoValue(cc.nombre); }}
+                          style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCentroCosto(cc.id, cc.nombre)}
                           style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}
                         >
                           <Trash2 size={18} />
