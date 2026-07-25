@@ -781,7 +781,7 @@ const SeguimientoOCModule = () => {
   // Helper to calculate state dates, business days and visual alerts
   const checkPlazos = (oc) => {
     if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada') {
-      return { statusType: 'cancelado', badgeBg: 'rgba(100, 116, 139, 0.2)', badgeColor: '#94a3b8', isExpired: false, isYellow: false, alertMessage: 'Orden Cancelada (Artículos liberados)' };
+      return { statusType: 'cancelado', badgeBg: 'rgba(239, 68, 68, 0.2)', badgeColor: '#ef4444', isExpired: true, isYellow: false, alertMessage: 'Orden Cancelada (Artículos liberados)' };
     }
     if (oc.estado === 'Recepción Conforme') {
       return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, alertMessage: 'Recepción Conforme en Bodega' };
