@@ -547,6 +547,16 @@ const SeguimientoOCModule = () => {
       const ocObj = ocs.find(o => String(o.id) === String(ocId));
       const targetSol = ocObj?.solicitud_compra;
 
+      if (nuevoEstado === 'Cancelado' || nuevoEstado === 'Cancelada') {
+        const confirmCancel = window.confirm(
+          `⚠️ ¿Está seguro de cambiar el estado de la Orden de Compra "${ocObj?.numero_oc || ''}" a CANCELADO?\n\nEsta acción liberará los artículos asociados para que puedan ser asignados a otra OC.`
+        );
+        if (!confirmCancel) {
+          cargarOcs(); // Restaura el valor previo en el selector
+          return;
+        }
+      }
+
       const updates = { estado: nuevoEstado };
       if (nuevoEstado === 'Aceptada' && !ocObj?.fecha_aceptacion) {
         updates.fecha_aceptacion = new Date().toISOString();
