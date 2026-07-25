@@ -272,22 +272,29 @@ const SeguimientoOCModule = () => {
 
     try {
       // Fetch OCs already created for this solicitud (EXCLUDING CANCELLED OCs)
+      const formattedSol = s.numero_solicitud.trim().toUpperCase().startsWith('S-')
+        ? s.numero_solicitud.trim().toUpperCase()
+        : `S-${s.numero_solicitud.trim().toUpperCase()}`;
+
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select(`
           id,
           numero_oc,
+          solicitud_compra,
           estado,
           ordenes_compra_articulos (
             codigo_articulo
           )
         `)
-        .eq('solicitud_compra', s.numero_solicitud)
-        .not('estado', 'in', '("Cancelado","Cancelada")');
+        .or(`solicitud_compra.eq.${s.numero_solicitud},solicitud_compra.eq.${formattedSol}`);
+
+      // Filter out cancelled OCs in JS
+      const activeOcs = (ocsData || []).filter(oc => oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada');
 
       // Map assigned codes -> OC number
       const assignedCodesMap = {};
-      (ocsData || []).forEach(oc => {
+      activeOcs.forEach(oc => {
         (oc.ordenes_compra_articulos || []).forEach(art => {
           if (art.codigo_articulo) {
             assignedCodesMap[art.codigo_articulo.trim().toUpperCase()] = oc.numero_oc;
@@ -334,19 +341,24 @@ const SeguimientoOCModule = () => {
   const evaluarYActualizarEstadoSolicitud = async (solNumero) => {
     if (!solNumero) return;
     try {
+      const formattedSol = solNumero.trim().toUpperCase().startsWith('S-')
+        ? solNumero.trim().toUpperCase()
+        : `S-${solNumero.trim().toUpperCase()}`;
+
       // 1. Fetch child articles of the Solicitud
-      const { data: solData } = await supabase
+      const { data: solList } = await supabase
         .from('solicitudes_compra')
         .select(`
           id,
+          numero_solicitud,
           codigo_articulo,
           solicitudes_compra_articulos (
             codigo_articulo
           )
         `)
-        .eq('numero_solicitud', solNumero)
-        .maybeSingle();
+        .or(`numero_solicitud.eq.${solNumero},numero_solicitud.eq.${formattedSol}`);
 
+      const solData = solList?.[0];
       if (!solData) return;
 
       const requestedCodes = new Set();
@@ -365,16 +377,19 @@ const SeguimientoOCModule = () => {
         .from('ordenes_compra')
         .select(`
           id,
+          solicitud_compra,
           estado,
           ordenes_compra_articulos (
             codigo_articulo
           )
         `)
-        .eq('solicitud_compra', solNumero)
-        .not('estado', 'in', '("Cancelado","Cancelada")');
+        .or(`solicitud_compra.eq.${solNumero},solicitud_compra.eq.${formattedSol}`);
+
+      // Filter out cancelled OCs in JS
+      const activeOcs = (ocsData || []).filter(oc => oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada');
 
       const assignedCodes = new Set();
-      (ocsData || []).forEach(oc => {
+      activeOcs.forEach(oc => {
         (oc.ordenes_compra_articulos || []).forEach(art => {
           if (art.codigo_articulo) assignedCodes.add(art.codigo_articulo.trim().toUpperCase());
         });
@@ -397,7 +412,7 @@ const SeguimientoOCModule = () => {
       await supabase
         .from('solicitudes_compra')
         .update({ estado: nuevoEstado })
-        .eq('numero_solicitud', solNumero);
+        .or(`numero_solicitud.eq.${solNumero},numero_solicitud.eq.${formattedSol}`);
 
     } catch (err) {
       console.error('Error al evaluar estado de la solicitud:', err);
