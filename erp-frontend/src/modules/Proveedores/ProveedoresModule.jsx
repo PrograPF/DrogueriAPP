@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Plus, Search, Edit2, Trash2, X, Save, Phone, Mail, MapPin, Building2, Hash } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Save, Phone, Mail, MapPin, Building2, Hash, FileCheck } from 'lucide-react';
 
 const ProveedoresModule = () => {
   const [proveedores, setProveedores] = useState([]);
@@ -12,7 +12,7 @@ const ProveedoresModule = () => {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
 
-  const formVacio = { rut: '', nombre_proveedor: '', telefono_contacto: '', correo: '', direccion: '' };
+  const formVacio = { rut: '', nombre_proveedor: '', telefono_contacto: '', correo: '', direccion: '', resolucion_sanitaria: '' };
   const [form, setForm] = useState(formVacio);
 
   const cargarProveedores = useCallback(async () => {
@@ -42,6 +42,7 @@ const ProveedoresModule = () => {
       telefono_contacto: prov.telefono_contacto || '',
       correo: prov.correo || '',
       direccion: prov.direccion || '',
+      resolucion_sanitaria: prov.resolucion_sanitaria || '',
     });
     setError('');
     setShowModal(true);
@@ -76,7 +77,8 @@ const ProveedoresModule = () => {
 
   const filtrados = proveedores.filter(p =>
     p.nombre_proveedor?.toLowerCase().includes(search.toLowerCase()) ||
-    p.rut?.toLowerCase().includes(search.toLowerCase())
+    p.rut?.toLowerCase().includes(search.toLowerCase()) ||
+    p.resolucion_sanitaria?.toLowerCase().includes(search.toLowerCase())
   );
 
   const s = {
@@ -93,7 +95,7 @@ const ProveedoresModule = () => {
     tdName: { padding: '14px 16px', color: '#f1f5f9', fontSize: '0.92rem', fontWeight: '600', borderBottom: '1px solid rgba(255,255,255,0.04)' },
     btnIcon: { padding: '6px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', transition: 'all 0.2s', marginLeft: '6px' },
     overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-    modal: { background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '18px', padding: '32px', width: '100%', maxWidth: '520px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)' },
+    modal: { background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '18px', padding: '32px', width: '100%', maxWidth: '520px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' },
     modalTitle: { fontSize: '1.3rem', fontWeight: '700', color: '#f1f5f9', marginBottom: '24px' },
     label: { display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' },
     inputGroup: { display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px' },
@@ -121,7 +123,7 @@ const ProveedoresModule = () => {
         <Search size={16} color="#64748b" />
         <input
           style={s.searchInput}
-          placeholder="Buscar por nombre o RUT..."
+          placeholder="Buscar por nombre, RUT o resolución..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -141,6 +143,7 @@ const ProveedoresModule = () => {
               <tr>
                 <th style={s.th}>RUT</th>
                 <th style={s.th}>Nombre Proveedor</th>
+                <th style={s.th}>Resolución Sanitaria</th>
                 <th style={s.th}>Teléfono</th>
                 <th style={s.th}>Correo</th>
                 <th style={s.th}>Dirección</th>
@@ -155,6 +158,15 @@ const ProveedoresModule = () => {
                 >
                   <td style={s.td}><span style={s.badge}>{p.rut}</span></td>
                   <td style={s.tdName}>{p.nombre_proveedor}</td>
+                  <td style={s.td}>
+                    {p.resolucion_sanitaria ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>
+                        <FileCheck size={13} /> {p.resolucion_sanitaria}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#475569' }}>—</span>
+                    )}
+                  </td>
                   <td style={s.td}>{p.telefono_contacto || <span style={{ color: '#334155' }}>—</span>}</td>
                   <td style={s.td}>{p.correo || <span style={{ color: '#334155' }}>—</span>}</td>
                   <td style={s.td}>{p.direccion || <span style={{ color: '#334155' }}>—</span>}</td>
@@ -196,6 +208,12 @@ const ProveedoresModule = () => {
             <div style={s.inputGroup}>
               <Building2 size={16} color="#64748b" />
               <input style={s.input} placeholder="Ej: Laboratorio Chile S.A." value={form.nombre_proveedor} onChange={e => setForm({ ...form, nombre_proveedor: e.target.value })} />
+            </div>
+
+            <label style={s.label}>Resolución Sanitaria</label>
+            <div style={s.inputGroup}>
+              <FileCheck size={16} color="#10b981" />
+              <input style={s.input} placeholder="Ej: Res. N° 12345/2023" value={form.resolucion_sanitaria} onChange={e => setForm({ ...form, resolucion_sanitaria: e.target.value })} />
             </div>
 
             <label style={s.label}>Teléfono Contacto</label>
