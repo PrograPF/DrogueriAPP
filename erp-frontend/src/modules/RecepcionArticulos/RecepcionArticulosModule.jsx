@@ -305,8 +305,11 @@ const RecepcionArticulosModule = () => {
     cargarArticulosCatalog();
   }, []);
 
-  // Filtered OCs based on search query matching OC#, Proveedor, or Articles
+  // Filtered OCs based on search query matching OC#, Proveedor, or Articles (Only 'Enviada' or 'Aceptada')
   const filteredOcs = ocs.filter(oc => {
+    const esValidaParaRecepcion = oc.estado === 'Enviada' || oc.estado === 'Aceptada';
+    if (!esValidaParaRecepcion) return false;
+
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
 

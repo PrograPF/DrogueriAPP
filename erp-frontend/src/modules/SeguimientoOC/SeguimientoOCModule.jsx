@@ -1260,9 +1260,11 @@ const SeguimientoOCModule = () => {
     );
   };
 
-  // Filtered Active OCs for Recepcion Search Input
+  // Filtered Active OCs for Recepcion Search Input (Only 'Enviada' or 'Aceptada')
   const filteredActiveOcsForRecepcion = ocs.filter(oc => {
-    if (oc.estado === 'Cancelada') return false; // Filter out completely cancelled ones
+    const esValidaParaRecepcion = oc.estado === 'Enviada' || oc.estado === 'Aceptada';
+    if (!esValidaParaRecepcion) return false;
+
     const q = recepcionSearchQuery.toLowerCase().trim();
     if (!q) return true; // Show all active OCs if query is empty
 
