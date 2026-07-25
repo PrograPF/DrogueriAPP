@@ -544,8 +544,11 @@ const SeguimientoOCModule = () => {
   // Update status directly from table
   const handleUpdateEstado = async (ocId, nuevoEstado) => {
     try {
+      const ocObj = ocs.find(o => String(o.id) === String(ocId));
+      const targetSol = ocObj?.solicitud_compra;
+
       const updates = { estado: nuevoEstado };
-      if (nuevoEstado === 'Aceptada') {
+      if (nuevoEstado === 'Aceptada' && !ocObj?.fecha_aceptacion) {
         updates.fecha_aceptacion = new Date().toISOString();
       }
       
@@ -555,6 +558,12 @@ const SeguimientoOCModule = () => {
         .eq('id', ocId);
 
       if (error) throw error;
+
+      // Re-evaluate and update linked Solicitud status immediately (frees up articles if Cancelado)
+      if (targetSol) {
+        await evaluarYActualizarEstadoSolicitud(targetSol);
+      }
+
       alert('Estado de la OC actualizado correctamente.');
       
       // Sync local modal state if currently open
@@ -562,7 +571,7 @@ const SeguimientoOCModule = () => {
         setSelectedOcForModal(prev => ({
           ...prev,
           estado: nuevoEstado,
-          fecha_aceptacion: nuevoEstado === 'Aceptada' ? new Date().toISOString() : prev.fecha_aceptacion
+          fecha_aceptacion: nuevoEstado === 'Aceptada' ? (prev.fecha_aceptacion || new Date().toISOString()) : prev.fecha_aceptacion
         }));
       }
 
