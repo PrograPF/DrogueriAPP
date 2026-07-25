@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, 
+  Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
   Activity, ClipboardList, X, Filter
 } from 'lucide-react';
@@ -1280,7 +1280,83 @@ const SeguimientoOCModule = () => {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px' }}>
       <AnimatePresence mode="wait">
-        {view === 'list' ? (
+        {view === 'selection' && (
+          /* ==========================================
+             VISTA PRINCIPAL: SELECCIÓN DE MÓDULOS OC
+             ========================================== */
+          <motion.div
+            key="selection-view"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            style={{ 
+              maxWidth: '1000px', 
+              margin: '30px auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px'
+            }}
+          >
+            {/* Header del Módulo OC */}
+            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: '800', color: '#f8fafc', margin: 0 }}>
+                Gestión y Seguimiento de Órdenes de Compra
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '1rem', marginTop: '8px' }}>
+                Selecciona la sección o herramienta que deseas gestionar.
+              </p>
+            </div>
+
+            {/* Grid de Secciones / Botones */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '24px'
+            }}>
+              {/* Botón 1: Asignación y seguimiento de oc */}
+              <motion.div 
+                whileHover={{ 
+                  scale: 1.02, 
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  borderColor: 'rgba(59, 130, 246, 0.4)',
+                  transition: { duration: 0.2 }
+                }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('list')}
+                className="glass-card"
+                style={{ 
+                  padding: '36px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: '20px',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: '16px',
+                  background: 'rgba(59, 130, 246, 0.03)'
+                }}
+              >
+                <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%' }}>
+                  <Truck size={48} color="#3b82f6" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: '#f8fafc' }}>
+                    Asignación y seguimiento de oc
+                  </h2>
+                  <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
+                    Registro, asignación a solicitudes, monitoreo de plazos, alertas y recepción de productos.
+                  </p>
+                </div>
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontWeight: '600', fontSize: '0.95rem' }}>
+                  Abrir Seguimiento <ArrowRight size={18} />
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        {view === 'list' && (
           <motion.div
             key="list-view"
             initial={{ opacity: 0, y: 15 }}
@@ -1289,6 +1365,28 @@ const SeguimientoOCModule = () => {
             className="glass-card"
             style={{ padding: '30px' }}
           >
+            {/* Botón Volver al Menú Principal OC */}
+            <button 
+              onClick={() => setView('selection')} 
+              className="btn-secondary" 
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                marginBottom: '20px', 
+                padding: '8px 16px', 
+                borderRadius: '8px', 
+                cursor: 'pointer',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#cbd5e1',
+                fontSize: '0.88rem',
+                fontWeight: '600'
+              }}
+            >
+              <ArrowLeft size={16} /> Volver al Menú OC
+            </button>
+
             {/* Header */}
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px', marginBottom: '30px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1896,7 +1994,9 @@ const SeguimientoOCModule = () => {
               </motion.div>
             )}
           </motion.div>
-        ) : (
+        )}
+
+        {view === 'create' && (
           /* CREATE OC VIEW */
           <motion.div
             key="create-view"
