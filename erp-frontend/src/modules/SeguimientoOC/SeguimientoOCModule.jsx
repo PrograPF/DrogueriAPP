@@ -445,16 +445,42 @@ const SeguimientoOCModule = () => {
       console.log(`[evaluarEstadoSolicitud] RESULTADO: ${exactNumSol} -> Total OCs=${(ocsData||[]).length}, Activas=${activeOcs.length}, Asignados=${assignedCount}/${requestedCodes.size} -> NUEVO ESTADO: "${nuevoEstado}"`);
 
       // Step 4: Update status using the solicitud's primary key ID
-      const { error: updateErr, count: updateCount } = await supabase
+      const { error: updateErr, data: updateData } = await supabase
         .from('solicitudes_compra')
         .update({ estado: nuevoEstado })
         .eq('id', solData.id)
-        .select();
+        .select('id, numero_solicitud, estado');
+
+      console.log('[evaluarEstadoSolicitud] UPDATE resultado:', { error: updateErr, data: updateData });
 
       if (updateErr) {
         console.error('[evaluarEstadoSolicitud] ERROR en update:', updateErr);
-      } else {
-        console.log(`[evaluarEstadoSolicitud] UPDATE exitoso para ID ${solData.id}, rows afectadas:`, updateCount);
+      }
+
+      // VERIFICACION: Re-leer la solicitud para confirmar que el estado realmente cambió
+      const { data: verify } = await supabase
+        .from('solicitudes_compra')
+        .select('id, numero_solicitud, estado')
+        .eq('id', solData.id)
+        .maybeSingle();
+
+      console.log(`[evaluarEstadoSolicitud] VERIFICACION post-update: estado actual en BD = "${verify?.estado}"`);
+      
+      if (verify && verify.estado !== nuevoEstado) {
+        console.error(`[evaluarEstadoSolicitud] ¡¡DISCREPANCIA!! Se intentó poner "${nuevoEstado}" pero la BD tiene "${verify.estado}". Reintentando update...`);
+        // Reintentar sin .select()
+        await supabase
+          .from('solicitudes_compra')
+          .update({ estado: nuevoEstado })
+          .eq('id', solData.id);
+        
+        // Verificar de nuevo
+        const { data: verify2 } = await supabase
+          .from('solicitudes_compra')
+          .select('id, numero_solicitud, estado')
+          .eq('id', solData.id)
+          .maybeSingle();
+        console.log(`[evaluarEstadoSolicitud] VERIFICACION 2: estado actual en BD = "${verify2?.estado}"`);
       }
 
     } catch (err) {
