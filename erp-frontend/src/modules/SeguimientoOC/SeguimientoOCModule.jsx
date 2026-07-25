@@ -538,6 +538,9 @@ const SeguimientoOCModule = () => {
     if (window.confirm(`¿Está seguro de eliminar la Orden de Compra "${numeroOc}"? Se eliminarán también todos sus artículos asociados de forma permanente.`)) {
       setLoading(true);
       try {
+        const ocToDelete = ocs.find(o => String(o.id) === String(id));
+        const targetSol = ocToDelete?.solicitud_compra;
+
         // 1. Delete associated articles
         const { error: errItems } = await supabase
           .from('ordenes_compra_articulos')
@@ -554,8 +557,14 @@ const SeguimientoOCModule = () => {
 
         if (errOc) throw errOc;
 
+        // 3. Re-evaluate and update status of the associated Solicitud
+        if (targetSol) {
+          await evaluarYActualizarEstadoSolicitud(targetSol);
+        }
+
         alert('Orden de Compra eliminada correctamente.');
-        cargarOcs();
+        await cargarOcs();
+        await cargarSolicitudesOptions();
       } catch (err) {
         console.error('Error al eliminar OC:', err);
         alert('Error al eliminar: ' + err.message);
