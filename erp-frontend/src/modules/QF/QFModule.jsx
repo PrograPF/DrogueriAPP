@@ -855,12 +855,21 @@ const QFModule = () => {
                               <label style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Sub-Centro *</label>
                               <select
                                 className="input-field"
-                                style={{ width: '100%', fontSize: '0.85rem', borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.08)' }}
+                                style={{ 
+                                  width: '100%', 
+                                  fontSize: '0.85rem', 
+                                  borderColor: '#3b82f6', 
+                                  background: '#0f172a',
+                                  color: '#f8fafc',
+                                  fontWeight: '600'
+                                }}
                                 value={row.sub_centro_costo || subCentrosOptions[0] || 'UAPO'}
                                 onChange={(e) => handleArticleRowChange(row.key, 'sub_centro_costo', e.target.value)}
                               >
                                 {subCentrosOptions.map(sc => (
-                                  <option key={sc} value={sc}>{sc}</option>
+                                  <option key={sc} value={sc} style={{ background: '#0f172a', color: '#f8fafc' }}>
+                                    {sc}
+                                  </option>
                                 ))}
                               </select>
                             </div>
