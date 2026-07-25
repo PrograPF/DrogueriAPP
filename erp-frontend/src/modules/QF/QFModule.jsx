@@ -100,7 +100,7 @@ const QFModule = () => {
         solData = data || [];
       }
 
-      // 2. Fetch OCs to check assigned status and numbers
+      // 2. Fetch OCs to check assigned status and numbers (excluding cancelled OCs)
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select('id, numero_oc, solicitud_compra, estado')
@@ -109,9 +109,12 @@ const QFModule = () => {
       const map = {};
       (ocsData || []).forEach(oc => {
         if (oc.solicitud_compra) {
-          const key = oc.solicitud_compra.trim().toUpperCase();
-          if (!map[key]) map[key] = [];
-          map[key].push(oc);
+          const isCancelled = oc.estado === 'Cancelado' || oc.estado === 'Cancelada';
+          if (!isCancelled) {
+            const key = oc.solicitud_compra.trim().toUpperCase();
+            if (!map[key]) map[key] = [];
+            map[key].push(oc);
+          }
         }
       });
 
@@ -509,10 +512,10 @@ const QFModule = () => {
                           badgeBg = 'rgba(16, 185, 129, 0.15)';
                           badgeColor = '#10b981';
                           displayStateText = 'OC asignada completa';
-                        } else if (currentStatus === 'OC asignada parcial' || matchingOcs.length > 0) {
+                        } else if (currentStatus === 'OC asignada parcial') {
                           badgeBg = 'rgba(59, 130, 246, 0.15)';
                           badgeColor = '#3b82f6';
-                          displayStateText = currentStatus === 'OC asignada completa' ? 'OC asignada completa' : 'OC asignada parcial';
+                          displayStateText = 'OC asignada parcial';
                         }
 
                         return (
