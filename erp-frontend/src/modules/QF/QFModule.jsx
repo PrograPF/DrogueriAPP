@@ -50,19 +50,23 @@ const QFModule = () => {
   const [formFechaCreacion, setFormFechaCreacion] = useState(getTodayDateString());
   const [formObservaciones, setFormObservaciones] = useState('');
 
+  // Sub-Centros de Costo options (for RESOLUTIVIDAD)
+  const [subCentrosOptions, setSubCentrosOptions] = useState(['UAPO', 'ORL', 'TD']);
+
   // Assigned OCs mapping: { [numero_solicitud]: [{ id, numero_oc, estado }] }
   const [assignedOcsMap, setAssignedOcsMap] = useState({});
 
   // Form State (Dynamic Article Rows)
-  // Row structure: { key, codigo, descripcion, cantidad, suggestions: [], showSuggestions: false }
+  // Row structure: { key, codigo, descripcion, cantidad, sub_centro_costo, suggestions: [], showSuggestions: false }
   const [articulosForm, setArticulosForm] = useState([
-    { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, suggestions: [], showSuggestions: false }
+    { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
   ]);
 
   // Initial Load
   useEffect(() => {
     fetchSolicitudes();
     fetchCentrosCosto();
+    fetchSubCentrosCosto();
   }, []);
 
   // Fetch Solicitudes with Child Articles and Assigned OCs
@@ -79,7 +83,8 @@ const QFModule = () => {
             id,
             codigo_articulo,
             descripcion_articulo,
-            cantidad
+            cantidad,
+            sub_centro_costo
           )
         `)
         .order('created_at', { ascending: false });
@@ -119,6 +124,22 @@ const QFModule = () => {
     }
   };
 
+  // Fetch Sub-Centros de Costo for RESOLUTIVIDAD
+  const fetchSubCentrosCosto = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sub_centros_costo')
+        .select('nombre')
+        .order('nombre');
+
+      if (!error && data && data.length > 0) {
+        setSubCentrosOptions(data.map(d => d.nombre));
+      }
+    } catch (err) {
+      console.warn('Cargando sub-centros por defecto (fallback):', err.message);
+    }
+  };
+
   // Fetch Centros de Costo
   const fetchCentrosCosto = async () => {
     try {
@@ -142,7 +163,7 @@ const QFModule = () => {
     setFormFechaCreacion(getTodayDateString());
     setFormObservaciones('');
     setArticulosForm([
-      { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, suggestions: [], showSuggestions: false }
+      { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
     ]);
     setView('create');
   };
@@ -158,11 +179,12 @@ const QFModule = () => {
     // Map existing child articles
     if (item.solicitudes_compra_articulos && item.solicitudes_compra_articulos.length > 0) {
       setArticulosForm(
-        item.solicitudes_compra_articulos.map(art => ({
-          key: art.id || Date.now() + Math.random(),
-          codigo: art.codigo_articulo || '',
-          descripcion: art.descripcion_articulo || '',
-          cantidad: art.cantidad || 1,
+        item.solicitudes_compra_articulos.map(c => ({
+          key: c.id || Date.now() + Math.random(),
+          codigo: c.codigo_articulo || '',
+          descripcion: c.descripcion_articulo || '',
+          cantidad: c.cantidad || 1,
+          sub_centro_costo: c.sub_centro_costo || 'UAPO',
           suggestions: [],
           showSuggestions: false
         }))
@@ -172,16 +194,17 @@ const QFModule = () => {
       setArticulosForm([
         {
           key: Date.now(),
-          codigo: item.codigo_articulo,
+          codigo: item.codigo_articulo || '',
           descripcion: item.descripcion_articulo || '',
           cantidad: item.cantidad || 1,
+          sub_centro_costo: 'UAPO',
           suggestions: [],
           showSuggestions: false
         }
       ]);
     } else {
       setArticulosForm([
-        { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, suggestions: [], showSuggestions: false }
+        { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
       ]);
     }
 
@@ -192,7 +215,7 @@ const QFModule = () => {
   const handleAddArticleRow = () => {
     setArticulosForm(prev => [
       ...prev,
-      { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, suggestions: [], showSuggestions: false }
+      { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: subCentrosOptions[0] || 'UAPO', suggestions: [], showSuggestions: false }
     ]);
   };
 
@@ -279,8 +302,9 @@ const QFModule = () => {
 
     const formattedNumero = formatNumeroSolicitud(formNumero);
     const selectedCc = centrosCosto.find(c => String(c.id) === String(formCentroCostoId));
+    const isResolutividad = selectedCc && selectedCc.nombre.trim().toUpperCase() === 'RESOLUTIVIDAD';
     const matchingOcs = assignedOcsMap[formattedNumero.toUpperCase()] || [];
-    const calculatedEstado = matchingOcs.length > 0 ? 'OC asignada' : 'Sin OC asignada';
+    const calculatedEstado = matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada';
 
     try {
       const parentPayload = {
@@ -296,7 +320,7 @@ const QFModule = () => {
         cantidad: parseInt(validArticles[0].cantidad) || 1
       };
 
-      let parentId = editingSolicitudId;
+      let targetId = editingSolicitudId;
 
       if (!editingSolicitudId) {
         // Insert new parent
@@ -727,113 +751,137 @@ const QFModule = () => {
                 </div>
 
                 {/* Tabla Dinámica de Artículos */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {articulosForm.map((row, index) => (
-                    <div 
-                      key={row.key}
-                      style={{
-                        padding: '16px',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
-                        borderRadius: '12px',
-                        display: 'grid',
-                        gridTemplateColumns: '1.2fr 2fr 0.8fr auto',
-                        gap: '12px',
-                        alignItems: 'center',
-                        position: 'relative'
-                      }}
-                    >
-                      {/* Código con auto-sugerencia */}
-                      <div style={{ position: 'relative' }}>
-                        <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Código *</label>
-                        <input 
-                          type="text"
-                          placeholder="Ej: 888"
-                          className="input-field"
-                          style={{ width: '100%', fontSize: '0.85rem' }}
-                          value={row.codigo}
-                          onChange={(e) => handleArticleRowChange(row.key, 'codigo', e.target.value)}
-                        />
+                {(() => {
+                  const selectedCc = centrosCosto.find(c => String(c.id) === String(formCentroCostoId));
+                  const isResolutividad = selectedCc && selectedCc.nombre.trim().toUpperCase() === 'RESOLUTIVIDAD';
 
-                        {/* Desplegable de auto-sugerencias */}
-                        {row.showSuggestions && row.suggestions.length > 0 && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: '-150px',
-                            background: '#0f172a',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            borderRadius: '8px',
-                            maxHeight: '160px',
-                            overflowY: 'auto',
-                            zIndex: 100,
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.6)',
-                            marginTop: '4px'
-                          }}>
-                            {row.suggestions.map(sug => (
-                              <div
-                                key={sug.codigo}
-                                onMouseDown={() => handleSelectSuggestion(row.key, sug)}
-                                style={{
-                                  padding: '8px 12px',
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem',
-                                  borderBottom: '1px solid rgba(255,255,255,0.03)',
-                                  display: 'flex',
-                                  justifyContent: 'space-between'
-                                }}
-                              >
-                                <strong style={{ color: '#3b82f6' }}>{sug.codigo}</strong>
-                                <span style={{ color: '#94a3b8', marginLeft: '8px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                                  {sug.descripcion}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Descripción */}
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Descripción</label>
-                        <input 
-                          type="text"
-                          placeholder="Nombre del fármaco o insumo..."
-                          className="input-field"
-                          style={{ width: '100%', fontSize: '0.85rem' }}
-                          value={row.descripcion}
-                          onChange={(e) => handleArticleRowChange(row.key, 'descripcion', e.target.value)}
-                        />
-                      </div>
-
-                      {/* Cantidad */}
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Cant.</label>
-                        <input 
-                          type="number"
-                          min="1"
-                          className="input-field"
-                          style={{ width: '100%', fontSize: '0.85rem', textAlign: 'center' }}
-                          value={row.cantidad}
-                          onChange={(e) => handleArticleRowChange(row.key, 'cantidad', e.target.value)}
-                        />
-                      </div>
-
-                      {/* Botón Eliminar Fila */}
-                      <div style={{ paddingTop: '18px' }}>
-                        <button 
-                          type="button"
-                          onClick={() => handleRemoveArticleRow(row.key)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px' }}
-                          title="Quitar este artículo"
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {articulosForm.map((row, index) => (
+                        <div 
+                          key={row.key}
+                          style={{
+                            padding: '16px',
+                            background: isResolutividad ? 'rgba(59, 130, 246, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+                            border: isResolutividad ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid rgba(255, 255, 255, 0.06)',
+                            borderRadius: '12px',
+                            display: 'grid',
+                            gridTemplateColumns: isResolutividad ? '1fr 1.6fr 0.7fr 1fr auto' : '1.2fr 2fr 0.8fr auto',
+                            gap: '12px',
+                            alignItems: 'center',
+                            position: 'relative'
+                          }}
                         >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                          {/* Código con auto-sugerencia */}
+                          <div style={{ position: 'relative' }}>
+                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Código *</label>
+                            <input 
+                              type="text"
+                              placeholder="Ej: 888"
+                              className="input-field"
+                              style={{ width: '100%', fontSize: '0.85rem' }}
+                              value={row.codigo}
+                              onChange={(e) => handleArticleRowChange(row.key, 'codigo', e.target.value)}
+                            />
+
+                            {/* Desplegable de auto-sugerencias */}
+                            {row.showSuggestions && row.suggestions.length > 0 && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: '-150px',
+                                background: '#0f172a',
+                                border: '1px solid rgba(255,255,255,0.12)',
+                                borderRadius: '8px',
+                                maxHeight: '160px',
+                                overflowY: 'auto',
+                                zIndex: 100,
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.6)',
+                                marginTop: '4px'
+                              }}>
+                                {row.suggestions.map(sug => (
+                                  <div
+                                    key={sug.codigo}
+                                    onMouseDown={() => handleSelectSuggestion(row.key, sug)}
+                                    style={{
+                                      padding: '8px 12px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.8rem',
+                                      borderBottom: '1px solid rgba(255,255,255,0.03)',
+                                      display: 'flex',
+                                      justifyContent: 'space-between'
+                                    }}
+                                  >
+                                    <strong style={{ color: '#3b82f6' }}>{sug.codigo}</strong>
+                                    <span style={{ color: '#94a3b8', marginLeft: '8px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                                      {sug.descripcion}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Descripción */}
+                          <div>
+                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Descripción</label>
+                            <input 
+                              type="text"
+                              placeholder="Nombre del fármaco o insumo..."
+                              className="input-field"
+                              style={{ width: '100%', fontSize: '0.85rem' }}
+                              value={row.descripcion}
+                              onChange={(e) => handleArticleRowChange(row.key, 'descripcion', e.target.value)}
+                            />
+                          </div>
+
+                          {/* Cantidad */}
+                          <div>
+                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Cant.</label>
+                            <input 
+                              type="number"
+                              min="1"
+                              className="input-field"
+                              style={{ width: '100%', fontSize: '0.85rem', textAlign: 'center' }}
+                              value={row.cantidad}
+                              onChange={(e) => handleArticleRowChange(row.key, 'cantidad', e.target.value)}
+                            />
+                          </div>
+
+                          {/* SUB-CENTRO DE COSTO (DETERMINADO SOLO SI RESOLUTIVIDAD ESTÁ SELECCIONADO) */}
+                          {isResolutividad && (
+                            <div>
+                              <label style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Sub-Centro *</label>
+                              <select
+                                className="input-field"
+                                style={{ width: '100%', fontSize: '0.85rem', borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.08)' }}
+                                value={row.sub_centro_costo || subCentrosOptions[0] || 'UAPO'}
+                                onChange={(e) => handleArticleRowChange(row.key, 'sub_centro_costo', e.target.value)}
+                              >
+                                {subCentrosOptions.map(sc => (
+                                  <option key={sc} value={sc}>{sc}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Botón Eliminar Fila */}
+                          <div style={{ paddingTop: '18px' }}>
+                            <button 
+                              type="button"
+                              onClick={() => handleRemoveArticleRow(row.key)}
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px' }}
+                              title="Quitar este artículo"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
 
                 <button 
                   type="button"
@@ -962,7 +1010,22 @@ const QFModule = () => {
                       selectedSolicitudForModal.solicitudes_compra_articulos.map(art => (
                         <tr key={art.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                           <td style={{ padding: '10px', fontWeight: '700', color: '#3b82f6' }}>{art.codigo_articulo}</td>
-                          <td style={{ padding: '10px', color: '#f8fafc' }}>{art.descripcion_articulo || 'Sin descripción'}</td>
+                          <td style={{ padding: '10px', color: '#f8fafc' }}>
+                            {art.descripcion_articulo || 'Sin descripción'}
+                            {art.sub_centro_costo && (
+                              <span style={{ 
+                                background: 'rgba(59, 130, 246, 0.15)', 
+                                color: '#3b82f6', 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: '700',
+                                marginLeft: '8px'
+                              }}>
+                                {art.sub_centro_costo}
+                              </span>
+                            )}
+                          </td>
                           <td style={{ padding: '10px', textAlign: 'center', fontWeight: '700' }}>{art.cantidad}</td>
                         </tr>
                       ))

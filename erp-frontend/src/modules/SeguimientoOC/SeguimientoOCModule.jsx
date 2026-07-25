@@ -217,7 +217,8 @@ const SeguimientoOCModule = () => {
             id,
             codigo_articulo,
             descripcion_articulo,
-            cantidad
+            cantidad,
+            sub_centro_costo
           )
         `)
         .order('created_at', { ascending: false });
@@ -268,17 +269,19 @@ const SeguimientoOCModule = () => {
       const allItems = childItems.length > 0 ? childItems : (s.codigo_articulo ? [{
         codigo_articulo: s.codigo_articulo,
         descripcion_articulo: s.descripcion_articulo || articulosCatalog[s.codigo_articulo] || '',
-        cantidad: s.cantidad || 1
+        cantidad: s.cantidad || 1,
+        sub_centro_costo: s.sub_centro_costo || null
       }] : []);
 
       const formRows = allItems.map(item => {
         const codeUpper = (item.codigo_articulo || '').trim().toUpperCase();
         const ocPrevia = assignedCodesMap[codeUpper] || null;
+        const subTag = item.sub_centro_costo ? ` [${item.sub_centro_costo}]` : '';
 
         return {
           key: Date.now() + Math.random(),
           codigo: item.codigo_articulo || '',
-          nombre: item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '',
+          nombre: ((item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '') + subTag).trim(),
           cantidad: item.cantidad || 1,
           isNew: false,
           tempName: '',
