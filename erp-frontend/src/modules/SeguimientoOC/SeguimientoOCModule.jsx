@@ -60,6 +60,30 @@ const parseDisplayDate = (str) => {
   return new Date().toISOString();
 };
 
+// Calculate Business Days excluding Saturdays (6) and Sundays (0)
+export const calcularDiasHabiles = (startDateInput, endDateInput = new Date()) => {
+  if (!startDateInput) return 0;
+  const start = new Date(startDateInput);
+  const end = new Date(endDateInput);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start >= end) return 0;
+
+  let count = 0;
+  let cur = new Date(start);
+  cur.setDate(cur.getDate() + 1);
+
+  while (cur <= end) {
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) { // 0 = Sunday, 6 = Saturday
+      count++;
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+};
+
 // Custom hook local to quickly check arsenal descriptions
 const useArsenalAutoSuggest = (codigo) => {
   const [nombre, setNombre] = useState('');
@@ -142,10 +166,14 @@ const SeguimientoOCModule = () => {
     solicitud_compra: '',
     proveedor: '',
     rut_proveedor: '',
-    tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1', 'PEDIDO ESPECIAL'
-    dias_plazo_atraso: 4, // Default to 4
-    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Cancelada', 'Aceptada con multa', 'Recepcionado'
-    fecha_envio_display: getTodayDisplayString() // Chilean formatted date: DD/MM/YYYY
+    tipo_oc: 'AG', // 'AG', 'SE', 'CM', 'L1', 'PEDIDO ESPECIAL', 'OC ESPECIAL'
+    dias_enviada_aceptada: 4,
+    dias_alerta_aceptada: 4,
+    dias_aceptada_recepcion: 10,
+    dias_alerta_recepcion: 7,
+    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Recepción Conforme', 'Recepción Con Multa', 'Cancelado'
+    fecha_envio_display: getTodayDisplayString(),
+    fecha_aceptacion_display: ''
   });
 
   // States for supplier searchable dropdown
@@ -237,23 +265,25 @@ const SeguimientoOCModule = () => {
     }
   };
 
-  // Option A: Select Solicitud, check assigned items in other OCs, mark previously assigned ones in red
+  // Option A: Select Solicitud, check assigned items in non-cancelled OCs, mark previously assigned ones in red
   const handleSeleccionarSolicitud = async (s) => {
     setFormData(prev => ({ ...prev, solicitud_compra: s.numero_solicitud }));
     setShowSolicitudSuggestions(false);
 
     try {
-      // Fetch OCs already created for this solicitud
+      // Fetch OCs already created for this solicitud (EXCLUDING CANCELLED OCs)
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select(`
           id,
           numero_oc,
+          estado,
           ordenes_compra_articulos (
             codigo_articulo
           )
         `)
-        .eq('solicitud_compra', s.numero_solicitud);
+        .eq('solicitud_compra', s.numero_solicitud)
+        .not('estado', 'in', '("Cancelado","Cancelada")');
 
       // Map assigned codes -> OC number
       const assignedCodesMap = {};
@@ -330,16 +360,18 @@ const SeguimientoOCModule = () => {
 
       if (requestedCodes.size === 0) return;
 
-      // 2. Fetch all articles assigned across all OCs for this Solicitud
+      // 2. Fetch all articles assigned across all non-cancelled OCs for this Solicitud
       const { data: ocsData } = await supabase
         .from('ordenes_compra')
         .select(`
           id,
+          estado,
           ordenes_compra_articulos (
             codigo_articulo
           )
         `)
-        .eq('solicitud_compra', solNumero);
+        .eq('solicitud_compra', solNumero)
+        .not('estado', 'in', '("Cancelado","Cancelada")');
 
       const assignedCodes = new Set();
       (ocsData || []).forEach(oc => {
@@ -478,6 +510,7 @@ const SeguimientoOCModule = () => {
     }
   };
 
+  // Open Create View
   const handleStartCreate = () => {
     setFormData({
       numero_oc: '',
@@ -485,9 +518,13 @@ const SeguimientoOCModule = () => {
       proveedor: '',
       rut_proveedor: '',
       tipo_oc: 'AG',
-      dias_plazo_atraso: 4,
+      dias_enviada_aceptada: 4,
+      dias_alerta_aceptada: 4,
+      dias_aceptada_recepcion: 10,
+      dias_alerta_recepcion: 7,
       estado: 'Enviada',
-      fecha_envio_display: getTodayDisplayString()
+      fecha_envio_display: getTodayDisplayString(),
+      fecha_aceptacion_display: ''
     });
     setProveedorSearch('');
     setShowProveedorSuggestions(false);
@@ -657,14 +694,14 @@ const SeguimientoOCModule = () => {
         proveedor: formData.proveedor.trim(),
         rut_proveedor: formData.rut_proveedor.trim(),
         tipo_oc: formData.tipo_oc,
-        dias_plazo_atraso: formData.tipo_oc === 'AG' ? 4 : parseInt(formData.dias_plazo_atraso),
+        dias_enviada_aceptada: parseInt(formData.dias_enviada_aceptada) || 4,
+        dias_alerta_aceptada: parseInt(formData.dias_alerta_aceptada) || 4,
+        dias_aceptada_recepcion: parseInt(formData.dias_aceptada_recepcion) || 10,
+        dias_alerta_recepcion: parseInt(formData.dias_alerta_recepcion) || 7,
         estado: formData.estado,
-        fecha_envio: parseDisplayDate(formData.fecha_envio_display)
+        fecha_envio: parseDisplayDate(formData.fecha_envio_display),
+        fecha_aceptacion: formData.fecha_aceptacion_display ? parseDisplayDate(formData.fecha_aceptacion_display) : (formData.estado === 'Aceptada' ? new Date().toISOString() : null)
       };
-
-      if (formData.estado === 'Aceptada') {
-        ocInsert.fecha_aceptacion = new Date().toISOString();
-      }
 
       const { data: insertedOC, error: insertOCErr } = await supabase
         .from('ordenes_compra')
@@ -723,40 +760,69 @@ const SeguimientoOCModule = () => {
     }
   };
 
-  // Helper to calculate state dates and visual alerts
+  // Helper to calculate state dates, business days and visual alerts
   const checkPlazos = (oc) => {
-    // Completed OCs or Cancelled OCs do not trigger alerts
-    if (oc.estado === 'Cancelada' || oc.estado === 'Recepcionado') {
-      return { isExpired: false, alertMessage: '' };
+    if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada') {
+      return { statusType: 'cancelado', badgeBg: 'rgba(100, 116, 139, 0.2)', badgeColor: '#94a3b8', isExpired: false, isYellow: false, alertMessage: 'Orden Cancelada (Artículos liberados)' };
+    }
+    if (oc.estado === 'Recepción Conforme') {
+      return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, alertMessage: 'Recepción Conforme en Bodega' };
+    }
+    if (oc.estado === 'Recepción Con Multa') {
+      return { statusType: 'multa', badgeBg: 'rgba(249, 115, 22, 0.15)', badgeColor: '#f97316', isExpired: false, isYellow: false, alertMessage: 'Recepción Con Multa (Entregado del Día 11 hábil en adelante)' };
     }
 
-    const today = new Date();
-    const dateEnvio = new Date(oc.fecha_envio);
-    const dateAceptacion = oc.fecha_aceptacion ? new Date(oc.fecha_aceptacion) : null;
+    const isEspecial = oc.tipo_oc === 'OC ESPECIAL';
+    
+    // Limits in business days
+    const maxEnviadaAceptada = isEspecial ? (parseInt(oc.dias_enviada_aceptada) || 4) : 4;
+    const alertaEnviadaAceptada = isEspecial ? (parseInt(oc.dias_alerta_aceptada) || 4) : 4;
+    
+    const maxAceptadaRecepcion = isEspecial ? (parseInt(oc.dias_aceptada_recepcion) || 10) : 10;
+    const alertaAceptadaRecepcion = isEspecial ? (parseInt(oc.dias_alerta_recepcion) || 7) : 7;
 
-    const diffDaysEnvio = Math.floor((today - dateEnvio) / (1000 * 60 * 60 * 24));
-    const diffDaysAceptada = dateAceptacion ? Math.floor((today - dateAceptacion) / (1000 * 60 * 60 * 24)) : 0;
+    const hoy = new Date();
+    const fechaEnvio = oc.fecha_envio ? new Date(oc.fecha_envio) : hoy;
+    const fechaAceptacion = oc.fecha_aceptacion ? new Date(oc.fecha_aceptacion) : null;
+
+    const diasHabilesEnvio = calcularDiasHabiles(fechaEnvio, hoy);
+    const diasHabilesAceptacion = fechaAceptacion ? calcularDiasHabiles(fechaAceptacion, hoy) : 0;
 
     let isExpired = false;
+    let isYellow = false;
     let alertMessage = '';
+    let badgeBg = 'rgba(59, 130, 246, 0.15)';
+    let badgeColor = '#3b82f6';
 
-    if (oc.tipo_oc === 'AG') {
-      if (oc.estado === 'Enviada' && diffDaysEnvio > 4) {
-        isExpired = true;
-        alertMessage = `Atrasada: Han pasado ${diffDaysEnvio} días sin aceptación (Límite: 4 días).`;
-      } else if (oc.estado === 'Aceptada' && diffDaysAceptada > 4) {
-        isExpired = true;
-        alertMessage = `Atraso en entrega: Aceptada hace ${diffDaysAceptada} días (Límite: 4 días).`;
+    if (oc.estado === 'Enviada') {
+      if (diasHabilesEnvio >= alertaEnviadaAceptada) {
+        isYellow = true;
+        badgeBg = 'rgba(234, 179, 8, 0.2)';
+        badgeColor = '#eab308';
+        alertMessage = `Alerta Amarilla Aceptación: Llevas ${diasHabilesEnvio} días hábiles en estado Enviada (Límite: ${maxEnviadaAceptada} días hábiles).`;
+      } else {
+        alertMessage = `Enviada hace ${diasHabilesEnvio} días hábiles (Sin contar fines de semana).`;
       }
-    } else {
-      const limite = oc.dias_plazo_atraso || 0;
-      if (oc.estado === 'Aceptada' && diffDaysAceptada > limite) {
+    } else if (oc.estado === 'Aceptada') {
+      badgeBg = 'rgba(16, 185, 129, 0.15)';
+      badgeColor = '#10b981';
+
+      if (diasHabilesAceptacion >= maxAceptadaRecepcion) {
         isExpired = true;
-        alertMessage = `Atraso en entrega: Aceptada hace ${diffDaysAceptada} días (Límite personalizado: ${limite} días).`;
+        badgeBg = 'rgba(239, 68, 68, 0.2)';
+        badgeColor = '#ef4444';
+        alertMessage = `⚠️ Excedido de Plazo: Llevas ${diasHabilesAceptacion} días hábiles desde Aceptada (Límite: ${maxAceptadaRecepcion} días hábiles). Aplicará Recepción Con Multa al entregar.`;
+      } else if (diasHabilesAceptacion >= alertaAceptadaRecepcion) {
+        isYellow = true;
+        badgeBg = 'rgba(234, 179, 8, 0.2)';
+        badgeColor = '#eab308';
+        alertMessage = `Alerta Amarilla Entrega: Llevas ${diasHabilesAceptacion} días hábiles desde Aceptada (Alerta activa a partir del Día ${alertaAceptadaRecepcion} hábil).`;
+      } else {
+        alertMessage = `Aceptada hace ${diasHabilesAceptacion} días hábiles (Sin contar fines de semana).`;
       }
     }
 
-    return { isExpired, alertMessage };
+    return { isExpired, isYellow, alertMessage, badgeBg, badgeColor, diasHabilesEnvio, diasHabilesAceptacion };
   };
 
   // Handle manual delivery input change
@@ -822,19 +888,30 @@ const SeguimientoOCModule = () => {
       
       const updatedOc = refreshedOcs?.[0];
       if (updatedOc) {
-        // 2. Check if the OC is now fully completed (all articles quantity_received >= quantity)
-        const allCompleted = (updatedOc.ordenes_compra_articulos || []).every(
-          art => (art.cantidad_recepcionada || 0) >= (art.cantidad || 0)
-        );
+        // 4. Update parent OC status based on business days and completion
+        const totalRequested = (updatedOc.ordenes_compra_articulos || []).reduce((acc, a) => acc + (a.cantidad || 0), 0);
+        const totalReceivedNow = (updatedOc.ordenes_compra_articulos || []).reduce((acc, a) => acc + (a.cantidad_recepcionada || 0), 0);
 
-        if (allCompleted && updatedOc.estado !== 'Recepcionado') {
-          const { error: updateOcErr } = await supabase
+        const isFullyReceived = totalReceivedNow >= totalRequested;
+        let nuevoEstado = updatedOc.estado;
+
+        if (isFullyReceived) {
+          const fechaInicio = updatedOc.fecha_aceptacion || updatedOc.fecha_envio || new Date().toISOString();
+          const diasHabilesTranscurridos = calcularDiasHabiles(new Date(fechaInicio), new Date());
+          const maxPermitidos = updatedOc.tipo_oc === 'OC ESPECIAL' ? (parseInt(updatedOc.dias_aceptada_recepcion) || 10) : 10;
+
+          if (diasHabilesTranscurridos > maxPermitidos) {
+            nuevoEstado = 'Recepción Con Multa';
+          } else {
+            nuevoEstado = 'Recepción Conforme';
+          }
+
+          await supabase
             .from('ordenes_compra')
-            .update({ estado: 'Recepcionado' })
+            .update({ estado: nuevoEstado })
             .eq('id', selectedOcIdForRecepcion);
-
-          if (updateOcErr) throw updateOcErr;
-          alert('¡Excelente! Todas las cantidades han sido completadas. La OC se ha marcado como "Recepcionado" automáticamente.');
+          
+          alert('¡Excelente! Todas las cantidades han sido completadas. La OC se ha marcado como "' + nuevoEstado + '".');
         } else {
           alert('Recepción parcial registrada correctamente.');
         }
@@ -1713,9 +1790,9 @@ const SeguimientoOCModule = () => {
                     </div>
                   )}
                 </div>
-                {/* Manual date selector input field - Forcing DD/MM/YYYY */}
+                {/* Manual date selector: Fecha de Envío */}
                 <div>
-                  <label style={labelStyle}><Calendar size={16} /> Fecha de Envío</label>
+                  <label style={labelStyle}><Calendar size={16} /> Fecha de Envío *</label>
                   <input
                     type="text"
                     value={formData.fecha_envio_display}
@@ -1726,6 +1803,22 @@ const SeguimientoOCModule = () => {
                   />
                   <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
                     Formato: Día/Mes/Año (ej: 19/05/2026)
+                  </small>
+                </div>
+
+                {/* Manual date selector: Fecha de Aceptación */}
+                <div>
+                  <label style={labelStyle}><Calendar size={16} /> Fecha de Aceptación (Manual / Opcional)</label>
+                  <input
+                    type="text"
+                    value={formData.fecha_aceptacion_display || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, fecha_aceptacion_display: e.target.value }))}
+                    placeholder="DD/MM/YYYY"
+                    className="input-field"
+                    style={{ letterSpacing: '0.05em' }}
+                  />
+                  <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Requerido si la OC ya fue aceptada por el proveedor.
                   </small>
                 </div>
               </div>
@@ -1744,38 +1837,84 @@ const SeguimientoOCModule = () => {
                     <option value="CM">CM (Convenio)</option>
                     <option value="L1">L1 (Licitación Pública)</option>
                     <option value="PEDIDO ESPECIAL">PEDIDO ESPECIAL</option>
+                    <option value="OC ESPECIAL">OC ESPECIAL (Configuración Manual)</option>
                   </select>
                 </div>
 
-                {/* Conditional Field: Plazo de Días */}
-                {formData.tipo_oc !== 'AG' ? (
-                  <div>
-                    <label style={labelStyle}>Plazo de días (Aceptada ➔ Atrasada)</label>
-                    <input
-                      type="number"
-                      value={formData.dias_plazo_atraso}
-                      onChange={e => setFormData(prev => ({ ...prev, dias_plazo_atraso: e.target.value }))}
-                      placeholder="Ej: 10 días"
-                      className="input-field"
-                      min="1"
-                    />
-                    <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
-                      Cantidad personalizada de días antes de marcar como atraso de entrega.
-                    </small>
+                {/* Custom Fields for OC ESPECIAL */}
+                {formData.tipo_oc === 'OC ESPECIAL' ? (
+                  <div style={{
+                    background: 'rgba(59, 130, 246, 0.08)',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <strong style={{ color: '#3b82f6', fontSize: '0.85rem' }}>⚙️ Configuración Personalizada de Días Hábiles (OC ESPECIAL):</strong>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Enviada ➔ Aceptada (X días)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={formData.dias_enviada_aceptada}
+                          onChange={e => setFormData(prev => ({ ...prev, dias_enviada_aceptada: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#eab308', display: 'block', marginBottom: '4px' }}>Alerta Amarilla Aceptación (Z días)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem', borderColor: '#eab308' }}
+                          value={formData.dias_alerta_aceptada}
+                          onChange={e => setFormData(prev => ({ ...prev, dias_alerta_aceptada: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Aceptada ➔ Recepción (Y días)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={formData.dias_aceptada_recepcion}
+                          onChange={e => setFormData(prev => ({ ...prev, dias_aceptada_recepcion: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#eab308', display: 'block', marginBottom: '4px' }}>Alerta Amarilla Entrega (Q días)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem', borderColor: '#eab308' }}
+                          value={formData.dias_alerta_recepcion}
+                          onChange={e => setFormData(prev => ({ ...prev, dias_alerta_recepcion: e.target.value }))}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ 
-                    background: 'rgba(59, 130, 246, 0.05)', 
-                    border: '1px solid rgba(59, 130, 246, 0.2)', 
-                    padding: '15px', 
+                    background: 'rgba(255, 255, 255, 0.02)', 
+                    border: '1px solid var(--border-color)', 
+                    padding: '14px', 
                     borderRadius: '8px',
-                    fontSize: '0.9rem',
+                    fontSize: '0.82rem',
                     color: '#94a3b8'
                   }}>
-                    <strong>Lógica Convenio AG Activa:</strong>
-                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <li>Máximo <strong>4 días</strong> para pasar de <strong>Enviada</strong> a <strong>Aceptada</strong>.</li>
-                      <li>Máximo <strong>4 días</strong> adicionales para entregar tras ser aceptada antes de marcarse como <strong>Atrasada</strong>.</li>
+                    <strong>Reglas Estándar Días Hábiles (Lun-Vie):</strong>
+                    <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <li>Enviada ➔ Aceptada: <strong>4 días hábiles</strong> (Alerta amarilla el Día 4).</li>
+                      <li>Aceptada ➔ Conforme: <strong>10 días hábiles</strong> (Alerta amarilla el Día 7).</li>
+                      <li>Día 11 hábil en adelante: <strong>Recepción Con Multa</strong>.</li>
                     </ul>
                   </div>
                 )}
@@ -1789,6 +1928,7 @@ const SeguimientoOCModule = () => {
                   >
                     <option value="Enviada">Enviada</option>
                     <option value="Aceptada">Aceptada</option>
+                    <option value="Cancelado">Cancelado (Liberar artículos)</option>
                   </select>
                 </div>
               </div>
