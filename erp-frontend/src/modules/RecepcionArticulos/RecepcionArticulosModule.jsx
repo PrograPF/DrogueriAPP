@@ -632,7 +632,7 @@ const RecepcionArticulosModule = () => {
 
                             {/* Selector de estado */}
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {Object.keys(ESTADO_ART_CONFIG).map(estado => {
+                              {['Pendiente', 'Recepcionado', 'Rechazado'].map(estado => {
                                 const eCfg = ESTADO_ART_CONFIG[estado];
                                 const activo = estadoActivo === estado;
                                 return (
