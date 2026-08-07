@@ -392,7 +392,7 @@ const RecepcionArticulosModule = () => {
                   <Search size={22} color="#3b82f6" /> Órdenes de Compra
                 </h3>
                 <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
-                  Solo OC en estado <strong style={{ color: '#3b82f6' }}>Enviada</strong> o <strong style={{ color: '#10b981' }}>Aceptada</strong>
+                  Registro y recepción física de mercancía en bahía de descarga
                 </p>
               </div>
               <button onClick={cargarOcs} className="btn-secondary" style={{ padding: '10px 16px', display: 'inline-flex', alignItems: 'center', gap: '8px' }} disabled={loading}>
@@ -444,10 +444,6 @@ const RecepcionArticulosModule = () => {
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#3b82f6' }}>{oc.numero_oc}</span>
-                          {/* Estado Seguimiento OC (Sistema 1) */}
-                          <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', background: oc.estado === 'Enviada' ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)', color: oc.estado === 'Enviada' ? '#3b82f6' : '#10b981' }}>
-                            {oc.estado}
-                          </span>
                           {/* Estado Recepción (Sistema 2) */}
                           {ocCfg && (
                             <span style={{ padding: '2px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', background: ocCfg.bg, color: ocCfg.color, border: `1px solid ${ocCfg.color}40` }}>
@@ -466,9 +462,7 @@ const RecepcionArticulosModule = () => {
                         <ResumenArts arts={oc.ordenes_compra_articulos} />
                       </div>
                       <div style={{ fontSize: '0.82rem', color: '#94a3b8', textAlign: 'right' }}>
-                        <div><strong>Enviada:</strong> {formatDate(oc.fecha_envio)}</div>
-                        {oc.fecha_aceptacion && <div style={{ color: '#10b981', marginTop: '2px' }}><strong>Aceptada:</strong> {formatDate(oc.fecha_aceptacion)}</div>}
-                        <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#3b82f6', fontWeight: '700' }}>
+                        <div style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: '700' }}>
                           {(oc.ordenes_compra_articulos || []).length} artículo(s) → Gestionar
                         </div>
                       </div>
@@ -522,44 +516,29 @@ const RecepcionArticulosModule = () => {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.35rem', fontWeight: '800', margin: 0 }}>OC: {selectedOcForModal.numero_oc}</h3>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                    {/* Sistema 1 */}
-                    <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)', color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : '#10b981' }}>
-                      Seguimiento: {selectedOcForModal.estado}
-                    </span>
-                    {/* Sistema 2 */}
-                    {selectedOcForModal.estado_recepcion && (() => {
-                      const cfg = ESTADO_OC_CONFIG[selectedOcForModal.estado_recepcion];
-                      return cfg ? (
+                  {selectedOcForModal.estado_recepcion && (() => {
+                    const cfg = ESTADO_OC_CONFIG[selectedOcForModal.estado_recepcion];
+                    return cfg ? (
+                      <div style={{ marginTop: '6px' }}>
                         <span style={{ padding: '2px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}40` }}>
                           Recepción: {cfg.label}
                         </span>
-                      ) : null;
-                    })()}
-                  </div>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               </div>
 
               {/* Info grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px', marginBottom: '22px', fontSize: '0.88rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px', marginBottom: '22px', fontSize: '0.88rem' }}>
                 <div>
                   <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Proveedor</span>
                   <strong style={{ color: 'var(--text-primary)' }}>{selectedOcForModal.proveedor}</strong>
                   <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '1px' }}>RUT: {selectedOcForModal.rut_proveedor || 'S/R'}</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Enviada</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{formatDate(selectedOcForModal.fecha_envio)}</strong>
-                </div>
-                {selectedOcForModal.fecha_aceptacion && (
-                  <div>
-                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Aceptada</span>
-                    <strong style={{ color: '#10b981' }}>{formatDate(selectedOcForModal.fecha_aceptacion)}</strong>
-                  </div>
-                )}
-                <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Artículos</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{(selectedOcForModal.ordenes_compra_articulos || []).length}</strong>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Total Artículos</span>
+                  <strong style={{ color: '#38bdf8', fontSize: '1rem' }}>{(selectedOcForModal.ordenes_compra_articulos || []).length} artículo(s)</strong>
                 </div>
               </div>
 
@@ -619,13 +598,25 @@ const RecepcionArticulosModule = () => {
                             transition: 'background 0.2s'
                           }}>
                             <div style={{ flex: 1, minWidth: '200px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>[{art.codigo_articulo}]</span>
-                                <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{artName}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <span style={{
+                                  fontSize: '0.88rem',
+                                  fontWeight: '800',
+                                  color: '#38bdf8',
+                                  background: 'rgba(56, 189, 248, 0.12)',
+                                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontFamily: 'monospace',
+                                  letterSpacing: '0.5px'
+                                }}>
+                                  [{art.codigo_articulo}]
+                                </span>
+                                <span style={{ fontWeight: '700', fontSize: '0.92rem' }}>{artName}</span>
                                 {cambiado && <span style={{ fontSize: '0.68rem', color: '#3b82f6', fontWeight: '700', background: 'rgba(59,130,246,0.1)', padding: '1px 6px', borderRadius: '4px' }}>modificado</span>}
                               </div>
-                              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
-                                Cant. pedida: <strong style={{ color: 'var(--text-primary)' }}>{art.cantidad} uds.</strong>
+                              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                Cantidad: <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{art.cantidad} uds.</strong>
                                 {art.fecha_recepcion && <span style={{ marginLeft: '10px' }}>Recibido: {new Date(art.fecha_recepcion).toLocaleDateString('es-CL')}</span>}
                               </div>
                             </div>
