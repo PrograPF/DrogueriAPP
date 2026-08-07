@@ -45,19 +45,17 @@ const RevisionBodegaModule = () => {
   // Auto-detectar lote, vencimiento e ISP desde la tabla 'articulos_variantes' en Supabase
   useEffect(() => {
     if (form.codigo) {
-      let isCurrent = true;
-
       const timeoutId = setTimeout(async () => {
         try {
           const { data, error } = await supabase
             .from('articulos_variantes')
             .select('lote, vencimiento, isp')
-            .eq('codigo_articulo', form.codigo.trim())
+            .eq('codigo_articulo', form.codigo)
             .order('vencimiento', { ascending: true })
             .limit(1)
             .maybeSingle();
 
-          if (!error && data && isCurrent) {
+          if (!error && data) {
             setForm(prev => ({
               ...prev,
               vencimiento: data.vencimiento || prev.vencimiento,
@@ -66,21 +64,15 @@ const RevisionBodegaModule = () => {
             }));
           }
         } catch (err) {
-          if (isCurrent) {
-            console.error("Error auto-detectando lote/vencimiento/isp:", err);
-          }
+          console.error("Error auto-detectando lote/vencimiento/isp:", err);
         }
       }, 500);
 
-      return () => {
-        isCurrent = false;
-        clearTimeout(timeoutId);
-      };
+      return () => clearTimeout(timeoutId);
     }
   }, [form.codigo]);
 
-  // Cargar OCs disponibles para asociar a una revisión de bodega
-  // Se muestran todas las OC en estado Enviada o Aceptada (el mismo criterio que Recepción)
+  // Cargar OCs disponibles (que estén en recepción completa o incompleta)
   const cargarOcsDisponibles = async () => {
     setLoadingOcs(true);
     try {
@@ -91,13 +83,22 @@ const RevisionBodegaModule = () => {
           ordenes_compra_articulos (
             id,
             codigo_articulo,
-            cantidad
+            cantidad,
+            cantidad_recepcionada,
+            estado
           )
         `)
-        .or('estado.eq.Enviada,estado.eq.Aceptada')
         .order('fecha_envio', { ascending: false });
       if (error) throw error;
-      setOcs(data || []);
+
+      // Filtrar las OCs que tienen al menos un artículo en estado recepcionado o recepcion incompleta
+      const filtradas = (data || []).filter(oc => 
+        (oc.ordenes_compra_articulos || []).some(art => 
+          art.state === 'recepcionado' || art.estado === 'recepcionado' || art.estado === 'recepcion incompleta'
+        )
+      );
+
+      setOcs(filtradas);
     } catch (err) {
       console.error('Error al cargar OCs disponibles:', err);
     } finally {
@@ -105,49 +106,52 @@ const RevisionBodegaModule = () => {
     }
   };
 
-  // Seleccionar una OC y cargar todos sus artículos para referencia
+  // Seleccionar una OC y cargar sus artículos recepcionados
   const seleccionarOc = async (oc) => {
     setOcSeleccionada(oc);
-
-    const arts = oc.ordenes_compra_articulos || [];
-    if (arts.length === 0) {
+    
+    const artsRecepcionados = (oc.ordenes_compra_articulos || []).filter(
+      art => art.estado === 'recepcionado' || art.estado === 'recepcion incompleta'
+    );
+    if (artsRecepcionados.length === 0) {
       setArticulosOc([]);
       return;
     }
-
-    const codigos = arts.map(a => a.codigo_articulo);
+    
+    const codigos = artsRecepcionados.map(a => a.codigo_articulo);
     try {
       const { data, error } = await supabase
         .from('articulos')
         .select('codigo, descripcion')
         .in('codigo', codigos);
-
+        
       if (error) throw error;
-
+      
       const mapping = {};
       (data || []).forEach(a => {
         mapping[a.codigo.trim()] = a.descripcion;
       });
-
+      
       setArticulosCatalog(mapping);
-
-      const combinados = arts.map(art => ({
+      
+      const combinados = artsRecepcionados.map(art => ({
         ...art,
         descripcion: mapping[art.codigo_articulo?.trim()] || 'Artículo ' + art.codigo_articulo
       }));
-
+      
       setArticulosOc(combinados);
-
+      
+      // Inicializar el código seleccionado en el formulario
       if (combinados.length > 0) {
         setForm(prev => ({
           ...prev,
           codigo: combinados[0].codigo_articulo,
-          cantidad: combinados[0].cantidad || ''
+          cantidad: combinados[0].cantidad_recepcionada || combinados[0].cantidad || ''
         }));
       }
     } catch (err) {
-      console.error('Error al obtener artículos de la OC:', err);
-      alert('Error al cargar artículos de la OC: ' + err.message);
+      console.error("Error al obtener descripciones de artículos de la OC:", err);
+      alert("Error al cargar artículos de la OC: " + err.message);
     }
   };
 
@@ -420,9 +424,33 @@ const RevisionBodegaModule = () => {
       const { error: insertVarError } = await supabase.from('articulos_variantes').insert(insertVariantes);
       if (insertVarError) throw insertVarError;
 
-      // Nota: La revisión de bodega es un proceso independiente.
-      // El estado de los artículos en ordenes_compra_articulos es gestionado
-      // exclusivamente desde el módulo de Seguimiento de OC.
+      // 3. Actualizar estado y cantidad_recepcionada en ordenes_compra_articulos
+      for (const item of items) {
+        const artOc = articulosOc.find(a => a.codigo_articulo === item.codigo);
+        if (artOc) {
+          const cantidadAnterior = artOc.cantidad_recepcionada || 0;
+          const nuevaCantidadRecepcionada = cantidadAnterior + item.cantidad;
+          const nuevoEstado = nuevaCantidadRecepcionada >= artOc.cantidad ? 'recepcion completa' : 'recepcion incompleta';
+          
+          const historialActual = Array.isArray(artOc.historial) ? artOc.historial : [];
+          const nuevoHistorial = [
+            ...historialActual,
+            { estado: nuevoEstado, fecha_almacenamiento: new Date().toISOString() }
+          ];
+
+          const { error: updateArtErr } = await supabase
+            .from('ordenes_compra_articulos')
+            .update({
+              cantidad_recepcionada: nuevaCantidadRecepcionada,
+              estado: nuevoEstado,
+              fecha_almacenamiento: new Date().toISOString(),
+              historial: nuevoHistorial
+            })
+            .eq('id', artOc.id);
+
+          if (updateArtErr) throw updateArtErr;
+        }
+      }
 
       const nuevasAlertas = await calcularCrucePendientes(items);
       setAlertas(nuevasAlertas);
