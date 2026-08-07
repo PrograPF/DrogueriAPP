@@ -1,20 +1,41 @@
 import { supabase } from '../supabaseClient';
 
 /**
- * Carga el catálogo completo de artículos desde Supabase eliminando el límite por defecto de 1000 filas.
+ * Carga el catálogo completo de artículos desde Supabase paginando en bloques
+ * de 1000 filas (superando el límite estricto de max-rows de Supabase/PostgREST).
  * Retorna un objeto mapa flexible donde la clave es el código de artículo.
  */
 export const fetchArticulosCatalogMap = async () => {
   try {
-    const { data: arts, error } = await supabase
-      .from('articulos')
-      .select('codigo, descripcion')
-      .range(0, 9999);
+    let allArts = [];
+    let from = 0;
+    const step = 1000;
+    let hasMore = true;
 
-    if (error) throw error;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('articulos')
+        .select('codigo, descripcion')
+        .range(from, from + step - 1);
+
+      if (error) {
+        console.error('Error al cargar bloque del catálogo de artículos:', error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allArts = allArts.concat(data);
+        from += step;
+        if (data.length < step) {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
 
     const mapping = {};
-    (arts || []).forEach(item => {
+    allArts.forEach(item => {
       if (item && item.codigo) {
         const rawCode = String(item.codigo).trim();
         const cleanCode = rawCode.replace(/^0+/, '');
@@ -37,7 +58,7 @@ export const fetchArticulosCatalogMap = async () => {
 
 /**
  * Resuelve el nombre de un artículo dado su código y un mapa del catálogo.
- * Soporta formateo flexible (ceros a la izquierda) y provee fallback descriptivo.
+ * Soporta formateo flexible (ceros a la izquierda) y provee fallback.
  */
 export const resolveArticuloNombre = (catalogMap, codigo, fallbackText = '', isCatalogLoaded = true) => {
   if (!codigo) return fallbackText || 'Sin código';
@@ -52,7 +73,7 @@ export const resolveArticuloNombre = (catalogMap, codigo, fallbackText = '', isC
     if (cleanCode && catalogMap[cleanCode.padStart(6, '0')]) return catalogMap[cleanCode.padStart(6, '0')];
   }
 
-  if (fallbackText && fallbackText !== 'Cargando nombre...' && fallbackText !== 'Cargando...') {
+  if (fallbackText && fallbackText !== 'Cargando nombre...' && fallbackText !== 'Cargando...' && !fallbackText.startsWith('Artículo [')) {
     return fallbackText;
   }
 
