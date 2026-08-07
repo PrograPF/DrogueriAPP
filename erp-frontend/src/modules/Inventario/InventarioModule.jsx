@@ -42,6 +42,7 @@ const InventarioModule = () => {
       const { data: artsData, error: artsErr } = await supabase
         .from('articulos')
         .select('*')
+        .range(0, 9999)
         .order('descripcion');
       if (artsErr) throw artsErr;
 
@@ -157,8 +158,15 @@ const InventarioModule = () => {
   // Mapear descripción de artículos
   const articulosMap = {};
   articulos.forEach(art => {
-    if (art.codigo) {
-      articulosMap[art.codigo.trim()] = art.descripcion;
+    if (art && art.codigo) {
+      const rawCode = String(art.codigo).trim();
+      const cleanCode = rawCode.replace(/^0+/, '');
+      articulosMap[rawCode] = art.descripcion;
+      if (cleanCode) {
+        articulosMap[cleanCode] = art.descripcion;
+        articulosMap[cleanCode.padStart(4, '0')] = art.descripcion;
+        articulosMap[cleanCode.padStart(6, '0')] = art.descripcion;
+      }
     }
   });
 

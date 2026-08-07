@@ -6,6 +6,8 @@ import useCentros from '../../hooks/useCentros';
 import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
 import { formatDate } from '../../utils/dateFormatter';
 
+import { fetchArticulosCatalogMap, resolveArticuloNombre } from '../../utils/catalogHelper';
+
 const PAGE_SIZE = 50;
 
 const InformesModule = ({ onBack }) => {
@@ -18,26 +20,14 @@ const InformesModule = ({ onBack }) => {
   const [hasMore, setHasMore] = useState(true);
   const { centros } = useCentros();
   const [articulosCatalog, setArticulosCatalog] = useState({});
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
 
   // Cargar catálogo de fármacos y DM para traducción en caliente
   useEffect(() => {
     const cargarCatalog = async () => {
-      try {
-        const { data: arts, error } = await supabase
-          .from('articulos')
-          .select('codigo, descripcion');
-        if (error) throw error;
-
-        const mapping = {};
-        (arts || []).forEach(item => {
-          if (item.codigo) {
-            mapping[item.codigo.trim()] = item.descripcion;
-          }
-        });
-        setArticulosCatalog(mapping);
-      } catch (err) {
-        console.error('Error al cargar catálogo de artículos:', err);
-      }
+      const mapping = await fetchArticulosCatalogMap();
+      setArticulosCatalog(mapping);
+      setCatalogLoaded(true);
     };
     cargarCatalog();
   }, []);
@@ -136,7 +126,7 @@ const InformesModule = ({ onBack }) => {
   const filteredData = useMemo(() => {
     return data.map(item => ({
       ...item,
-      nombre: articulosCatalog[item.cod?.trim()] || 'Cargando nombre...'
+      nombre: resolveArticuloNombre(articulosCatalog, item.cod, item.nombre, catalogLoaded)
     })).filter(item => {
       if (filterCodigo) {
         const term = filterCodigo.toLowerCase();

@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
+import { fetchArticulosCatalogMap } from '../../utils/catalogHelper';
 
 // Helper to get today's date formatted as yyyy-MM-dd
 const getTodayString = () => {
@@ -232,22 +233,8 @@ const SeguimientoOCModule = () => {
 
   // Load articles catalog
   const cargarArticulosCatalog = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('articulos')
-        .select('codigo, descripcion');
-      if (error) throw error;
-      
-      const mapping = {};
-      (data || []).forEach(art => {
-        if (art.codigo) {
-          mapping[art.codigo.trim()] = art.descripcion;
-        }
-      });
-      setArticulosCatalog(mapping);
-    } catch (err) {
-      console.error('Error al cargar catálogo de artículos:', err);
-    }
+    const mapping = await fetchArticulosCatalogMap();
+    setArticulosCatalog(mapping);
   };
 
   // Load solicitudes options for auto-filling OC items

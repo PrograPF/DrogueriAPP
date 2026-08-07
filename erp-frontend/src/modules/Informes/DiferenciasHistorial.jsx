@@ -5,6 +5,8 @@ import { supabase } from '../../supabaseClient';
 import { thStyleInformes as thStyle, tdStyleInformes as tdStyle } from '../../styles/sharedStyles';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 
+import { fetchArticulosCatalogMap, resolveArticuloNombre } from '../../utils/catalogHelper';
+
 const PAGE_SIZE = 50;
 
 const DiferenciasHistorial = ({ onBack }) => {
@@ -16,26 +18,14 @@ const DiferenciasHistorial = ({ onBack }) => {
   const [estadoFilter, setEstadoFilter] = useState('todos'); // 'todos' | 'pendiente' | 'realizado'
 
   const [articulosCatalog, setArticulosCatalog] = useState({});
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
 
   // Cargar catálogo de fármacos y DM para traducción en caliente
   useEffect(() => {
     const cargarCatalog = async () => {
-      try {
-        const { data: arts, error } = await supabase
-          .from('articulos')
-          .select('codigo, descripcion');
-        if (error) throw error;
-
-        const mapping = {};
-        (arts || []).forEach(item => {
-          if (item.codigo) {
-            mapping[item.codigo.trim()] = item.descripcion;
-          }
-        });
-        setArticulosCatalog(mapping);
-      } catch (err) {
-        console.error('Error al cargar catálogo de artículos:', err);
-      }
+      const mapping = await fetchArticulosCatalogMap();
+      setArticulosCatalog(mapping);
+      setCatalogLoaded(true);
     };
     cargarCatalog();
   }, []);
@@ -163,7 +153,7 @@ const DiferenciasHistorial = ({ onBack }) => {
   const filteredData = useMemo(() => {
     let mapped = data.map(item => ({
       ...item,
-      nombre: articulosCatalog[item.cod?.trim()] || 'Cargando nombre...'
+      nombre: resolveArticuloNombre(articulosCatalog, item.cod, item.nombre, catalogLoaded)
     }));
 
     if (estadoFilter === 'pendiente') {

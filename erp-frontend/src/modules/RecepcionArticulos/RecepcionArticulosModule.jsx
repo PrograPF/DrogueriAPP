@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
+import { fetchArticulosCatalogMap } from '../../utils/catalogHelper';
 
 
 
@@ -57,22 +58,8 @@ const RecepcionArticulosModule = () => {
 
   // Fetch articles base catalog
   const cargarArticulosCatalog = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('articulos')
-        .select('codigo, descripcion');
-      if (error) throw error;
-      
-      const mapping = {};
-      (data || []).forEach(art => {
-        if (art.codigo) {
-          mapping[art.codigo.trim()] = art.descripcion;
-        }
-      });
-      setArticulosCatalog(mapping);
-    } catch (err) {
-      console.error('Error al cargar catálogo de artículos:', err);
-    }
+    const mapping = await fetchArticulosCatalogMap();
+    setArticulosCatalog(mapping);
   };
 
   // Fetch OCs from Supabase
