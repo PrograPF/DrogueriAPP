@@ -91,11 +91,15 @@ const useArsenalAutoSuggest = (codigo) => {
   const [exists, setExists] = useState(true);
 
   useEffect(() => {
-    if (!codigo || codigo.trim() === '') {
+    const trimmedCodigo = codigo ? String(codigo).trim() : '';
+
+    if (!trimmedCodigo) {
       setNombre('');
       setExists(true);
       return;
     }
+
+    let isCurrent = true;
 
     const lookup = async () => {
       setLoading(true);
@@ -103,25 +107,31 @@ const useArsenalAutoSuggest = (codigo) => {
         const { data, error } = await supabase
           .from('articulos')
           .select('descripcion')
-          .eq('codigo', codigo.trim())
+          .eq('codigo', trimmedCodigo)
           .limit(1)
           .maybeSingle();
 
         if (error) throw error;
 
-        if (data) {
-          setNombre(data.descripcion);
-          setExists(true);
-        } else {
+        if (isCurrent) {
+          if (data) {
+            setNombre(data.descripcion);
+            setExists(true);
+          } else {
+            setNombre('');
+            setExists(false);
+          }
+        }
+      } catch (err) {
+        if (isCurrent) {
+          console.error(err);
           setNombre('');
           setExists(false);
         }
-      } catch (err) {
-        console.error(err);
-        setNombre('');
-        setExists(false);
       } finally {
-        setLoading(false);
+        if (isCurrent) {
+          setLoading(false);
+        }
       }
     };
 
@@ -129,7 +139,10 @@ const useArsenalAutoSuggest = (codigo) => {
       lookup();
     }, 400);
 
-    return () => clearTimeout(handler);
+    return () => {
+      isCurrent = false;
+      clearTimeout(handler);
+    };
   }, [codigo]);
 
   return { nombre, loading, exists };

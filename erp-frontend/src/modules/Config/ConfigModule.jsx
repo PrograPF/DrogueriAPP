@@ -100,11 +100,16 @@ const ConfigModule = () => {
       return;
     }
 
+    let isCurrent = true;
+
     const handler = setTimeout(() => {
-      handleSearchSilent();
+      handleSearchSilent(isCurrent);
     }, 450);
 
-    return () => clearTimeout(handler);
+    return () => {
+      isCurrent = false;
+      clearTimeout(handler);
+    };
   }, [searchTerm, activeTab]);
 
   // ==========================================
@@ -300,7 +305,7 @@ const ConfigModule = () => {
     handleSearchSilent();
   };
 
-  const handleSearchSilent = async () => {
+  const handleSearchSilent = async (isCurrentCheck) => {
     const term = searchTerm.trim();
     if (!term) return;
     setLoadingCatalog(true);
@@ -320,11 +325,15 @@ const ConfigModule = () => {
         .limit(50);
 
       if (error) throw error;
-      setCatalogItems(data || []);
+      if (isCurrentCheck === undefined || isCurrentCheck) {
+        setCatalogItems(data || []);
+      }
     } catch (err) {
       console.error('Error al realizar búsqueda de artículos:', err);
     } finally {
-      setLoadingCatalog(false);
+      if (isCurrentCheck === undefined || isCurrentCheck) {
+        setLoadingCatalog(false);
+      }
     }
   };
 

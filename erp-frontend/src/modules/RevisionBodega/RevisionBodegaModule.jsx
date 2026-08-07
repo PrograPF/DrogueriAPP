@@ -45,17 +45,19 @@ const RevisionBodegaModule = () => {
   // Auto-detectar lote, vencimiento e ISP desde la tabla 'articulos_variantes' en Supabase
   useEffect(() => {
     if (form.codigo) {
+      let isCurrent = true;
+
       const timeoutId = setTimeout(async () => {
         try {
           const { data, error } = await supabase
             .from('articulos_variantes')
             .select('lote, vencimiento, isp')
-            .eq('codigo_articulo', form.codigo)
+            .eq('codigo_articulo', form.codigo.trim())
             .order('vencimiento', { ascending: true })
             .limit(1)
             .maybeSingle();
 
-          if (!error && data) {
+          if (!error && data && isCurrent) {
             setForm(prev => ({
               ...prev,
               vencimiento: data.vencimiento || prev.vencimiento,
@@ -64,11 +66,16 @@ const RevisionBodegaModule = () => {
             }));
           }
         } catch (err) {
-          console.error("Error auto-detectando lote/vencimiento/isp:", err);
+          if (isCurrent) {
+            console.error("Error auto-detectando lote/vencimiento/isp:", err);
+          }
         }
       }, 500);
 
-      return () => clearTimeout(timeoutId);
+      return () => {
+        isCurrent = false;
+        clearTimeout(timeoutId);
+      };
     }
   }, [form.codigo]);
 

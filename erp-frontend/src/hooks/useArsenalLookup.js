@@ -3,38 +3,46 @@ import { supabase } from '../supabaseClient';
 
 /**
  * Hook que busca la descripción de un fármaco o DM en Supabase.
- * Utiliza un debounce de 400ms para no saturar de consultas la base de datos.
+ * Utiliza un debounce de 400ms para no saturar de consultas la base de datos,
+ * e ignora respuestas de peticiones obsoletas (evita condiciones de carrera).
  */
 const useArsenalLookup = (codigo) => {
   const [nombre, setNombre] = useState('Esperando código...');
 
   useEffect(() => {
-    if (!codigo || codigo.trim() === '') {
+    const trimmedCodigo = codigo ? String(codigo).trim() : '';
+
+    if (!trimmedCodigo) {
       setNombre('Esperando código...');
       return;
     }
 
     setNombre('Buscando...');
+    let isCurrent = true;
 
     const lookup = async () => {
       try {
         const { data, error } = await supabase
           .from('articulos')
           .select('descripcion')
-          .eq('codigo', codigo.trim())
+          .eq('codigo', trimmedCodigo)
           .limit(1)
           .maybeSingle();
 
         if (error) throw error;
 
-        if (data) {
-          setNombre(data.descripcion);
-        } else {
-          setNombre('Código no encontrado en arsenal');
+        if (isCurrent) {
+          if (data) {
+            setNombre(data.descripcion);
+          } else {
+            setNombre('Código no encontrado en arsenal');
+          }
         }
       } catch (err) {
-        console.error('Error al buscar en el arsenal:', err);
-        setNombre('Error en búsqueda');
+        if (isCurrent) {
+          console.error('Error al buscar en el arsenal:', err);
+          setNombre('Error en búsqueda');
+        }
       }
     };
 
@@ -42,11 +50,15 @@ const useArsenalLookup = (codigo) => {
       lookup();
     }, 400);
 
-    return () => clearTimeout(handler);
+    return () => {
+      isCurrent = false;
+      clearTimeout(handler);
+    };
   }, [codigo]);
 
   return nombre;
 };
 
 export default useArsenalLookup;
+
 
