@@ -25,17 +25,19 @@ function calcularEstadoRecepcionOc(articulos) {
 
   const estados = articulos.map(a => a.estado_recepcion || 'Pendiente');
 
-  const hayPendiente     = estados.some(e => e === 'Pendiente');
+  const todosPendientes  = estados.every(e => e === 'Pendiente');
+  const todosListos      = estados.every(e => e === 'Recepcionado' || e === 'Revisado');
+  const todosRechazados  = estados.every(e => e === 'Rechazado');
   const hayRecepcionado  = estados.some(e => e === 'Recepcionado' || e === 'Revisado');
   const hayRechazado     = estados.some(e => e === 'Rechazado');
-  const todosRechazados  = estados.every(e => e === 'Rechazado');
-  const todosListos      = estados.every(e => e === 'Recepcionado' || e === 'Revisado');
 
+  if (todosPendientes)                    return null;
   if (todosListos)                        return 'Recepcion Completa';
   if (todosRechazados)                    return 'Rechazo';
   if (hayRecepcionado && hayRechazado)    return 'Recepcion Parcial/Rechazo';
-  if (hayPendiente && !hayRechazado)      return 'Recepcion Parcial';
-  return 'Recepcion Parcial';
+  if (hayRecepcionado)                    return 'Recepcion Parcial';
+  if (hayRechazado)                       return 'Recepcion Parcial/Rechazo';
+  return null;
 }
 
 const ESTADO_ART_CONFIG = {
