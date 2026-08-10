@@ -504,9 +504,7 @@ const SeguimientoOCModule = () => {
             codigo_articulo,
             cantidad,
             cantidad_recepcionada,
-            estado,
-            fecha_almacenamiento,
-            historial
+            estado_recepcion
           )
         `)
         .order('fecha_envio', { ascending: false });
@@ -570,16 +568,42 @@ const SeguimientoOCModule = () => {
     }
   };
 
-  // Automatically fetch comments and reset tab when modal selected OC changes
+  // Recargar datos frescos de la OC al abrir el modal y fetch comentarios
   useEffect(() => {
     if (selectedOcForModal) {
       setModalTab('articulos');
       fetchComentarios(selectedOcForModal.id);
+      // Recargar artículos frescos desde Supabase para reflejar cambios de estado
+      const refrescarArticulos = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('ordenes_compra')
+            .select(`
+              *,
+              ordenes_compra_articulos (
+                id,
+                codigo_articulo,
+                cantidad,
+                cantidad_recepcionada,
+                estado_recepcion
+              )
+            `)
+            .eq('id', selectedOcForModal.id)
+            .maybeSingle();
+          if (!error && data) {
+            setSelectedOcForModal(data);
+          }
+        } catch (err) {
+          console.error('Error al refrescar OC para modal:', err);
+        }
+      };
+      refrescarArticulos();
     } else {
       setComentarios([]);
       setModalTab('articulos');
     }
-  }, [selectedOcForModal]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOcForModal?.id]);
 
   const cargarProveedores = async () => {
     setLoadingProveedores(true);
@@ -1007,9 +1031,7 @@ const SeguimientoOCModule = () => {
             codigo_articulo,
             cantidad,
             cantidad_recepcionada,
-            estado,
-            fecha_almacenamiento,
-            historial
+            estado_recepcion
           )
         `)
         .eq('id', selectedOcIdForRecepcion);
@@ -2614,23 +2636,16 @@ const SeguimientoOCModule = () => {
                           const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
                           const cantSol = art.cantidad || 0;
                           const cantRec = art.cantidad_recepcionada || 0;
-                          let deliveryState = art.estado || 'Pendiente';
-                          let badgeBg = 'rgba(255,255,255,0.05)';
-                          let badgeColor = '#94a3b8';
+                          const estadoArt = art.estado_recepcion || 'Pendiente';
 
-                          if (deliveryState === 'recepcion completa') {
-                            badgeBg = 'rgba(16, 185, 129, 0.15)';
-                            badgeColor = '#10b981';
-                          } else if (deliveryState === 'recepcion incompleta') {
-                            badgeBg = 'rgba(245, 158, 11, 0.15)';
-                            badgeColor = '#f59e0b';
-                          } else if (deliveryState === 'recepcionado') {
-                            badgeBg = 'rgba(59, 130, 246, 0.15)';
-                            badgeColor = '#3b82f6';
-                          } else if (deliveryState?.startsWith('rechazado')) {
-                            badgeBg = 'rgba(239, 68, 68, 0.15)';
-                            badgeColor = '#ef4444';
-                          }
+                          // Colores del Sistema 2
+                          const estadoConfig = {
+                            'Pendiente':    { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)'  },
+                            'Recepcionado': { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)'  },
+                            'Rechazado':    { color: '#ef4444', bg: 'rgba(239,68,68,0.12)'   },
+                            'Revisado':     { color: '#10b981', bg: 'rgba(16,185,129,0.12)'  },
+                          };
+                          const cfg = estadoConfig[estadoArt] || estadoConfig['Pendiente'];
 
                           return (
                             <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
@@ -2643,65 +2658,6 @@ const SeguimientoOCModule = () => {
                                   <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
                                   <span>Recibido: <strong style={{ color: cantRec >= cantSol ? '#10b981' : '#f59e0b' }}>{cantRec} uds.</strong></span>
                                 </div>
-                                {(() => {
-                                  const historyEntries = Array.isArray(art.historial) && art.historial.length > 0
-                                    ? art.historial
-                                    : (art.fecha_almacenamiento ? [{ estado: art.estado || 'Pendiente', fecha_almacenamiento: art.fecha_almacenamiento }] : []);
-                                  
-                                  const validEntries = historyEntries.filter(e => e.fecha_almacenamiento);
-                                  if (validEntries.length === 0) return null;
-
-                                  return (
-                                    <div style={{ 
-                                      marginTop: '10px', 
-                                      padding: '10px 14px', 
-                                      background: 'rgba(255,255,255,0.02)', 
-                                      borderRadius: '8px', 
-                                      border: '1px solid rgba(255,255,255,0.05)',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '6px'
-                                    }}>
-                                      <div style={{ fontSize: '0.73rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.5px' }}>
-                                        Historial de Estados
-                                      </div>
-                                      {validEntries.map((entry, eIdx) => {
-                                        const displayState = 
-                                          entry.estado === 'recepcion completa' ? 'Recepción Completa' :
-                                          entry.estado === 'recepcion incompleta' ? 'Recepción Incompleta' :
-                                          entry.estado === 'recepcionado' ? 'Recepcionado' :
-                                          entry.estado === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                                          entry.estado === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente';
-                                        
-                                        let stateColor = '#94a3b8';
-                                        let stateDot = 'rgba(255,255,255,0.2)';
-                                        
-                                        if (entry.estado === 'recepcion completa') {
-                                          stateColor = '#10b981';
-                                          stateDot = '#10b981';
-                                        } else if (entry.estado === 'recepcion incompleta') {
-                                          stateColor = '#f59e0b';
-                                          stateDot = '#f59e0b';
-                                        } else if (entry.estado === 'recepcionado') {
-                                          stateColor = '#3b82f6';
-                                          stateDot = '#3b82f6';
-                                        } else if (entry.estado?.startsWith('rechazado')) {
-                                          stateColor = '#ef4444';
-                                          stateDot = '#ef4444';
-                                        }
-
-                                        return (
-                                          <div key={eIdx} style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: stateDot }}></span>
-                                            <span style={{ color: stateColor, fontWeight: '700' }}>{displayState}</span>
-                                            <span style={{ color: '#64748b' }}>—</span>
-                                            <span style={{ color: '#cbd5e1', fontSize: '0.74rem' }}>{formatDateTime(entry.fecha_almacenamiento)}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                })()}
                               </td>
                               <td style={{ padding: '12px 12px', verticalAlign: 'top', textAlign: 'right' }}>
                                 <span style={{ 
@@ -2709,16 +2665,11 @@ const SeguimientoOCModule = () => {
                                   borderRadius: '6px', 
                                   fontSize: '0.75rem', 
                                   fontWeight: '700',
-                                  background: badgeBg,
-                                  color: badgeColor,
-                                  textTransform: 'capitalize',
+                                  background: cfg.bg,
+                                  color: cfg.color,
                                   display: 'inline-block'
                                 }}>
-                                  {deliveryState === 'recepcion completa' ? 'Recepción Completa' :
-                                   deliveryState === 'recepcion incompleta' ? 'Recepción Incompleta' :
-                                   deliveryState === 'recepcionado' ? 'Recepcionado' :
-                                   deliveryState === 'rechazado por vencimiento' ? 'Rechazado por Vencimiento' :
-                                   deliveryState === 'rechazado por calidad' ? 'Rechazado por Calidad' : 'Pendiente'}
+                                  {estadoArt}
                                 </span>
                               </td>
                             </tr>
