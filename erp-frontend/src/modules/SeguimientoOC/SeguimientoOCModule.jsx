@@ -9,6 +9,7 @@ import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 import { fetchArticulosCatalogMap } from '../../utils/catalogHelper';
+import { evaluarYActualizarEstadoSolicitud } from '../../utils/solicitudHelper';
 
 // Helper to get today's date formatted as yyyy-MM-dd
 const getTodayString = () => {
@@ -287,7 +288,8 @@ const SeguimientoOCModule = () => {
           solicitud_compra,
           estado,
           ordenes_compra_articulos (
-            codigo_articulo
+            codigo_articulo,
+            estado_recepcion
           )
         `)
         .or(`solicitud_compra.eq.${s.numero_solicitud},solicitud_compra.eq.${formattedSol}`);
@@ -295,11 +297,11 @@ const SeguimientoOCModule = () => {
       // Filter out cancelled OCs in JS
       const activeOcs = (ocsData || []).filter(oc => oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada');
 
-      // Map assigned codes -> OC number
+      // Map assigned codes -> OC number (Excluye artículos cuyo estado_recepcion sea Rechazado)
       const assignedCodesMap = {};
       activeOcs.forEach(oc => {
         (oc.ordenes_compra_articulos || []).forEach(art => {
-          if (art.codigo_articulo) {
+          if (art.codigo_articulo && art.estado_recepcion !== 'Rechazado') {
             assignedCodesMap[art.codigo_articulo.trim().toUpperCase()] = oc.numero_oc;
           }
         });
@@ -342,154 +344,7 @@ const SeguimientoOCModule = () => {
 
   // Helper function to calculate request status: 'Sin OC asignada', 'OC asignada parcial', 'OC asignada completa'
   // excludeOcIds: array of OC IDs to treat as cancelled (handles race condition with Supabase)
-  const evaluarYActualizarEstadoSolicitud = async (solNumero, excludeOcIds = []) => {
-    if (!solNumero) return;
-    try {
-      // Step 1: Find the Solicitud - try exact match, then with/without S- prefix
-      let solData = null;
-      const trimmed = solNumero.trim();
-      const upper = trimmed.toUpperCase();
-      const withPrefix = upper.startsWith('S-') ? upper : `S-${upper}`;
-      const withoutPrefix = upper.startsWith('S-') ? upper.substring(2) : upper;
-
-      for (const candidate of [trimmed, withPrefix, withoutPrefix]) {
-        const { data } = await supabase
-          .from('solicitudes_compra')
-          .select(`
-            id,
-            numero_solicitud,
-            codigo_articulo,
-            solicitudes_compra_articulos (
-              codigo_articulo
-            )
-          `)
-          .eq('numero_solicitud', candidate)
-          .maybeSingle();
-        
-        if (data) {
-          solData = data;
-          break;
-        }
-      }
-
-      if (!solData) {
-        console.warn('[evaluarEstadoSolicitud] Solicitud no encontrada para:', solNumero);
-        return;
-      }
-
-      const exactNumSol = solData.numero_solicitud;
-      console.log('[evaluarEstadoSolicitud] Solicitud encontrada:', exactNumSol, 'ID:', solData.id);
-
-      // Collect ALL requested article codes from child table, fallback to parent
-      const requestedCodes = new Set();
-      if (solData.solicitudes_compra_articulos && solData.solicitudes_compra_articulos.length > 0) {
-        solData.solicitudes_compra_articulos.forEach(a => {
-          if (a.codigo_articulo) requestedCodes.add(a.codigo_articulo.trim().toUpperCase());
-        });
-      } else if (solData.codigo_articulo) {
-        requestedCodes.add(solData.codigo_articulo.trim().toUpperCase());
-      }
-
-      console.log('[evaluarEstadoSolicitud] Artículos solicitados:', [...requestedCodes]);
-
-      if (requestedCodes.size === 0) return;
-
-      // Step 2: Fetch ALL OCs that reference this solicitud
-      // Use ilike for case-insensitive match to avoid format mismatches
-      const { data: ocsData } = await supabase
-        .from('ordenes_compra')
-        .select(`
-          id,
-          numero_oc,
-          solicitud_compra,
-          estado,
-          ordenes_compra_articulos (
-            codigo_articulo
-          )
-        `)
-        .ilike('solicitud_compra', exactNumSol);
-
-      console.log('[evaluarEstadoSolicitud] OCs encontradas:', (ocsData || []).map(oc => ({
-        id: oc.id, oc: oc.numero_oc, estado: oc.estado, 
-        arts: (oc.ordenes_compra_articulos || []).map(a => a.codigo_articulo)
-      })));
-
-      // Filter out cancelled OCs + explicitly exclude the OC being cancelled right now
-      const excludeSet = new Set(excludeOcIds.map(id => String(id)));
-      const activeOcs = (ocsData || []).filter(oc => {
-        const isCancelled = oc.estado === 'Cancelado' || oc.estado === 'Cancelada';
-        const isExcluded = excludeSet.has(String(oc.id));
-        if (isCancelled || isExcluded) {
-          console.log(`[evaluarEstadoSolicitud] OC ${oc.numero_oc} (ID:${oc.id}) EXCLUIDA - estado:${oc.estado}, excluded:${isExcluded}`);
-        }
-        return !isCancelled && !isExcluded;
-      });
-
-      const assignedCodes = new Set();
-      activeOcs.forEach(oc => {
-        (oc.ordenes_compra_articulos || []).forEach(art => {
-          if (art.codigo_articulo) assignedCodes.add(art.codigo_articulo.trim().toUpperCase());
-        });
-      });
-
-      // Step 3: Determine status
-      let assignedCount = 0;
-      requestedCodes.forEach(code => {
-        if (assignedCodes.has(code)) assignedCount++;
-      });
-
-      let nuevoEstado = 'Sin OC asignada';
-      if (assignedCount >= requestedCodes.size) {
-        nuevoEstado = 'OC asignada completa';
-      } else if (assignedCount > 0) {
-        nuevoEstado = 'OC asignada parcial';
-      }
-
-      console.log(`[evaluarEstadoSolicitud] RESULTADO: ${exactNumSol} -> Total OCs=${(ocsData||[]).length}, Activas=${activeOcs.length}, Asignados=${assignedCount}/${requestedCodes.size} -> NUEVO ESTADO: "${nuevoEstado}"`);
-
-      // Step 4: Update status using the solicitud's primary key ID
-      const { error: updateErr, data: updateData } = await supabase
-        .from('solicitudes_compra')
-        .update({ estado: nuevoEstado })
-        .eq('id', solData.id)
-        .select('id, numero_solicitud, estado');
-
-      console.log('[evaluarEstadoSolicitud] UPDATE resultado:', { error: updateErr, data: updateData });
-
-      if (updateErr) {
-        console.error('[evaluarEstadoSolicitud] ERROR en update:', updateErr);
-      }
-
-      // VERIFICACION: Re-leer la solicitud para confirmar que el estado realmente cambió
-      const { data: verify } = await supabase
-        .from('solicitudes_compra')
-        .select('id, numero_solicitud, estado')
-        .eq('id', solData.id)
-        .maybeSingle();
-
-      console.log(`[evaluarEstadoSolicitud] VERIFICACION post-update: estado actual en BD = "${verify?.estado}"`);
-      
-      if (verify && verify.estado !== nuevoEstado) {
-        console.error(`[evaluarEstadoSolicitud] ¡¡DISCREPANCIA!! Se intentó poner "${nuevoEstado}" pero la BD tiene "${verify.estado}". Reintentando update...`);
-        // Reintentar sin .select()
-        await supabase
-          .from('solicitudes_compra')
-          .update({ estado: nuevoEstado })
-          .eq('id', solData.id);
-        
-        // Verificar de nuevo
-        const { data: verify2 } = await supabase
-          .from('solicitudes_compra')
-          .select('id, numero_solicitud, estado')
-          .eq('id', solData.id)
-          .maybeSingle();
-        console.log(`[evaluarEstadoSolicitud] VERIFICACION 2: estado actual en BD = "${verify2?.estado}"`);
-      }
-
-    } catch (err) {
-      console.error('[evaluarEstadoSolicitud] EXCEPCION:', err);
-    }
-  };
+  // Se utiliza la función centralizada evaluarYActualizarEstadoSolicitud importada desde ../../utils/solicitudHelper
 
   // Load active OCs from Supabase
   const cargarOcs = async () => {

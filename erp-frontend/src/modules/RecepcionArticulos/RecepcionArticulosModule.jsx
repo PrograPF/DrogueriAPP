@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { formatDate } from '../../utils/dateFormatter';
 import { fetchArticulosCatalogMap } from '../../utils/catalogHelper';
+import { evaluarYActualizarEstadoSolicitud } from '../../utils/solicitudHelper';
 
 // ─── Helpers de estado ────────────────────────────────────────────────────────
 
@@ -179,7 +180,12 @@ const RecepcionArticulosModule = () => {
         .eq('id', selectedOcForModal.id);
       if (ocErr) throw ocErr;
 
-      // 4. Limpiar estados locales y recargar
+      // 4. Re-evaluar estado de la Solicitud de Compra vinculada (libera artículos si fueron Rechazados)
+      if (selectedOcForModal.solicitud_compra) {
+        await evaluarYActualizarEstadoSolicitud(selectedOcForModal.solicitud_compra);
+      }
+
+      // 5. Limpiar estados locales y recargar
       setLocalEstados({});
       await cargarOcs();
 
