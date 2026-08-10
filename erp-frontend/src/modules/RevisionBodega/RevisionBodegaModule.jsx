@@ -80,7 +80,7 @@ const RevisionBodegaModule = () => {
   }, [form.codigo]);
 
   // Cargar OCs disponibles para asociar a una revisión de bodega
-  // Se muestran todas las OC en estado Enviada o Aceptada (el mismo criterio que Recepción)
+  // Se muestran solo las OCs con recepción física iniciada o completada
   const cargarOcsDisponibles = async () => {
     setLoadingOcs(true);
     try {
@@ -91,10 +91,11 @@ const RevisionBodegaModule = () => {
           ordenes_compra_articulos (
             id,
             codigo_articulo,
-            cantidad
+            cantidad,
+            estado_recepcion
           )
         `)
-        .or('estado.eq.Enviada,estado.eq.Aceptada')
+        .in('estado_recepcion', ['Recepcion Completa', 'Recepcion Parcial', 'Recepcion Parcial/Rechazo'])
         .order('fecha_envio', { ascending: false });
       if (error) throw error;
       setOcs(data || []);
