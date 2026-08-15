@@ -43,6 +43,7 @@ const RevisionBodegaModule = () => {
   const [ocSeleccionada, setOcSeleccionada] = useState(null);
   const [articulosOc, setArticulosOc] = useState([]);
   const [articulosCatalog, setArticulosCatalog] = useState({});
+  const [ocFilter, setOcFilter] = useState('pendientes'); // 'pendientes', 'revisadas', 'todas'
 
   const nombreArticulo = useArsenalLookup(form.codigo);
 
@@ -438,9 +439,37 @@ const RevisionBodegaModule = () => {
         }
       }
 
-      // Nota: La revisión de bodega es un proceso independiente.
-      // El estado de los artículos en ordenes_compra_articulos es gestionado
-      // exclusivamente desde el módulo de Seguimiento de OC.
+      // 4. Actualizar estado_revision en ordenes_compra si corresponde
+      if (ocSeleccionada) {
+        try {
+          const artsRecepcionados = (ocSeleccionada.ordenes_compra_articulos || [])
+            .filter(a => a.estado_recepcion === 'Recepcionado');
+
+          const { data: revsPrevias } = await supabase
+            .from('revisiones_bodega')
+            .select('codigo_articulo')
+            .eq('numero_oc', ocSeleccionada.numero_oc);
+
+          const codigosRevisados = new Set([
+            ...(revsPrevias || []).map(r => r.codigo_articulo?.trim()),
+            ...items.map(i => i.codigo?.trim())
+          ]);
+
+          const todosRevisados = artsRecepcionados.length > 0 && 
+            artsRecepcionados.every(a => codigosRevisados.has(a.codigo_articulo?.trim()));
+
+          const nuevoEstadoRevision = todosRevisados ? 'Revisada' : 'Revision Parcial';
+
+          await supabase
+            .from('ordenes_compra')
+            .update({ estado_revision: nuevoEstadoRevision })
+            .eq('id', ocSeleccionada.id);
+
+          setOcs(prev => prev.map(o => o.id === ocSeleccionada.id ? { ...o, estado_revision: nuevoEstadoRevision } : o));
+        } catch (errRev) {
+          console.error('Error al actualizar estado_revision en ordenes_compra:', errRev);
+        }
+      }
 
       const nuevasAlertas = await calcularCrucePendientes(items);
       setAlertas(nuevasAlertas);
@@ -646,13 +675,79 @@ const RevisionBodegaModule = () => {
                 Solo se muestran las OCs que han sido recepcionadas en bodega (con estado Recepción Completa o Incompleta).
               </p>
 
+              {/* Filtros de OCs */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setOcFilter('pendientes')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    border: ocFilter === 'pendientes' ? '1px solid #3b82f6' : '1px solid var(--border-color)',
+                    background: ocFilter === 'pendientes' ? 'rgba(59, 130, 246, 0.15)' : 'var(--btn-secondary-bg)',
+                    color: ocFilter === 'pendientes' ? '#60a5fa' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Pendientes de Revisión ({ocs.filter(o => o.estado_revision !== 'Revisada').length})
+                </button>
+                <button
+                  onClick={() => setOcFilter('revisadas')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    border: ocFilter === 'revisadas' ? '1px solid #10b981' : '1px solid var(--border-color)',
+                    background: ocFilter === 'revisadas' ? 'rgba(168, 185, 129, 0.15)' : 'var(--btn-secondary-bg)',
+                    color: ocFilter === 'revisadas' ? '#34d399' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Ya Revisadas ({ocs.filter(o => o.estado_revision === 'Revisada').length})
+                </button>
+                <button
+                  onClick={() => setOcFilter('todas')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    border: ocFilter === 'todas' ? '1px solid #a855f7' : '1px solid var(--border-color)',
+                    background: ocFilter === 'todas' ? 'rgba(168, 85, 247, 0.15)' : 'var(--btn-secondary-bg)',
+                    color: ocFilter === 'todas' ? '#c084fc' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Todas ({ocs.length})
+                </button>
+              </div>
+
               {loadingOcs ? (
                 <p style={{ color: '#94a3b8' }}>Cargando órdenes de compra...</p>
-              ) : ocs.length === 0 ? (
-                <p style={{ color: '#64748b', fontStyle: 'italic' }}>No hay órdenes de compra recepcionadas listas para revisión física en bodega.</p>
+              ) : ocs.filter(oc => {
+                if (ocFilter === 'pendientes') return oc.estado_revision !== 'Revisada';
+                if (ocFilter === 'revisadas') return oc.estado_revision === 'Revisada';
+                return true;
+              }).length === 0 ? (
+                <p style={{ color: '#64748b', fontStyle: 'italic', padding: '20px 0' }}>
+                  {ocFilter === 'pendientes' 
+                    ? '✓ ¡Excelente! No hay órdenes de compra pendientes de revisión en este momento.' 
+                    : ocFilter === 'revisadas' 
+                      ? 'No hay órdenes de compra con revisión completada en esta sección.' 
+                      : 'No hay órdenes de compra disponibles.'}
+                </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '5px' }}>
-                  {ocs.map(oc => (
+                  {ocs.filter(oc => {
+                    if (ocFilter === 'pendientes') return oc.estado_revision !== 'Revisada';
+                    if (ocFilter === 'revisadas') return oc.estado_revision === 'Revisada';
+                    return true;
+                  }).map(oc => (
                     <div 
                       key={oc.id} 
                       onClick={() => seleccionarOc(oc)}
@@ -677,11 +772,11 @@ const RevisionBodegaModule = () => {
                       }}
                     >
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: '800', color: '#3b82f6', fontSize: '1.05rem' }}>{oc.numero_oc}</span>
                           <span style={{ 
-                            background: 'rgba(16, 185, 129, 0.15)', 
-                            color: '#10b981', 
+                            background: 'rgba(59, 130, 246, 0.12)', 
+                            color: '#60a5fa', 
                             padding: '2px 8px', 
                             borderRadius: '6px', 
                             fontSize: '0.75rem', 
@@ -689,6 +784,40 @@ const RevisionBodegaModule = () => {
                           }}>
                             {oc.estado}
                           </span>
+                          {oc.estado_revision === 'Revisada' ? (
+                            <span style={{ 
+                              background: 'rgba(16, 185, 129, 0.15)', 
+                              color: '#10b981', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '700' 
+                            }}>
+                              ✓ Ya Revisada
+                            </span>
+                          ) : oc.estado_revision === 'Revision Parcial' ? (
+                            <span style={{ 
+                              background: 'rgba(245, 158, 11, 0.15)', 
+                              color: '#f59e0b', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '700' 
+                            }}>
+                              ⏳ Revisión Parcial
+                            </span>
+                          ) : (
+                            <span style={{ 
+                              background: 'rgba(100, 116, 139, 0.15)', 
+                              color: '#94a3b8', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '700' 
+                            }}>
+                              Pendiente
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '4px', fontWeight: '500' }}>
                           {oc.proveedor}
