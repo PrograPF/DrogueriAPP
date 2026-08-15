@@ -29,7 +29,9 @@ const RevisionBodegaModule = () => {
     isp: '',
     cantidad: '',
     carta_canje: false,
-    valor_sin_iva: ''
+    valor_sin_iva: '',
+    nota: '',
+    autor_nota: localStorage.getItem('firma_operador') || ''
   });
 
   // OCs y selección
@@ -81,7 +83,9 @@ const RevisionBodegaModule = () => {
       isp: '',
       cantidad: '',
       carta_canje: false,
-      valor_sin_iva: ''
+      valor_sin_iva: '',
+      nota: '',
+      autor_nota: localStorage.getItem('firma_operador') || ''
     });
 
     // Filtrar estrictamente los artículos con estado 'Recepcionado'
@@ -273,6 +277,10 @@ const RevisionBodegaModule = () => {
 
     const valorConIva = Math.round(valorSinIva * 1.19);
 
+    if (form.autor_nota?.trim()) {
+      localStorage.setItem('firma_operador', form.autor_nota.trim());
+    }
+
     const newItem = {
       id: Date.now().toString(),
       codigo: form.codigo,
@@ -287,7 +295,9 @@ const RevisionBodegaModule = () => {
       valor_sin_iva: valorSinIva,
       valor_con_iva: valorConIva,
       total_sin_iva: cantidad * valorSinIva,
-      total_con_iva: cantidad * valorConIva
+      total_con_iva: cantidad * valorConIva,
+      nota: form.nota?.trim() || '',
+      autor_nota: form.autor_nota?.trim() || (form.nota?.trim() ? 'Revisión Bodega' : '')
     };
 
     setItems(prev => [...prev, newItem]);
@@ -301,7 +311,8 @@ const RevisionBodegaModule = () => {
       isp: '', 
       cantidad: '',
       carta_canje: false,
-      valor_sin_iva: ''
+      valor_sin_iva: '',
+      nota: ''
     }));
   };
   const handleRemoveItem = (id) => {
@@ -386,7 +397,7 @@ const RevisionBodegaModule = () => {
         cantidad: item.cantidad,
         carta_canje: item.carta_canje || 'NO',
         estado: 'VIGENTE',
-        comentario: `Ingreso desde Revisión Bodega (${item.tipo_documento} N° ${item.numero_documento})`,
+        comentario: item.nota ? item.nota : `Ingreso desde Revisión Bodega (${item.tipo_documento} N° ${item.numero_documento})`,
         ultimo_valor_sin_iva: item.valor_sin_iva || 0,
         ultimo_valor_con_iva: item.valor_con_iva || 0,
         total_sin_iva: item.total_sin_iva || 0,
@@ -395,8 +406,34 @@ const RevisionBodegaModule = () => {
         fecha_ingreso: new Date().toISOString().split('T')[0]
       }));
 
-      const { error: insertVarError } = await supabase.from('articulos_variantes').insert(insertVariantes);
+      const { data: createdVariantes, error: insertVarError } = await supabase
+        .from('articulos_variantes')
+        .insert(insertVariantes)
+        .select('id, codigo_articulo, lote');
+
       if (insertVarError) throw insertVarError;
+
+      // 3. Si hay notas/comentarios, insertar en articulos_variantes_comentarios para bitácora de Inventario
+      if (createdVariantes && createdVariantes.length > 0) {
+        const comentariosToInsert = [];
+        createdVariantes.forEach((createdVar, idx) => {
+          const itemOrig = items[idx];
+          if (itemOrig?.nota) {
+            comentariosToInsert.push({
+              variante_id: createdVar.id,
+              comentario: itemOrig.nota,
+              usuario: itemOrig.autor_nota || 'Revisión Bodega'
+            });
+          }
+        });
+
+        if (comentariosToInsert.length > 0) {
+          const { error: comErr } = await supabase
+            .from('articulos_variantes_comentarios')
+            .insert(comentariosToInsert);
+          if (comErr) console.error('Error al registrar comentarios en bitácora:', comErr);
+        }
+      }
 
       // Nota: La revisión de bodega es un proceso independiente.
       // El estado de los artículos en ordenes_compra_articulos es gestionado
@@ -823,6 +860,30 @@ const RevisionBodegaModule = () => {
                         style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }}
                       />
                     </label>
+                  </div>
+                </div>
+
+                {/* Fila 5: NOTA / OBSERVACIÓN y RESPONSABLE / AUTOR */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+                  <div>
+                    <label style={labelStyle}>NOTA / OBSERVACIÓN</label>
+                    <input 
+                      name="nota" 
+                      value={form.nota} 
+                      onChange={handleInputChange} 
+                      className="input-field" 
+                      placeholder="Escriba una nota o comentario para este lote..." 
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>RESPONSABLE / AUTOR DE LA NOTA</label>
+                    <input 
+                      name="autor_nota" 
+                      value={form.autor_nota} 
+                      onChange={handleInputChange} 
+                      className="input-field" 
+                      placeholder="Nombre o firma del funcionario..." 
+                    />
                   </div>
                 </div>
 
