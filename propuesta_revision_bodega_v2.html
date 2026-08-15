@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Propuesta 2 - Ficha Rápida de Revisión en Bodega</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --input-bg: #0f172a;
+      --input-border: #475569;
+      --input-focus: #3b82f6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --badge-bg: rgba(59, 130, 246, 0.15);
+      --badge-text: #60a5fa;
+      --danger: #ef4444;
+      --surface-row: rgba(255, 255, 255, 0.02);
+    }
+
+    body.light-mode {
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --input-bg: #f8fafc;
+      --input-border: #cbd5e1;
+      --input-focus: #2563eb;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #059669;
+      --badge-bg: rgba(37, 99, 235, 0.1);
+      --badge-text: #2563eb;
+      --danger: #dc2626;
+      --surface-row: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      padding: 30px 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 1040px;
+    }
+
+    /* Top Bar */
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .theme-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .theme-btn:hover {
+      border-color: var(--accent);
+    }
+
+    /* Main Card */
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      margin-bottom: 25px;
+    }
+
+    /* OC Banner Strip */
+    .oc-banner {
+      background: var(--surface-row);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .oc-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .oc-badge {
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .oc-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .oc-provider {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .btn-link {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-link:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Form Body */
+    .form-container {
+      padding: 24px;
+    }
+
+    /* Sub-card Documento */
+    .doc-row {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px dashed var(--card-border);
+      margin-bottom: 20px;
+    }
+
+    /* Article Selector Banner */
+    .article-selector-block {
+      background: var(--surface-row);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .field-label {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .input-control {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .input-control:focus {
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    select.input-control {
+      cursor: pointer;
+    }
+
+    /* 4-column compact grid */
+    .grid-4-cols {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .grid-3-cols {
+      display: grid;
+      grid-template-columns: 1.2fr 1.2fr 1.6fr;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    @media (max-width: 800px) {
+      .doc-row, .grid-4-cols, .grid-3-cols {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Modern Toggle Box for Carta de Canje */
+    .toggle-card {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      height: 42px;
+    }
+    .toggle-card:hover {
+      border-color: var(--accent);
+    }
+
+    .toggle-card input {
+      accent-color: var(--accent);
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    /* Action Add Button */
+    .btn-add-action {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+    }
+    .btn-add-action:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Table Component */
+    .review-table-wrap {
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 15px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: var(--surface-row);
+      padding: 12px 14px;
+      color: var(--text-muted);
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      text-align: left;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+
+    .btn-del {
+      background: transparent;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    .btn-del:hover {
+      text-decoration: underline;
+    }
+
+    .btn-finish {
+      background: var(--success);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .btn-finish:hover {
+      opacity: 0.92;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wrapper">
+    <!-- Top Header -->
+    <div class="top-nav">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800;">Propuesta 2: Formulario Integrado Directo</h2>
+        <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 2px;">
+          Diseño limpio, sin títulos pesados y con distribución balanceada en 2 niveles.
+        </p>
+      </div>
+      <button class="theme-btn" onclick="toggleTheme()">
+        🌓 Alternar Modo Claro / Oscuro
+      </button>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="panel">
+      
+      <!-- Barra de la Orden de Compra -->
+      <div class="oc-banner">
+        <div class="oc-info">
+          <span class="oc-badge">OC ACTIVA</span>
+          <span class="oc-title">PRUEBA 3 ARTICULOS OC</span>
+          <span class="oc-provider">• Prov: LABORATORIOS CHILE S.A.</span>
+        </div>
+        <button class="btn-link">Cambiar OC</button>
+      </div>
+
+      <div class="form-container">
+        
+        <!-- Fila 1: Documento de Recepción -->
+        <div class="doc-row">
+          <div>
+            <label class="field-label">Documento</label>
+            <select class="input-control">
+              <option value="Factura">Factura</option>
+              <option value="Guía de Despacho">Guía de Despacho</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Nº de Documento</label>
+            <input type="text" class="input-control" placeholder="Ingrese el número de factura o guía..." value="FAC-10928">
+          </div>
+        </div>
+
+        <!-- Fila 2: Selector de Artículo Recepcionado (Formato destacado) -->
+        <div class="article-selector-block">
+          <label class="field-label">Seleccionar Artículo Recepcionado (Solo con estado 'Recepcionado')</label>
+          <select class="input-control" id="artSelect" onchange="onArtChange()" style="font-weight: 700; font-size: 0.95rem; color: var(--accent);">
+            <option value="1004" data-cant="1000">(1004) RISPERIDONA 1MG./ML. SOLUCION GOTAS ORALES FRASCO GOTARIO</option>
+            <option value="888" data-cant="500">(888) PARACETAMOL 500 MG COMPRIMIDOS</option>
+          </select>
+        </div>
+
+        <!-- Fila 3: Trazabilidad y Cantidad (4 columnas balanceadas) -->
+        <div class="grid-4-cols">
+          <div>
+            <label class="field-label">Lote</label>
+            <input type="text" class="input-control" placeholder="Ej: L-9824" value="LOTE-54A">
+          </div>
+          <div>
+            <label class="field-label">F. Vencimiento</label>
+            <input type="date" class="input-control" value="2027-08-30">
+          </div>
+          <div>
+            <label class="field-label">Registro ISP</label>
+            <input type="text" class="input-control" placeholder="Ej: F-1234/20" value="F-8893/22">
+          </div>
+          <div>
+            <label class="field-label">Cantidad a Ingresar</label>
+            <input type="number" id="cant" class="input-control" value="1000" min="1" style="font-weight: 700;">
+          </div>
+        </div>
+
+        <!-- Fila 4: Precios, Carta de Canje y Botón de Ingreso -->
+        <div class="grid-3-cols">
+          <div>
+            <label class="field-label">P. Unitario S/IVA ($)</label>
+            <input type="number" id="sIva" class="input-control" value="2500" oninput="calcCon(this.value)">
+          </div>
+          <div>
+            <label class="field-label">P. Unitario C/IVA ($)</label>
+            <input type="number" id="cIva" class="input-control" value="2975" oninput="calcSin(this.value)">
+          </div>
+          <div>
+            <label class="field-label">Condición</label>
+            <label class="toggle-card">
+              <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">Carta de Canje</span>
+              <input type="checkbox" id="canje">
+            </label>
+          </div>
+        </div>
+
+        <!-- Botón Añadir -->
+        <button class="btn-add-action" onclick="addItem()">
+          <span>+ Añadir a la Revisión</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Tabla de Ítems Añadidos -->
+    <div class="panel" style="padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h4 style="font-size: 1rem; font-weight: 700;">Artículos Listos para Ingreso (<span id="totItems">1</span>)</h4>
+        <span style="font-size: 0.82rem; color: var(--text-muted);">Total Unidades: <strong id="totUds" style="color: var(--text-main);">1000 uds.</strong></span>
+      </div>
+
+      <div class="review-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>CÓDIGO Y DESCRIPCIÓN</th>
+              <th>LOTE</th>
+              <th>VENCE</th>
+              <th>CANTIDAD</th>
+              <th>TOTAL C/IVA</th>
+              <th style="text-align: right;">ACCIÓN</th>
+            </tr>
+          </thead>
+          <tbody id="tblBody">
+            <tr>
+              <td><strong>(1004)</strong> RISPERIDONA 1MG./ML. GOTAS</td>
+              <td>LOTE-54A</td>
+              <td>30/08/2027</td>
+              <td><strong style="color: var(--success);">1000 uds.</strong></td>
+              <td>$2.975.000</td>
+              <td style="text-align: right;"><button class="btn-del" onclick="this.closest('tr').remove(); refreshTotals();">Quitar</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
+        <button class="btn-finish" onclick="alert('¡Simulación completada con éxito!')">
+          ✓ Finalizar y Generar Informe
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('light-mode');
+    }
+
+    function onArtChange() {
+      const sel = document.getElementById('artSelect');
+      const opt = sel.options[sel.selectedIndex];
+      document.getElementById('cant').value = opt.getAttribute('data-cant');
+    }
+
+    function calcCon(v) {
+      const n = parseFloat(v);
+      if (!isNaN(n)) document.getElementById('cIva').value = Math.round(n * 1.19);
+    }
+
+    function calcSin(v) {
+      const n = parseFloat(v);
+      if (!isNaN(n)) document.getElementById('sIva').value = Math.round((n / 1.19) * 100) / 100;
+    }
+
+    function addItem() {
+      const sel = document.getElementById('artSelect');
+      const opt = sel.options[sel.selectedIndex];
+      const cant = document.getElementById('cant').value;
+      const cIva = document.getElementById('cIva').value;
+      const tot = (parseInt(cant) || 0) * (parseFloat(cIva) || 0);
+
+      const tbody = document.getElementById('tblBody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>(${opt.value})</strong> ${opt.text.split(')')[1] || opt.text}</td>
+        <td>LOTE-NUEVO</td>
+        <td>2028-05-15</td>
+        <td><strong style="color: var(--success);">${cant} uds.</strong></td>
+        <td>$${tot.toLocaleString('es-CL')}</td>
+        <td style="text-align: right;"><button class="btn-del" onclick="this.closest('tr').remove(); refreshTotals();">Quitar</button></td>
+      `;
+      tbody.appendChild(tr);
+      refreshTotals();
+    }
+
+    function refreshTotals() {
+      const rows = document.querySelectorAll('#tblBody tr');
+      document.getElementById('totItems').textContent = rows.length;
+    }
+  </script>
+</body>
+</html>

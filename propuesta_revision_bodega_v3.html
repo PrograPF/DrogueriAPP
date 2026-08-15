@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Propuesta 3 - Ficha Ergonómica Pro (Revisión en Bodega)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --card-surface: #111827;
+      --subcard-surface: #1a2234;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --input-bg: #0b1120;
+      --input-border: #374151;
+      --input-focus: #3b82f6;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --accent: #3b82f6;
+      --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      --accent-glow: rgba(59, 130, 246, 0.3);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius-xl: 16px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+    }
+
+    body.light-mode {
+      --bg-base: #f3f4f6;
+      --card-surface: #ffffff;
+      --subcard-surface: #f8fafc;
+      --card-border: #e5e7eb;
+      --input-bg: #ffffff;
+      --input-border: #d1d5db;
+      --input-focus: #2563eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --accent: #2563eb;
+      --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      --accent-glow: rgba(37, 99, 235, 0.15);
+      --success: #059669;
+      --success-bg: rgba(5, 150, 105, 0.1);
+      --danger: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      padding: 30px 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 1060px;
+    }
+
+    /* Top Nav */
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .theme-switch {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Master Card */
+    .master-card {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-xl);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    /* Header Strip: Documento + OC en una sola barra integrada */
+    .header-strip {
+      background: var(--subcard-surface);
+      border-bottom: 1px solid var(--card-border);
+      padding: 18px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .header-strip {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .oc-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .oc-code {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+
+    .oc-supplier {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .doc-inline-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-action-ghost {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-action-ghost:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Main Body Form */
+    .form-body {
+      padding: 24px;
+    }
+
+    /* Primary Hero: Article Selector */
+    .article-hero {
+      background: var(--subcard-surface);
+      border: 1.5px solid var(--accent);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .article-hero-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .select-article-pro {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      width: 100%;
+      outline: none;
+      cursor: pointer;
+    }
+    .select-article-pro:focus {
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* Input Grid Layout */
+    .grid-row-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .grid-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+      align-items: end;
+    }
+
+    @media (max-width: 850px) {
+      .grid-row-4, .grid-row-3 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 550px) {
+      .grid-row-4, .grid-row-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .field-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-caption {
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--text-muted);
+    }
+
+    .input-box {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      width: 100%;
+    }
+    .input-box:focus {
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* Toggle Card */
+    .checkbox-pill {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .checkbox-pill:hover {
+      border-color: var(--accent);
+    }
+    .checkbox-pill input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Add Button */
+    .btn-submit-item {
+      background: var(--accent-gradient);
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+    .btn-submit-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+
+    /* Summary Card Table */
+    .items-card {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .items-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .table-deck {
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: var(--subcard-surface);
+      padding: 12px 14px;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--card-border);
+      text-align: left;
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+
+    .badge-lote {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+
+    .btn-trash {
+      background: transparent;
+      border: none;
+      color: var(--danger);
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .btn-trash:hover {
+      text-decoration: underline;
+    }
+
+    .btn-complete {
+      background: var(--success);
+      color: white;
+      border: none;
+      padding: 13px 28px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+    }
+    .btn-complete:hover {
+      opacity: 0.94;
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <div class="top-header">
+      <div>
+        <div class="badge-pill">Ficha de Revisión Física</div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; margin-top: 6px;">Propuesta 3: Ficha Ergonómica Pro</h2>
+      </div>
+      <button class="theme-switch" onclick="toggleTheme()">
+        🌓 Alternar Modo Claro / Oscuro
+      </button>
+    </div>
+
+    <!-- Master Form Card -->
+    <div class="master-card">
+      
+      <!-- Barra Superior Integrada (OC + Documento de Entrada) -->
+      <div class="header-strip">
+        <div class="oc-meta">
+          <div>
+            <div class="oc-code">PRUEBA 3 ARTICULOS OC</div>
+            <div class="oc-supplier">Proveedor: LABORATORIOS CHILE S.A.</div>
+          </div>
+          <button class="btn-action-ghost">Cambiar OC</button>
+        </div>
+
+        <div class="doc-inline-group">
+          <div style="width: 140px;">
+            <select class="input-box" style="padding: 8px 10px; font-weight: 600;">
+              <option value="Factura">Factura</option>
+              <option value="Guía de Despacho">Guía de Despacho</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div style="width: 160px;">
+            <input type="text" class="input-box" style="padding: 8px 10px;" placeholder="Nº Documento..." value="FAC-99201">
+          </div>
+        </div>
+      </div>
+
+      <!-- Cuerpo del Formulario -->
+      <div class="form-body">
+        
+        <!-- Bloque 1: Artículo Heroico (Solo los 2 recepcionados) -->
+        <div class="article-hero">
+          <div class="article-hero-label">
+            <span>Artículo a Ingresar</span>
+            <span style="color: var(--success); font-weight: 700;">✓ Solo artículos recepcionados</span>
+          </div>
+          <select class="select-article-pro" id="artSel" onchange="onSelectChange()">
+            <option value="1004" data-cant="1000">(1004) RISPERIDONA 1MG./ML. SOLUCION GOTAS ORALES FRASCO GOTARIO</option>
+            <option value="888" data-cant="500">(888) PARACETAMOL 500 MG COMPRIMIDOS</option>
+          </select>
+        </div>
+
+        <!-- Bloque 2: Lote, Vencimiento, ISP y Cantidad (4 columnas fluidas) -->
+        <div class="grid-row-4">
+          <div class="field-wrap">
+            <label class="field-caption">Lote</label>
+            <input type="text" class="input-box" placeholder="Ej: L-8849" value="LOTE-8849">
+          </div>
+          <div class="field-wrap">
+            <label class="field-caption">F. Vencimiento</label>
+            <input type="date" class="input-box" value="2027-10-31">
+          </div>
+          <div class="field-wrap">
+            <label class="field-caption">Registro ISP</label>
+            <input type="text" class="input-box" placeholder="Ej: F-12345/21" value="F-12345/21">
+          </div>
+          <div class="field-wrap">
+            <label class="field-caption">Cantidad a Ingresar</label>
+            <input type="number" id="cantidadInput" class="input-box" value="1000" min="1" style="font-weight: 700;">
+          </div>
+        </div>
+
+        <!-- Bloque 3: Valores y Carta de Canje (3 columnas) -->
+        <div class="grid-row-3">
+          <div class="field-wrap">
+            <label class="field-caption">P. Unitario Sin IVA ($)</label>
+            <input type="number" id="sinIva" class="input-box" value="2000" oninput="calcCon(this.value)">
+          </div>
+          <div class="field-wrap">
+            <label class="field-caption">P. Unitario Con IVA ($)</label>
+            <input type="number" id="conIva" class="input-box" value="2380" oninput="calcSin(this.value)">
+          </div>
+          <div class="field-wrap">
+            <label class="field-caption">Carta de Canje</label>
+            <label class="checkbox-pill">
+              <span style="font-size: 0.85rem; font-weight: 600;">¿Aplica Carta de Canje?</span>
+              <input type="checkbox" id="canje">
+            </label>
+          </div>
+        </div>
+
+        <!-- Botón Añadir -->
+        <button class="btn-submit-item" onclick="addItem()">
+          <span>+ Añadir Artículo a la Revisión</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Tarjeta de Artículos Añadidos -->
+    <div class="items-card">
+      <div class="items-header">
+        <div>
+          <h4 style="font-size: 1.05rem; font-weight: 800;">Artículos Listos para Ingreso (<span id="totalItems">1</span>)</h4>
+          <span style="font-size: 0.82rem; color: var(--text-muted);">Revisión lista para guardar en inventario</span>
+        </div>
+        <div style="font-size: 0.88rem; color: var(--text-muted);">
+          Total: <strong id="totalMonto" style="color: var(--text-main); font-size: 1rem;">$2.380.000</strong>
+        </div>
+      </div>
+
+      <div class="table-deck">
+        <table>
+          <thead>
+            <tr>
+              <th>CÓDIGO Y DESCRIPCIÓN</th>
+              <th>LOTE</th>
+              <th>VENCIMIENTO</th>
+              <th>CANTIDAD</th>
+              <th>VALOR TOTAL C/IVA</th>
+              <th style="text-align: right;">ACCIÓN</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            <tr>
+              <td><strong>(1004)</strong> RISPERIDONA 1MG./ML. GOTAS</td>
+              <td><span class="badge-lote">LOTE-8849</span></td>
+              <td>31/10/2027</td>
+              <td><strong style="color: var(--success);">1000 uds.</strong></td>
+              <td>$2.380.000</td>
+              <td style="text-align: right;"><button class="btn-trash" onclick="this.closest('tr').remove(); refreshTotals();">Quitar</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 22px;">
+        <button class="btn-complete" onclick="alert('¡Revisión completada exitosamente!')">
+          ✓ Finalizar y Generar Informe de Revisión
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('light-mode');
+    }
+
+    function onSelectChange() {
+      const sel = document.getElementById('artSel');
+      const opt = sel.options[sel.selectedIndex];
+      document.getElementById('cantidadInput').value = opt.getAttribute('data-cant');
+    }
+
+    function calcCon(v) {
+      const n = parseFloat(v);
+      if (!isNaN(n)) document.getElementById('conIva').value = Math.round(n * 1.19);
+    }
+
+    function calcSin(v) {
+      const n = parseFloat(v);
+      if (!isNaN(n)) document.getElementById('sinIva').value = Math.round((n / 1.19) * 100) / 100;
+    }
+
+    function addItem() {
+      const sel = document.getElementById('artSel');
+      const opt = sel.options[sel.selectedIndex];
+      const cant = document.getElementById('cantidadInput').value;
+      const cIva = document.getElementById('conIva').value;
+      const tot = (parseInt(cant) || 0) * (parseFloat(cIva) || 0);
+
+      const tbody = document.getElementById('itemsBody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>(${opt.value})</strong> ${opt.text.split(')')[1] || opt.text}</td>
+        <td><span class="badge-lote">LOTE-NUEVO</span></td>
+        <td>2028-02-28</td>
+        <td><strong style="color: var(--success);">${cant} uds.</strong></td>
+        <td>$${tot.toLocaleString('es-CL')}</td>
+        <td style="text-align: right;"><button class="btn-trash" onclick="this.closest('tr').remove(); refreshTotals();">Quitar</button></td>
+      `;
+      tbody.appendChild(tr);
+      refreshTotals();
+    }
+
+    function refreshTotals() {
+      const rows = document.querySelectorAll('#itemsBody tr');
+      document.getElementById('totalItems').textContent = rows.length;
+    }
+  </script>
+</body>
+</html>

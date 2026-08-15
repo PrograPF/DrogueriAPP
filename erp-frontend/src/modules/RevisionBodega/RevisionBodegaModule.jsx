@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye, FileText, X,
-  CheckCircle2, Clock, ChevronDown, ChevronUp, PackageCheck, AlertCircle
+  CheckCircle2, Clock, ChevronDown, ChevronUp, PackageCheck, AlertCircle, Edit3, Lock, Unlock, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -22,6 +22,15 @@ const RevisionBodegaModule = () => {
   const [historial, setHistorial] = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+
+  // Modales adicionales: Modificar Cantidad OC y Cerrar OC con Pendientes
+  const [isEditOcModalOpen, setIsEditOcModalOpen] = useState(false);
+  const [editOcArticle, setEditOcArticle] = useState(null);
+  const [editOcNewQty, setEditOcNewQty] = useState('');
+  const [loadingEditOc, setLoadingEditOc] = useState(false);
+
+  const [isCloseOcModalOpen, setIsCloseOcModalOpen] = useState(false);
+  const [loadingCloseOc, setLoadingCloseOc] = useState(false);
 
   // Estado del formulario actual
   const [form, setForm] = useState({
@@ -296,9 +305,133 @@ const RevisionBodegaModule = () => {
       setLoadingHistorial(false);
     }
   };
+  const handleGuardarAjusteCantidadOc = async () => {
+    if (!editOcArticle) return;
+    const nuevaCantidad = parseInt(editOcNewQty);
+    if (isNaN(nuevaCantidad) || nuevaCantidad <= 0) {
+      alert('Por favor ingrese una cantidad válida mayor a 0.');
+      return;
+    }
+
+    setLoadingEditOc(true);
+    try {
+      const { error } = await supabase
+        .from('ordenes_compra_articulos')
+        .update({ cantidad: nuevaCantidad })
+        .eq('id', editOcArticle.id);
+
+      if (error) throw error;
+
+      // Actualizar estado local
+      setArticulosOc(prev => prev.map(a => a.id === editOcArticle.id ? { ...a, cantidad: nuevaCantidad } : a));
+      setOcs(prev => prev.map(o => {
+        if (o.id === ocSeleccionada.id) {
+          return {
+            ...o,
+            ordenes_compra_articulos: (o.ordenes_compra_articulos || []).map(a => 
+              a.id === editOcArticle.id ? { ...a, cantidad: nuevaCantidad } : a
+            )
+          };
+        }
+        return o;
+      }));
+      setOcSeleccionada(prev => ({
+        ...prev,
+        ordenes_compra_articulos: (prev.ordenes_compra_articulos || []).map(a => 
+          a.id === editOcArticle.id ? { ...a, cantidad: nuevaCantidad } : a
+        )
+      }));
+
+      // Si el artículo editado es el que está en el formulario, ajustar la cantidad sugerida
+      if (form.codigo === editOcArticle.codigo_articulo) {
+        const revPrevia = revisionesPreviasOc
+          .filter(r => r.codigo_articulo?.trim() === editOcArticle.codigo_articulo?.trim())
+          .reduce((sum, r) => sum + (r.cantidad || 0), 0);
+        const enLista = items
+          .filter(i => i.codigo?.trim() === editOcArticle.codigo_articulo?.trim())
+          .reduce((sum, i) => sum + (i.cantidad || 0), 0);
+        const nuevoSaldo = Math.max(0, nuevaCantidad - revPrevia - enLista);
+        setForm(prev => ({ ...prev, cantidad: nuevoSaldo > 0 ? nuevoSaldo : '' }));
+      }
+
+      setIsEditOcModalOpen(false);
+      alert(`Cantidad en la OC para (${editOcArticle.codigo_articulo}) actualizada a ${nuevaCantidad.toLocaleString('es-CL')} unidades.`);
+    } catch (err) {
+      console.error('Error al modificar cantidad de la OC:', err);
+      alert('Error al actualizar cantidad: ' + err.message);
+    } finally {
+      setLoadingEditOc(false);
+    }
+  };
+
+  const handleCerrarOcConPendientes = async () => {
+    if (!ocSeleccionada) return;
+    setLoadingCloseOc(true);
+    try {
+      const nuevoEstado = 'Cerrada con Pendientes';
+      const { error } = await supabase
+        .from('ordenes_compra')
+        .update({ estado_revision: nuevoEstado })
+        .eq('id', ocSeleccionada.id);
+
+      if (error) throw error;
+
+      setOcs(prev => prev.map(o => o.id === ocSeleccionada.id ? { ...o, estado_revision: nuevoEstado } : o));
+      setOcSeleccionada(prev => ({ ...prev, estado_revision: nuevoEstado }));
+      setIsCloseOcModalOpen(false);
+      alert(`Orden de Compra ${ocSeleccionada.numero_oc} marcada como "Cerrada con Pendientes".`);
+    } catch (err) {
+      console.error('Error al cerrar OC con pendientes:', err);
+      alert('Error al cerrar la OC: ' + err.message);
+    } finally {
+      setLoadingCloseOc(false);
+    }
+  };
+
+  const handleReabrirOc = async () => {
+    if (!ocSeleccionada) return;
+    if (!window.confirm(`¿Desea reabrir la Orden de Compra ${ocSeleccionada.numero_oc} para permitir nuevos ingresos?`)) {
+      return;
+    }
+    try {
+      const nuevoEstado = revisionesPreviasOc.length > 0 ? 'Revision Parcial' : null;
+      const { error } = await supabase
+        .from('ordenes_compra')
+        .update({ estado_revision: nuevoEstado })
+        .eq('id', ocSeleccionada.id);
+
+      if (error) throw error;
+
+      setOcs(prev => prev.map(o => o.id === ocSeleccionada.id ? { ...o, estado_revision: nuevoEstado } : o));
+      setOcSeleccionada(prev => ({ ...prev, estado_revision: nuevoEstado }));
+      alert(`Orden de Compra ${ocSeleccionada.numero_oc} reabierta exitosamente.`);
+    } catch (err) {
+      console.error('Error al reabrir OC:', err);
+      alert('Error al reabrir la OC: ' + err.message);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setForm(prev => {
+      const updated = { ...prev, [name]: type === 'checkbox' ? checked : value };
+      if (name === 'codigo' && value) {
+        const art = articulosOc.find(a => a.codigo_articulo?.trim() === value.trim());
+        if (art) {
+          const revPrevia = revisionesPreviasOc
+            .filter(r => r.codigo_articulo?.trim() === value.trim())
+            .reduce((sum, r) => sum + (r.cantidad || 0), 0);
+          const enLista = items
+            .filter(i => i.codigo?.trim() === value.trim())
+            .reduce((sum, i) => sum + (i.cantidad || 0), 0);
+          const saldo = Math.max(0, (art.cantidad || 0) - revPrevia - enLista);
+          if (saldo > 0) {
+            updated.cantidad = saldo;
+          }
+        }
+      }
+      return updated;
+    });
   };
 
   const handleAddItem = (e) => {
@@ -316,13 +449,22 @@ const RevisionBodegaModule = () => {
       alert("Por favor seleccione un Artículo de la lista de recepcionados.");
       return;
     }
-    if (revisionesPreviasOc.some(r => r.codigo_articulo?.trim() === form.codigo?.trim())) {
-      alert("Este artículo ya fue revisado e ingresado previamente en esta Orden de Compra.");
-      return;
-    }
-    if (items.some(item => item.codigo?.trim() === form.codigo?.trim())) {
-      alert("Este artículo ya ha sido añadido a la lista actual de revisión.");
-      return;
+    
+    // Verificar si el artículo ya completó todas sus unidades en la OC
+    const artOc = articulosOc.find(a => a.codigo_articulo?.trim() === form.codigo?.trim());
+    if (artOc) {
+      const revPrevia = revisionesPreviasOc
+        .filter(r => r.codigo_articulo?.trim() === form.codigo?.trim())
+        .reduce((sum, r) => sum + (r.cantidad || 0), 0);
+      const enLista = items
+        .filter(i => i.codigo?.trim() === form.codigo?.trim())
+        .reduce((sum, i) => sum + (i.cantidad || 0), 0);
+      const saldo = Math.max(0, (artOc.cantidad || 0) - revPrevia - enLista);
+
+      if (saldo <= 0) {
+        alert(`Este artículo ya ha completado todas sus unidades (${(artOc.cantidad || 0).toLocaleString('es-CL')} uds) en esta Orden de Compra.`);
+        return;
+      }
     }
     if (!form.lote?.trim()) {
       alert("Por favor ingrese el Lote.");
@@ -529,20 +671,22 @@ const RevisionBodegaModule = () => {
           const artsRecepcionados = (ocSeleccionada.ordenes_compra_articulos || [])
             .filter(a => a.estado_recepcion === 'Recepcionado');
 
-          const { data: revsPrevias } = await supabase
-            .from('revisiones_bodega')
-            .select('codigo_articulo')
-            .eq('numero_oc', ocSeleccionada.numero_oc);
+          const todosCompletos = artsRecepcionados.length > 0 && artsRecepcionados.every(art => {
+            const revPrevia = revisionesPreviasOc
+              .filter(r => r.codigo_articulo?.trim() === art.codigo_articulo?.trim())
+              .reduce((sum, r) => sum + (r.cantidad || 0), 0);
+            const enNuevaRev = items
+              .filter(i => i.codigo?.trim() === art.codigo_articulo?.trim())
+              .reduce((sum, i) => sum + (i.cantidad || 0), 0);
+            return (revPrevia + enNuevaRev) >= (art.cantidad || 0);
+          });
 
-          const codigosRevisados = new Set([
-            ...(revsPrevias || []).map(r => r.codigo_articulo?.trim()),
-            ...items.map(i => i.codigo?.trim())
-          ]);
-
-          const todosRevisados = artsRecepcionados.length > 0 && 
-            artsRecepcionados.every(a => codigosRevisados.has(a.codigo_articulo?.trim()));
-
-          const nuevoEstadoRevision = todosRevisados ? 'Revisada' : 'Revision Parcial';
+          let nuevoEstadoRevision = 'Revision Parcial';
+          if (todosCompletos) {
+            nuevoEstadoRevision = 'Revisada';
+          } else if (ocSeleccionada.estado_revision === 'Cerrada con Pendientes') {
+            nuevoEstadoRevision = 'Cerrada con Pendientes';
+          }
 
           await supabase
             .from('ordenes_compra')
@@ -550,6 +694,7 @@ const RevisionBodegaModule = () => {
             .eq('id', ocSeleccionada.id);
 
           setOcs(prev => prev.map(o => o.id === ocSeleccionada.id ? { ...o, estado_revision: nuevoEstadoRevision } : o));
+          setOcSeleccionada(prev => prev ? { ...prev, estado_revision: nuevoEstadoRevision } : null);
         } catch (errRev) {
           console.error('Error al actualizar estado_revision en ordenes_compra:', errRev);
         }
@@ -763,77 +908,77 @@ const RevisionBodegaModule = () => {
                 Solo se muestran las OCs que han sido recepcionadas en bodega (con estado Recepción Completa o Incompleta).
               </p>
 
-              {/* Filtros de OCs */}
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => setOcFilter('pendientes')}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    border: ocFilter === 'pendientes' ? '1px solid #3b82f6' : '1px solid var(--border-color)',
-                    background: ocFilter === 'pendientes' ? 'rgba(59, 130, 246, 0.15)' : 'var(--btn-secondary-bg)',
-                    color: ocFilter === 'pendientes' ? '#60a5fa' : 'var(--text-secondary)',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Pendientes de Revisión ({ocs.filter(o => o.estado_revision !== 'Revisada').length})
-                </button>
-                <button
-                  onClick={() => setOcFilter('revisadas')}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    border: ocFilter === 'revisadas' ? '1px solid #10b981' : '1px solid var(--border-color)',
-                    background: ocFilter === 'revisadas' ? 'rgba(168, 185, 129, 0.15)' : 'var(--btn-secondary-bg)',
-                    color: ocFilter === 'revisadas' ? '#34d399' : 'var(--text-secondary)',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Ya Revisadas ({ocs.filter(o => o.estado_revision === 'Revisada').length})
-                </button>
-                <button
-                  onClick={() => setOcFilter('todas')}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    border: ocFilter === 'todas' ? '1px solid #a855f7' : '1px solid var(--border-color)',
-                    background: ocFilter === 'todas' ? 'rgba(168, 85, 247, 0.15)' : 'var(--btn-secondary-bg)',
-                    color: ocFilter === 'todas' ? '#c084fc' : 'var(--text-secondary)',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Todas ({ocs.length})
-                </button>
-              </div>
+                {/* Filtros de OCs */}
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setOcFilter('pendientes')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      border: ocFilter === 'pendientes' ? '1px solid #3b82f6' : '1px solid var(--border-color)',
+                      background: ocFilter === 'pendientes' ? 'rgba(59, 130, 246, 0.15)' : 'var(--btn-secondary-bg)',
+                      color: ocFilter === 'pendientes' ? '#60a5fa' : 'var(--text-secondary)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Pendientes de Revisión ({ocs.filter(o => o.estado_revision !== 'Revisada' && o.estado_revision !== 'Cerrada con Pendientes').length})
+                  </button>
+                  <button
+                    onClick={() => setOcFilter('revisadas')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      border: ocFilter === 'revisadas' ? '1px solid #10b981' : '1px solid var(--border-color)',
+                      background: ocFilter === 'revisadas' ? 'rgba(16, 185, 129, 0.15)' : 'var(--btn-secondary-bg)',
+                      color: ocFilter === 'revisadas' ? '#34d399' : 'var(--text-secondary)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Ya Revisadas / Cerradas ({ocs.filter(o => o.estado_revision === 'Revisada' || o.estado_revision === 'Cerrada con Pendientes').length})
+                  </button>
+                  <button
+                    onClick={() => setOcFilter('todas')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      border: ocFilter === 'todas' ? '1px solid #a855f7' : '1px solid var(--border-color)',
+                      background: ocFilter === 'todas' ? 'rgba(168, 85, 247, 0.15)' : 'var(--btn-secondary-bg)',
+                      color: ocFilter === 'todas' ? '#c084fc' : 'var(--text-secondary)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Todas ({ocs.length})
+                  </button>
+                </div>
 
               {loadingOcs ? (
                 <p style={{ color: '#94a3b8' }}>Cargando órdenes de compra...</p>
               ) : ocs.filter(oc => {
-                if (ocFilter === 'pendientes') return oc.estado_revision !== 'Revisada';
-                if (ocFilter === 'revisadas') return oc.estado_revision === 'Revisada';
+                if (ocFilter === 'pendientes') return oc.estado_revision !== 'Revisada' && oc.estado_revision !== 'Cerrada con Pendientes';
+                if (ocFilter === 'revisadas') return oc.estado_revision === 'Revisada' || oc.estado_revision === 'Cerrada con Pendientes';
                 return true;
               }).length === 0 ? (
                 <p style={{ color: '#64748b', fontStyle: 'italic', padding: '20px 0' }}>
                   {ocFilter === 'pendientes' 
                     ? '✓ ¡Excelente! No hay órdenes de compra pendientes de revisión en este momento.' 
                     : ocFilter === 'revisadas' 
-                      ? 'No hay órdenes de compra con revisión completada en esta sección.' 
+                      ? 'No hay órdenes de compra con revisión completada o cerrada en esta sección.' 
                       : 'No hay órdenes de compra disponibles.'}
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '5px' }}>
                   {ocs.filter(oc => {
-                    if (ocFilter === 'pendientes') return oc.estado_revision !== 'Revisada';
-                    if (ocFilter === 'revisadas') return oc.estado_revision === 'Revisada';
+                    if (ocFilter === 'pendientes') return oc.estado_revision !== 'Revisada' && oc.estado_revision !== 'Cerrada con Pendientes';
+                    if (ocFilter === 'revisadas') return oc.estado_revision === 'Revisada' || oc.estado_revision === 'Cerrada con Pendientes';
                     return true;
                   }).map(oc => (
                     <div 
@@ -883,6 +1028,20 @@ const RevisionBodegaModule = () => {
                             }}>
                               ✓ Ya Revisada
                             </span>
+                          ) : oc.estado_revision === 'Cerrada con Pendientes' ? (
+                            <span style={{ 
+                              background: 'rgba(245, 158, 11, 0.15)', 
+                              color: '#f59e0b', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: '700',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Lock size={12} /> Cerrada con Pendientes
+                            </span>
                           ) : oc.estado_revision === 'Revision Parcial' ? (
                             <span style={{ 
                               background: 'rgba(245, 158, 11, 0.15)', 
@@ -925,23 +1084,59 @@ const RevisionBodegaModule = () => {
           ) : (
             <>
               {(() => {
-                const codigosYaRevisados = new Set(revisionesPreviasOc.map(r => r.codigo_articulo?.trim()));
-                const totalRecepcionados = articulosOc.length;
-                const articulosYaRevisadosList = articulosOc.filter(a => codigosYaRevisados.has(a.codigo_articulo?.trim()));
-                const totalYaRevisados = articulosYaRevisadosList.length;
-                const totalPendientes = articulosOc.filter(a => !codigosYaRevisados.has(a.codigo_articulo?.trim())).length;
-                const esOcCompletada = totalRecepcionados > 0 && totalPendientes === 0;
-                const articulosDisponibles = articulosOc.filter(
-                  art => !codigosYaRevisados.has(art.codigo_articulo?.trim()) && !items.some(item => item.codigo?.trim() === art.codigo_articulo?.trim())
-                );
+                const articulosInfo = articulosOc.map(art => {
+                  const revPrevia = revisionesPreviasOc
+                    .filter(r => r.codigo_articulo?.trim() === art.codigo_articulo?.trim())
+                    .reduce((sum, r) => sum + (r.cantidad || 0), 0);
+                  const enListaActual = items
+                    .filter(i => i.codigo?.trim() === art.codigo_articulo?.trim())
+                    .reduce((sum, i) => sum + (i.cantidad || 0), 0);
+                  const totalRevisado = revPrevia + enListaActual;
+                  const saldoPendiente = Math.max(0, (art.cantidad || 0) - totalRevisado);
+                  const completo = totalRevisado >= (art.cantidad || 0);
+
+                  return {
+                    ...art,
+                    revPrevia,
+                    enListaActual,
+                    totalRevisado,
+                    saldoPendiente,
+                    completo
+                  };
+                });
+
+                const totalRecepcionados = articulosInfo.length;
+                const totalArticulosCompletos = articulosInfo.filter(a => a.completo).length;
+                const totalArticulosPendientes = articulosInfo.filter(a => !a.completo).length;
+
+                const totalUnidadesOc = articulosInfo.reduce((sum, a) => sum + (a.cantidad || 0), 0);
+                const totalUnidadesRevisadas = articulosInfo.reduce((sum, a) => sum + a.totalRevisado, 0);
+                const totalUnidadesPendientes = Math.max(0, totalUnidadesOc - totalUnidadesRevisadas);
+
+                const esOcCerradaConPendientes = ocSeleccionada.estado_revision === 'Cerrada con Pendientes';
+                const esOcCompletada = ocSeleccionada.estado_revision === 'Revisada' || 
+                  (totalRecepcionados > 0 && totalArticulosPendientes === 0);
+
+                const articulosDisponibles = articulosInfo.filter(a => a.saldoPendiente > 0);
+                const artSeleccionadoInfo = articulosInfo.find(a => a.codigo_articulo?.trim() === form.codigo?.trim());
 
                 return (
                   <div className="glass-card" style={{ padding: '24px', marginBottom: '25px' }}>
                     {/* Header Banner de la OC */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                        <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' }}>
-                          OC EN REVISIÓN
+                        <span style={{
+                          padding: '3px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          background: esOcCerradaConPendientes ? 'rgba(245, 158, 11, 0.15)' : esOcCompletada ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                          color: esOcCerradaConPendientes ? '#f59e0b' : esOcCompletada ? '#10b981' : '#3b82f6',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {esOcCerradaConPendientes ? <><Lock size={12} /> OC CERRADA CON PENDIENTES</> : esOcCompletada ? '✓ OC REVISADA 100%' : 'OC EN REVISIÓN'}
                         </span>
                         <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
                           {ocSeleccionada.numero_oc}
@@ -950,13 +1145,36 @@ const RevisionBodegaModule = () => {
                           • Proveedor: {ocSeleccionada.proveedor}
                         </span>
                       </div>
-                      <button 
-                        onClick={() => { setOcSeleccionada(null); setArticulosOc([]); setItems([]); setRevisionesPreviasOc([]); }} 
-                        className="btn-secondary" 
-                        style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                      >
-                        Cambiar OC
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {esOcCerradaConPendientes || esOcCompletada ? (
+                          <button
+                            type="button"
+                            onClick={handleReabrirOc}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.8rem', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            title="Reabrir orden de compra para ingresar más artículos"
+                          >
+                            <Unlock size={14} /> Reabrir OC
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsCloseOcModalOpen(true)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.8rem', padding: '6px 12px', borderColor: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            title="Cerrar orden de compra aunque queden artículos pendientes"
+                          >
+                            <Lock size={14} /> Cerrar OC con Pendientes
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => { setOcSeleccionada(null); setArticulosOc([]); setItems([]); setRevisionesPreviasOc([]); }} 
+                          className="btn-secondary" 
+                          style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                        >
+                          Cambiar OC
+                        </button>
+                      </div>
                     </div>
 
                     {/* PANEL VISUAL: HISTORIAL DE ARTÍCULOS YA REVISADOS EN ESTA OC */}
@@ -974,14 +1192,14 @@ const RevisionBodegaModule = () => {
                             Historial de Artículos Revisados en esta OC
                           </span>
                           <span style={{
-                            background: esOcCompletada ? 'rgba(16, 185, 129, 0.15)' : revisionesPreviasOc.length > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(100, 116, 139, 0.15)',
-                            color: esOcCompletada ? '#10b981' : revisionesPreviasOc.length > 0 ? '#f59e0b' : 'var(--text-secondary)',
+                            background: esOcCerradaConPendientes ? 'rgba(245, 158, 11, 0.15)' : esOcCompletada ? 'rgba(16, 185, 129, 0.15)' : revisionesPreviasOc.length > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                            color: esOcCerradaConPendientes ? '#f59e0b' : esOcCompletada ? '#10b981' : revisionesPreviasOc.length > 0 ? '#60a5fa' : 'var(--text-secondary)',
                             padding: '3px 10px',
                             borderRadius: '6px',
                             fontSize: '0.78rem',
                             fontWeight: '700'
                           }}>
-                            {totalYaRevisados} de {totalRecepcionados} artículos revisados ({totalPendientes} pendientes)
+                            {esOcCerradaConPendientes ? '🔒 Cerrada con Pendientes' : `${totalArticulosCompletos} de ${totalRecepcionados} artículos completos (${totalUnidadesPendientes.toLocaleString('es-CL')} uds pendientes)`}
                           </span>
                         </div>
 
@@ -1077,8 +1295,25 @@ const RevisionBodegaModule = () => {
                       )}
                     </div>
 
-                    {/* FORMULARIO DE INGRESO O AVISO DE OC COMPLETADA */}
-                    {esOcCompletada ? (
+                    {/* FORMULARIO DE INGRESO O AVISO DE OC CERRADA / COMPLETADA */}
+                    {esOcCerradaConPendientes ? (
+                      <div style={{
+                        background: 'rgba(245, 158, 11, 0.08)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        textAlign: 'center',
+                        marginBottom: '10px'
+                      }}>
+                        <Lock size={38} color="#f59e0b" style={{ margin: '0 auto 10px auto' }} />
+                        <h4 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#f59e0b', margin: '0 0 6px 0' }}>
+                          🔒 Orden de Compra Cerrada con Pendientes (Cierre Manual)
+                        </h4>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0, maxWidth: '600px', marginLeft: 'auto', marginRight: 'auto' }}>
+                          Esta orden fue cerrada manualmente con saldo pendiente ({totalUnidadesPendientes.toLocaleString('es-CL')} unidades no recibidas). Se encuentra archivada para gestión de Notas de Crédito.
+                        </p>
+                      </div>
+                    ) : esOcCompletada ? (
                       <div style={{
                         background: 'rgba(16, 185, 129, 0.1)',
                         border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -1089,10 +1324,10 @@ const RevisionBodegaModule = () => {
                       }}>
                         <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 10px auto' }} />
                         <h4 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#10b981', margin: '0 0 6px 0' }}>
-                          ✓ Todos los artículos recepcionados de esta OC ya fueron revisados
+                          ✓ Todos los artículos recepcionados de esta OC ya fueron revisados al 100%
                         </h4>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-                          Esta Orden de Compra ya tiene el 100% ({totalRecepcionados}/{totalRecepcionados}) de sus artículos ingresados a inventario. No quedan artículos pendientes para ingresar.
+                          Esta Orden de Compra ya tiene el 100% ({totalUnidadesOc.toLocaleString('es-CL')}/{totalUnidadesOc.toLocaleString('es-CL')} unidades) ingresadas a inventario. No quedan artículos pendientes para ingresar.
                         </p>
                       </div>
                     ) : (
@@ -1119,12 +1354,12 @@ const RevisionBodegaModule = () => {
                           </div>
                         </div>
 
-                        {/* Fila 2: Selector Unificado de Artículo Recepcionado */}
-                        <div style={{ background: 'var(--btn-secondary-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', marginBottom: '18px' }}>
+                        {/* Fila 2: Selector Unificado de Artículo Recepcionado y Ficha de Saldo */}
+                        <div style={{ background: 'var(--btn-secondary-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '18px', marginBottom: '18px' }}>
                           <label style={{ ...labelStyle, color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span>Seleccionar Artículo Recepcionado</span>
                             <span style={{ color: articulosDisponibles.length > 0 ? '#10b981' : '#f59e0b', fontSize: '0.75rem', textTransform: 'none', fontWeight: '600' }}>
-                              ✓ {articulosDisponibles.length} artículo(s) pendiente(s) por revisar
+                              ✓ {articulosDisponibles.length} artículo(s) con saldo pendiente
                             </span>
                           </label>
                           <select 
@@ -1137,10 +1372,55 @@ const RevisionBodegaModule = () => {
                             <option value="">-- Seleccione un artículo pendiente --</option>
                             {articulosDisponibles.map(art => (
                               <option key={art.id} value={art.codigo_articulo}>
-                                ({art.codigo_articulo}) {art.descripcion}
+                                ({art.codigo_articulo}) {art.descripcion} — [Pendiente: {art.saldoPendiente.toLocaleString('es-CL')} uds / Total OC: {(art.cantidad || 0).toLocaleString('es-CL')} uds]
                               </option>
                             ))}
                           </select>
+
+                          {/* Ficha de Saldo al Seleccionar Artículo */}
+                          {artSeleccionadoInfo && (
+                            <div style={{
+                              marginTop: '14px',
+                              padding: '14px 18px',
+                              background: 'rgba(59, 130, 246, 0.06)',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              borderRadius: '10px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '12px'
+                            }}>
+                              <div style={{ display: 'flex', gap: '22px', flexWrap: 'wrap' }}>
+                                <div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>📦 Total en OC</div>
+                                  <div style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-primary)' }}>{(artSeleccionadoInfo.cantidad || 0).toLocaleString('es-CL')} uds</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>🕒 Ya Revisado</div>
+                                  <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#10b981' }}>{artSeleccionadoInfo.revPrevia.toLocaleString('es-CL')} uds</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>⏳ Saldo Pendiente</div>
+                                  <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b' }}>{artSeleccionadoInfo.saldoPendiente.toLocaleString('es-CL')} uds</div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditOcArticle(artSeleccionadoInfo);
+                                  setEditOcNewQty(artSeleccionadoInfo.cantidad);
+                                  setIsEditOcModalOpen(true);
+                                }}
+                                className="btn-secondary"
+                                style={{ fontSize: '0.8rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.4)' }}
+                                title="Modificar cantidad de la orden de compra si la unidad de medida no calza"
+                              >
+                                <Edit3 size={14} /> Modificar Cantidad OC
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Fila 3: Trazabilidad y Cantidad (4 columnas fluidas) */}
@@ -1646,6 +1926,139 @@ const RevisionBodegaModule = () => {
                     Guardar Nota
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL MODIFICAR CANTIDAD DE LA OC (AJUSTE DE UNIDADES DE MEDIDA) */}
+      <AnimatePresence>
+        {isEditOcModalOpen && editOcArticle && (
+          <div 
+            style={{
+              position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+              background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 9999, padding: '20px'
+            }}
+            onClick={() => setIsEditOcModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '480px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '16px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                    Modificar Cantidad en la OC
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    ({editOcArticle.codigo_articulo}) {editOcArticle.descripcion}
+                  </p>
+                </div>
+                <button onClick={() => setIsEditOcModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '12px', fontSize: '0.82rem', color: '#fcd34d', lineHeight: '1.4' }}>
+                💡 <strong>Ajuste de Unidades de Medida:</strong> Utilice este cambio si la orden de compra venía expresada en otra unidad (ej. 10 cajas) y necesita ajustarla a unidades individuales (ej. 1.000 comprimidos), o si el proveedor facturó una cantidad corregida.
+              </div>
+
+              <div>
+                <label style={labelStyle}>Nueva Cantidad Total en la OC (Unidades)</label>
+                <input 
+                  type="number" 
+                  value={editOcNewQty} 
+                  onChange={(e) => setEditOcNewQty(e.target.value)}
+                  className="input-field" 
+                  style={{ fontSize: '1.1rem', fontWeight: '800', color: '#3b82f6', width: '100%' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+                  Ya se han revisado <strong>{editOcArticle.revPrevia || 0}</strong> unidades. El nuevo saldo pendiente se actualizará de inmediato.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button type="button" onClick={() => setIsEditOcModalOpen(false)} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+                  Cancelar
+                </button>
+                <button type="button" onClick={handleGuardarAjusteCantidadOc} disabled={loadingEditOc} className="btn-primary" style={{ padding: '8px 20px', fontSize: '0.85rem' }}>
+                  {loadingEditOc ? 'Guardando...' : 'Guardar y Recalcular'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL CERRAR OC CON PENDIENTES */}
+      <AnimatePresence>
+        {isCloseOcModalOpen && ocSeleccionada && (
+          <div 
+            style={{
+              position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+              background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 9999, padding: '20px'
+            }}
+            onClick={() => setIsCloseOcModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg-card)', border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '480px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '16px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ padding: '8px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                    <Lock size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                      Cerrar OC con Pendientes
+                    </h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      Orden de Compra: <strong>{ocSeleccionada.numero_oc}</strong>
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setIsCloseOcModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>
+                Esta acción marcará la Orden de Compra como <strong style={{ color: '#f59e0b' }}>"Cerrada con Pendientes"</strong>. La orden saldrá de la lista de revisiones pendientes y quedará guardada para gestiones de <strong>Notas de Crédito</strong> o cierres definitivos.
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button type="button" onClick={() => setIsCloseOcModalOpen(false)} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleCerrarOcConPendientes} 
+                  disabled={loadingCloseOc} 
+                  className="btn-primary" 
+                  style={{ padding: '8px 20px', fontSize: '0.85rem', background: '#f59e0b', color: '#000' }}
+                >
+                  {loadingCloseOc ? 'Cerrando...' : 'Confirmar Cierre de OC'}
+                </button>
               </div>
             </motion.div>
           </div>

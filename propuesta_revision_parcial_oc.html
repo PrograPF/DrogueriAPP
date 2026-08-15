@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demostración Interactiva: Revisiones Parciales, Control de Saldo y Ajuste de OC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e1a;
+      --card-surface: #111827;
+      --subcard-surface: #1a2234;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --input-bg: #0b1120;
+      --input-border: #374151;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.15);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.12);
+      --purple: #a855f7;
+      --purple-bg: rgba(168, 85, 247, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      padding: 30px 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    /* Tabs Guía de Opciones */
+    .feature-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .feature-btn {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .feature-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    .feature-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    /* Tarjetas */
+    .glass-card {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Tabla */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: var(--subcard-surface);
+      padding: 12px 14px;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    td {
+      padding: 14px;
+      border-bottom: 1px solid var(--card-border);
+      vertical-align: middle;
+    }
+
+    /* Controles Form */
+    .input-field {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+    }
+
+    .label-title {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Ficha Informativa de Saldo */
+    .balance-card {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(168, 85, 247, 0.05) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .balance-metrics {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .metric-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .metric-val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 480px;
+      padding: 26px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .highlight-box {
+      background: rgba(59, 130, 246, 0.08);
+      border-left: 4px solid var(--accent);
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Top Header -->
+    <div class="top-bar">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h2 style="font-size: 1.4rem; font-weight: 800;">Revisión en Bodega — OC-744883</h2>
+          <span class="pill-badge" id="oc-status-badge">⏳ Revisión Parcial</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+          Proveedor: LABORATORIO CHILE S.A. • Factura / Guía: FAC-88910
+        </p>
+      </div>
+      <div>
+        <button class="btn-secondary" onclick="resetDemo()">🔄 Reiniciar Demostración</button>
+      </div>
+    </div>
+
+    <!-- Navegación Guía de Opciones A, B, C, D, E -->
+    <div class="feature-nav">
+      <button class="feature-btn active" onclick="showFeature('all')">👁️ Vista Completa Integrada</button>
+      <button class="feature-btn" onclick="showFeature('op-a')">A. Selector con Control de Unidades</button>
+      <button class="feature-btn" onclick="showFeature('op-b')">B. Ficha de Saldo Pendiente</button>
+      <button class="feature-btn" onclick="showFeature('op-c')">C. Ajuste de Cantidad OC (Unidades)</button>
+      <button class="feature-btn" onclick="showFeature('op-d')">D. Historial Multi-Lote</button>
+      <button class="feature-btn" onclick="showFeature('op-e')">E. Estado Parcial vs Revisada</button>
+    </div>
+
+    <!-- Explicación de la Opción Seleccionada -->
+    <div class="highlight-box" id="feature-explanation">
+      <strong>🌟 Vista Completa:</strong> Aquí puedes probar cómo interactúan todas las opciones. Selecciona un artículo incompleto (ej. Paracetamol), observa cómo muestra el saldo pendiente (500 de 1.000), ajusta la cantidad de la OC con el lápiz ✏️ o ingresa un nuevo lote para completar la entrega.
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- OPCIÓN D: PANEL DE HISTORIAL MULTI-LOTE DE ESTA OC -->
+    <!-- ========================================================================= -->
+    <div class="glass-card" id="section-history" style="padding: 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.1rem;">📋</span>
+          <h3 style="font-size: 1rem; font-weight: 800;">Historial de Artículos Revisados en esta OC</h3>
+          <span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;" id="summary-badge">
+            1 de 3 artículos completos (2 parciales / pendientes)
+          </span>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto; border: 1px solid var(--card-border); border-radius: 8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>CÓDIGO Y DESCRIPCIÓN</th>
+              <th>VENCIMIENTO</th>
+              <th>LOTE</th>
+              <th>DOCUMENTO</th>
+              <th>REGISTRO ISP</th>
+              <th style="text-align: right;">CANTIDAD</th>
+              <th style="text-align: center;">CARTA DE CANJE</th>
+              <th>FECHA REVISIÓN</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <!-- Filas dinámicas generadas por JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- FORMULARIO DE INGRESO: OPCIONES A, B, C -->
+    <!-- ========================================================================= -->
+    <div class="glass-card" id="section-form">
+      <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+        <span>➕</span> Ingreso de Revisión a Bodega
+      </h3>
+
+      <!-- Fila 1: Documento -->
+      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px dashed var(--card-border);">
+        <div>
+          <label class="label-title">Documento</label>
+          <select class="input-field">
+            <option>Factura</option>
+            <option>Guía de Despacho</option>
+          </select>
+        </div>
+        <div>
+          <label class="label-title">Nº de Documento</label>
+          <input class="input-field" value="FAC-88910" readonly style="background: rgba(255,255,255,0.02);" />
+        </div>
+      </div>
+
+      <!-- ===================================================== -->
+      <!-- OPCIÓN A & B: SELECTOR INTELIGENTE Y FICHA DE SALDO -->
+      <!-- ===================================================== -->
+      <div style="background: var(--subcard-surface); border: 1px solid var(--card-border); border-radius: 12px; padding: 18px; margin-bottom: 20px;" id="box-selector">
+        <label class="label-title" style="color: var(--text-main); display: flex; justify-content: space-between; align-items: center;">
+          <span>Seleccionar Artículo de la OC</span>
+          <span style="color: #60a5fa; font-size: 0.75rem; font-weight: 700;">
+            ✓ Muestra unidades en OC, ya revisadas y saldo pendiente
+          </span>
+        </label>
+        
+        <!-- Dropdown con cantidades -->
+        <select id="select-articulo" class="input-field" onchange="onArticleChange()" style="font-weight: 700; color: #3b82f6; font-size: 0.95rem;">
+          <!-- Opciones dinámicas -->
+        </select>
+
+        <!-- FICHA INFORMATIVA DE SALDO (OPCIÓN B) -->
+        <div class="balance-card" id="balance-info-box">
+          <div class="balance-metrics">
+            <div class="metric-box">
+              <span class="metric-label">📦 Total en OC</span>
+              <span class="metric-val" id="val-oc" style="color: #cbd5e1;">1.000 uds</span>
+            </div>
+            <div class="metric-box">
+              <span class="metric-label">🕒 Ya Revisado</span>
+              <span class="metric-val" id="val-reviewed" style="color: #10b981;">500 uds</span>
+            </div>
+            <div class="metric-box">
+              <span class="metric-label">⏳ Saldo Pendiente</span>
+              <span class="metric-val" id="val-pending" style="color: #f59e0b;">500 uds</span>
+            </div>
+          </div>
+
+          <!-- BOTÓN MODIFICAR CANTIDAD OC (OPCIÓN C) -->
+          <div>
+            <button type="button" class="btn-secondary" onclick="openEditOcModal()" style="border-color: rgba(59, 130, 246, 0.4); color: #60a5fa;" title="Cambiar unidades de medida o corregir cantidad en la OC">
+              ✏️ Modificar Cantidad OC
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fila 3: Datos de Trazabilidad -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 18px;">
+        <div>
+          <label class="label-title">Lote</label>
+          <input type="text" id="input-lote" class="input-field" placeholder="Ej. LOTE-2026-B" value="LOTE-884-PARCIAL" />
+        </div>
+        <div>
+          <label class="label-title">F. Vencimiento</label>
+          <input type="date" id="input-venc" class="input-field" value="2028-11-30" />
+        </div>
+        <div>
+          <label class="label-title">Registro ISP</label>
+          <input type="text" id="input-isp" class="input-field" value="F-18920" />
+        </div>
+        <div>
+          <label class="label-title">Cantidad a Ingresar</label>
+          <input type="number" id="input-cantidad" class="input-field" value="500" style="font-weight: 800; color: #10b981;" />
+        </div>
+      </div>
+
+      <!-- Fila 4: Precios y Carta de Canje -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 22px; align-items: end;">
+        <div>
+          <label class="label-title">P. Unitario Sin IVA ($)</label>
+          <input type="number" id="input-precio" class="input-field" value="1200" />
+        </div>
+        <div>
+          <label class="label-title">Condición Especial</label>
+          <label style="display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; padding: 10px 14px; height: 42px; cursor: pointer;">
+            <span style="font-size: 0.85rem; font-weight: 600;">Carta de Canje</span>
+            <input type="checkbox" id="input-canje" style="width: 18px; height: 18px; accent-color: #3b82f6;" />
+          </label>
+        </div>
+        <div>
+          <button class="btn-primary" style="width: 100%; height: 42px;" onclick="addRevisionItem()">
+            ➕ Ingresar Lote a la Revisión
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- OPCIÓN C: MODAL DE MODIFICACIÓN DE CANTIDAD EN LA OC (UNIDADES DE MEDIDA) -->
+  <!-- ========================================================================= -->
+  <div class="modal-overlay" id="edit-oc-modal">
+    <div class="modal-box">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div>
+          <h3 style="font-size: 1.2rem; font-weight: 800;">Modificar Cantidad en la OC</h3>
+          <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 4px;" id="modal-art-name">
+            (345) PARACETAMOL 500 MG COMPRIMIDOS
+          </p>
+        </div>
+        <button onclick="closeEditOcModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem;">✕</button>
+      </div>
+
+      <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 14px; margin-bottom: 18px; font-size: 0.85rem; line-height: 1.4; color: #fcd34d;">
+        💡 <strong>Uso frecuente:</strong> Utilice este ajuste si la orden de compra venía en una unidad de medida diferente (ej. cajas de 10) y necesita convertirla a unidades individuales (ej. 1.000 comprimidos), o si la cantidad en la OC fue corregida por el proveedor.
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label class="label-title">Nueva Cantidad Total en la OC (Unidades)</label>
+        <input type="number" id="modal-new-qty" class="input-field" style="font-size: 1.1rem; font-weight: 800; color: #3b82f6;" />
+        <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">
+          Actualmente ya se han revisado <strong id="modal-already-rev">500</strong> unidades. El nuevo saldo pendiente será recalculado automáticamente.
+        </span>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn-secondary" onclick="closeEditOcModal()">Cancelar</button>
+        <button class="btn-primary" onclick="saveOcQtyChange()">Guardar y Actualizar Saldo</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Estado de la demostración
+    const ocArticulos = [
+      { codigo: '345', nombre: 'PARACETAMOL 500 MG COMPRIMIDOS', cantidadOc: 1000 },
+      { codigo: '1004', nombre: 'AMOXICILINA 500 MG CAPSULAS', cantidadOc: 600 },
+      { codigo: '888', nombre: 'IBUPROFENO 400 MG COMPRIMIDOS', cantidadOc: 300 }
+    ];
+
+    let revisiones = [
+      { codigo: '345', nombre: 'PARACETAMOL 500 MG COMPRIMIDOS', vencimiento: '2027-10-15', lote: 'LOTE-PARA-01', documento: 'Factura FAC-88910', isp: 'F-18920', cantidad: 500, carta_canje: 'NO', fecha: '15/08/2026 a las 18:30' },
+      { codigo: '888', nombre: 'IBUPROFENO 400 MG COMPRIMIDOS', vencimiento: '2028-05-20', lote: 'LOTE-IBU-99', documento: 'Factura FAC-88910', isp: 'F-22100', cantidad: 300, carta_canje: 'SI', fecha: '15/08/2026 a las 18:45' }
+    ];
+
+    let selectedCodigo = '345';
+
+    function init() {
+      renderHistory();
+      populateSelect();
+      updateBalanceBox();
+      updateOcStatus();
+    }
+
+    function getRevisadoTotal(codigo) {
+      return revisiones.filter(r => r.codigo === codigo).reduce((acc, curr) => acc + curr.cantidad, 0);
+    }
+
+    function renderHistory() {
+      const tbody = document.getElementById('history-table-body');
+      tbody.innerHTML = '';
+      revisiones.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.style.background = 'rgba(16, 185, 129, 0.02)';
+        tr.innerHTML = `
+          <td><strong>(${r.codigo})</strong> ${r.nombre}</td>
+          <td><span style="color: #f59e0b; font-weight: 600;">${r.vencimiento}</span></td>
+          <td><strong>${r.lote}</strong></td>
+          <td><span style="color: #3b82f6; font-weight: 700;">${r.documento}</span></td>
+          <td>${r.isp}</td>
+          <td style="text-align: right; font-weight: 800; color: #10b981;">${r.cantidad.toLocaleString('es-CL')}</td>
+          <td style="text-align: center;"><span style="font-weight: 700; color: ${r.carta_canje === 'SI' ? '#3b82f6' : 'var(--text-muted)'}; background: ${r.carta_canje === 'SI' ? 'rgba(59, 130, 246, 0.12)' : 'transparent'}; padding: 2px 6px; border-radius: 4px;">${r.carta_canje}</span></td>
+          <td style="font-size: 0.78rem; color: var(--text-muted);">${r.fecha}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function populateSelect() {
+      const select = document.getElementById('select-articulo');
+      select.innerHTML = '';
+
+      let hayDisponibles = false;
+      ocArticulos.forEach(art => {
+        const revisado = getRevisadoTotal(art.codigo);
+        const pendiente = Math.max(0, art.cantidadOc - revisado);
+
+        // Si aún tiene pendiente, o si es el seleccionado
+        if (pendiente > 0) {
+          hayDisponibles = true;
+          const opt = document.createElement('option');
+          opt.value = art.codigo;
+          opt.selected = (art.codigo === selectedCodigo);
+          opt.innerHTML = `(${art.codigo}) ${art.nombre} — [Pendiente: ${pendiente.toLocaleString('es-CL')} uds / Total OC: ${art.cantidadOc.toLocaleString('es-CL')} uds]`;
+          select.appendChild(opt);
+        }
+      });
+
+      if (!hayDisponibles) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.innerText = '✓ Todos los artículos de la OC están 100% revisados';
+        select.appendChild(opt);
+        document.getElementById('balance-info-box').style.display = 'none';
+      } else {
+        document.getElementById('balance-info-box').style.display = 'flex';
+      }
+    }
+
+    function onArticleChange() {
+      selectedCodigo = document.getElementById('select-articulo').value;
+      updateBalanceBox();
+    }
+
+    function updateBalanceBox() {
+      const art = ocArticulos.find(a => a.codigo === selectedCodigo);
+      if (!art) return;
+
+      const revisado = getRevisadoTotal(art.codigo);
+      const pendiente = Math.max(0, art.cantidadOc - revisado);
+
+      document.getElementById('val-oc').innerText = `${art.cantidadOc.toLocaleString('es-CL')} uds`;
+      document.getElementById('val-reviewed').innerText = `${revisado.toLocaleString('es-CL')} uds`;
+      document.getElementById('val-pending').innerText = `${pendiente.toLocaleString('es-CL')} uds`;
+      document.getElementById('input-cantidad').value = pendiente;
+    }
+
+    function updateOcStatus() {
+      let todosCompletos = true;
+      let totalCompletados = 0;
+
+      ocArticulos.forEach(art => {
+        const revisado = getRevisadoTotal(art.codigo);
+        if (revisado >= art.cantidadOc) {
+          totalCompletados++;
+        } else {
+          todosCompletos = false;
+        }
+      });
+
+      const badge = document.getElementById('oc-status-badge');
+      const sumBadge = document.getElementById('summary-badge');
+
+      if (todosCompletos) {
+        badge.innerHTML = '✓ Revisada 100%';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.color = '#10b981';
+        badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+
+        sumBadge.innerText = `✓ Todos los ${ocArticulos.length} artículos están 100% revisados`;
+        sumBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+        sumBadge.style.color = '#10b981';
+      } else {
+        badge.innerHTML = '⏳ Revisión Parcial';
+        badge.style.background = 'rgba(245, 158, 11, 0.15)';
+        badge.style.color = '#f59e0b';
+        badge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+
+        sumBadge.innerText = `${totalCompletados} de ${ocArticulos.length} artículos completos (${ocArticulos.length - totalCompletados} pendientes)`;
+        sumBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+        sumBadge.style.color = '#f59e0b';
+      }
+    }
+
+    // Modal Edit OC
+    function openEditOcModal() {
+      const art = ocArticulos.find(a => a.codigo === selectedCodigo);
+      if (!art) return;
+
+      document.getElementById('modal-art-name').innerText = `(${art.codigo}) ${art.nombre}`;
+      document.getElementById('modal-new-qty').value = art.cantidadOc;
+      document.getElementById('modal-already-rev').innerText = `${getRevisadoTotal(art.codigo)} uds`;
+      document.getElementById('edit-oc-modal').classList.add('active');
+    }
+
+    function closeEditOcModal() {
+      document.getElementById('edit-oc-modal').classList.remove('active');
+    }
+
+    function saveOcQtyChange() {
+      const newQty = parseInt(document.getElementById('modal-new-qty').value);
+      if (isNaN(newQty) || newQty <= 0) {
+        alert('Por favor ingrese una cantidad válida mayor a 0');
+        return;
+      }
+
+      const art = ocArticulos.find(a => a.codigo === selectedCodigo);
+      if (art) {
+        art.cantidadOc = newQty;
+      }
+
+      closeEditOcModal();
+      populateSelect();
+      updateBalanceBox();
+      updateOcStatus();
+      alert(`✓ Cantidad en la OC actualizada a ${newQty.toLocaleString('es-CL')} unidades.`);
+    }
+
+    // Ingresar Item
+    function addRevisionItem() {
+      const art = ocArticulos.find(a => a.codigo === selectedCodigo);
+      if (!art) {
+        alert('Seleccione un artículo.');
+        return;
+      }
+
+      const cantidad = parseInt(document.getElementById('input-cantidad').value);
+      if (isNaN(cantidad) || cantidad <= 0) {
+        alert('Ingrese una cantidad válida.');
+        return;
+      }
+
+      const lote = document.getElementById('input-lote').value;
+      const venc = document.getElementById('input-venc').value;
+      const isp = document.getElementById('input-isp').value;
+      const canje = document.getElementById('input-canje').checked ? 'SI' : 'NO';
+
+      revisiones.push({
+        codigo: art.codigo,
+        nombre: art.nombre,
+        vencimiento: venc,
+        lote: lote,
+        documento: 'Factura FAC-88910',
+        isp: isp,
+        cantidad: cantidad,
+        carta_canje: canje,
+        fecha: new Date().toLocaleDateString('es-CL') + ' a las ' + new Date().toLocaleTimeString().substring(0,5)
+      });
+
+      renderHistory();
+      populateSelect();
+      updateBalanceBox();
+      updateOcStatus();
+    }
+
+    function resetDemo() {
+      ocArticulos[0].cantidadOc = 1000;
+      ocArticulos[1].cantidadOc = 600;
+      ocArticulos[2].cantidadOc = 300;
+
+      revisiones = [
+        { codigo: '345', nombre: 'PARACETAMOL 500 MG COMPRIMIDOS', vencimiento: '2027-10-15', lote: 'LOTE-PARA-01', documento: 'Factura FAC-88910', isp: 'F-18920', cantidad: 500, carta_canje: 'NO', fecha: '15/08/2026 a las 18:30' },
+        { codigo: '888', nombre: 'IBUPROFENO 400 MG COMPRIMIDOS', vencimiento: '2028-05-20', lote: 'LOTE-IBU-99', documento: 'Factura FAC-88910', isp: 'F-22100', cantidad: 300, carta_canje: 'SI', fecha: '15/08/2026 a las 18:45' }
+      ];
+
+      selectedCodigo = '345';
+      init();
+    }
+
+    // Guía explicativa
+    function showFeature(feat) {
+      document.querySelectorAll('.feature-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const exp = document.getElementById('feature-explanation');
+      if (feat === 'all') {
+        exp.innerHTML = `<strong>🌟 Vista Completa:</strong> Aquí puedes probar cómo interactúan todas las opciones. Selecciona un artículo incompleto (ej. Paracetamol), observa cómo muestra el saldo pendiente (500 de 1.000), ajusta la cantidad de la OC con el lápiz ✏️ o ingresa un nuevo lote para completar la entrega.`;
+      } else if (feat === 'op-a') {
+        exp.innerHTML = `<strong>🅰️ Opción A - Selector Inteligente:</strong> Despliega el menú de artículos. Observa cómo cada opción muestra de forma clara: <code>(Código) Nombre — [Pendiente: X uds / Total OC: Y uds]</code>. Si un artículo aún no se completa, sigue apareciendo en el menú.`;
+      } else if (feat === 'op-b') {
+        exp.innerHTML = `<strong>🅱️ Opción B - Ficha de Saldo Pendiente:</strong> Al seleccionar cualquier artículo, se despliega la tarjeta resumen con 3 métricas en tiempo real: <strong>📦 Total en OC</strong>, <strong>🕒 Ya Revisado</strong> y <strong>⏳ Saldo Pendiente</strong>.`;
+      } else if (feat === 'op-c') {
+        exp.innerHTML = `<strong>🅲 Opción C - Modificar Cantidad en la OC:</strong> Haz clic en el botón <code>✏️ Modificar Cantidad OC</code>. Te permite corregir la cantidad base (ej. transformar 10 cajas en 1.000 comprimidos). Al guardar, se recalcula inmediatamente el saldo pendiente.`;
+      } else if (feat === 'op-d') {
+        exp.innerHTML = `<strong>🅳 Opción D - Historial Multi-Lote:</strong> Mira la tabla superior. Si un artículo se entrega en varios lotes o fechas, cada ingreso se registra en su propia fila con lote, vencimiento, cantidad y carta de canje (SI/NO).`;
+      } else if (feat === 'op-e') {
+        exp.innerHTML = `<strong>🅴 Opción E - Estado Parcial vs Revisada:</strong> Mira la insignia superior de la OC. Mientras queden unidades pendientes, la OC se mantiene en <code>⏳ Revisión Parcial</code>. Si completas los 500 restantes de Paracetamol y los 600 de Amoxicilina, la OC cambiará automáticamente a <code>✓ Revisada 100%</code>.`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
