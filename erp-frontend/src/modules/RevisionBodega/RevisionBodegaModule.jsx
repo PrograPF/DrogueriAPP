@@ -29,8 +29,7 @@ const RevisionBodegaModule = () => {
     isp: '',
     cantidad: '',
     carta_canje: false,
-    valor_sin_iva: '',
-    valor_con_iva: ''
+    valor_sin_iva: ''
   });
 
   // OCs y selección
@@ -106,11 +105,24 @@ const RevisionBodegaModule = () => {
     }
   };
 
-  // Seleccionar una OC y cargar todos sus artículos para referencia
+  // Seleccionar una OC y cargar solo sus artículos recepcionados
   const seleccionarOc = async (oc) => {
     setOcSeleccionada(oc);
+    setItems([]);
+    setForm({
+      tipo_documento: 'Factura',
+      numero_documento: '',
+      codigo: '',
+      lote: '',
+      vencimiento: '',
+      isp: '',
+      cantidad: '',
+      carta_canje: false,
+      valor_sin_iva: ''
+    });
 
-    const arts = oc.ordenes_compra_articulos || [];
+    // Filtrar estrictamente los artículos con estado 'Recepcionado'
+    const arts = (oc.ordenes_compra_articulos || []).filter(a => a.estado_recepcion === 'Recepcionado');
     if (arts.length === 0) {
       setArticulosOc([]);
       return;
@@ -138,39 +150,11 @@ const RevisionBodegaModule = () => {
       }));
 
       setArticulosOc(combinados);
-
-      if (combinados.length > 0) {
-        setForm(prev => ({
-          ...prev,
-          codigo: combinados[0].codigo_articulo,
-          cantidad: combinados[0].cantidad || ''
-        }));
-      }
+      // El formulario inicia completamente vacío
     } catch (err) {
       console.error('Error al obtener artículos de la OC:', err);
       alert('Error al cargar artículos de la OC: ' + err.message);
     }
-  };
-
-  // Cálculo recíproco de IVA
-  const handleValorSinIvaChange = (val) => {
-    const vSin = parseFloat(val);
-    if (isNaN(vSin)) {
-      setForm(prev => ({ ...prev, valor_sin_iva: val, valor_con_iva: '' }));
-      return;
-    }
-    const vCon = Math.round(vSin * 1.19);
-    setForm(prev => ({ ...prev, valor_sin_iva: val, valor_con_iva: String(vCon) }));
-  };
-
-  const handleValorConIvaChange = (val) => {
-    const vCon = parseFloat(val);
-    if (isNaN(vCon)) {
-      setForm(prev => ({ ...prev, valor_con_iva: val, valor_sin_iva: '' }));
-      return;
-    }
-    const vSin = Math.round((vCon / 1.19) * 100) / 100;
-    setForm(prev => ({ ...prev, valor_con_iva: val, valor_sin_iva: String(vSin) }));
   };
 
   // Cargar OCs al iniciar
@@ -265,14 +249,45 @@ const RevisionBodegaModule = () => {
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handleAddItem = () => {
-    if (!form.codigo || !form.cantidad || parseInt(form.cantidad) <= 0) {
-      alert("Por favor ingrese al menos el Código y una Cantidad válida.");
+  const handleAddItem = (e) => {
+    if (e) e.preventDefault();
+
+    if (!form.tipo_documento?.trim()) {
+      alert("Por favor seleccione el Tipo de Documento.");
       return;
     }
-
+    if (!form.numero_documento?.trim()) {
+      alert("Por favor ingrese el Nº de Documento.");
+      return;
+    }
+    if (!form.codigo?.trim()) {
+      alert("Por favor seleccione un Artículo de la lista de recepcionados.");
+      return;
+    }
+    if (!form.lote?.trim()) {
+      alert("Por favor ingrese el Lote.");
+      return;
+    }
     if (!form.vencimiento) {
-      alert("Por favor ingrese la fecha de vencimiento.");
+      alert("Por favor ingrese la Fecha de Vencimiento.");
+      return;
+    }
+    if (!form.isp?.trim()) {
+      alert("Por favor ingrese el Registro ISP.");
+      return;
+    }
+    const cantidad = parseInt(form.cantidad);
+    if (isNaN(cantidad) || cantidad <= 0) {
+      alert("Por favor ingrese una Cantidad válida mayor a 0.");
+      return;
+    }
+    if (form.valor_sin_iva === '' || form.valor_sin_iva === null || form.valor_sin_iva === undefined) {
+      alert("Por favor ingrese el Precio Unitario Sin IVA ($). Puede ser 0 o superior.");
+      return;
+    }
+    const valorSinIva = parseFloat(form.valor_sin_iva);
+    if (isNaN(valorSinIva) || valorSinIva < 0) {
+      alert("El Precio Unitario Sin IVA debe ser un número mayor o igual a 0.");
       return;
     }
 
@@ -284,24 +299,22 @@ const RevisionBodegaModule = () => {
     const totalMeses = añosDiff * 12 + mesesDiff;
 
     if (totalMeses <= 14 && !form.carta_canje) {
-      alert("este articulo debe tener carta de canje");
+      alert("Este artículo debe tener Carta de Canje (vencimiento igual o menor a 14 meses).");
       return;
     }
 
-    const valorSinIva = parseFloat(form.valor_sin_iva) || 0;
-    const valorConIva = parseFloat(form.valor_con_iva) || 0;
-    const cantidad = parseInt(form.cantidad) || 0;
+    const valorConIva = Math.round(valorSinIva * 1.19);
 
     const newItem = {
       id: Date.now().toString(),
       codigo: form.codigo,
       nombre: articulosCatalog[form.codigo] || nombreArticulo || 'Desconocido',
-      lote: form.lote || 'S/L',
+      lote: form.lote.trim(),
       vencimiento: form.vencimiento,
-      isp: form.isp || 'S/I',
+      isp: form.isp.trim(),
       cantidad: cantidad,
       tipo_documento: form.tipo_documento,
-      numero_documento: form.numero_documento || 'S/D',
+      numero_documento: form.numero_documento.trim(),
       carta_canje: form.carta_canje ? 'SI' : 'NO',
       valor_sin_iva: valorSinIva,
       valor_con_iva: valorConIva,
@@ -311,20 +324,16 @@ const RevisionBodegaModule = () => {
 
     setItems(prev => [...prev, newItem]);
     
-    // Calcular el siguiente código disponible de la OC que no esté en items
-    const disponibles = articulosOc.filter(art => art.codigo_articulo !== form.codigo && !items.some(item => item.codigo === art.codigo_articulo));
-    const siguienteCodigo = disponibles[0]?.codigo_articulo || '';
-
+    // Limpiar completamente el formulario de artículo para agregar otro desde cero
     setForm(prev => ({ 
       ...prev, 
-      codigo: siguienteCodigo, 
+      codigo: '', 
       lote: '', 
       vencimiento: '', 
       isp: '', 
       cantidad: '',
       carta_canje: false,
-      valor_sin_iva: '',
-      valor_con_iva: ''
+      valor_sin_iva: ''
     }));
   };
   const handleRemoveItem = (id) => {
@@ -684,180 +693,234 @@ const RevisionBodegaModule = () => {
             </div>
           ) : (
             <>
-              <div className="glass-card" style={{ padding: '30px', marginBottom: '30px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div>
-                    <span style={{ fontSize: '0.8rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase' }}>Orden de Compra seleccionada</span>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc', margin: '4px 0 0 0' }}>
-                      {ocSeleccionada.numero_oc} <span style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: '400' }}>({ocSeleccionada.proveedor})</span>
+              <div className="glass-card" style={{ padding: '24px', marginBottom: '25px' }}>
+                {/* Header Banner de la OC */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' }}>
+                      OC EN REVISIÓN
+                    </span>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
+                      {ocSeleccionada.numero_oc}
                     </h3>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      • Proveedor: {ocSeleccionada.proveedor}
+                    </span>
                   </div>
                   <button 
                     onClick={() => { setOcSeleccionada(null); setArticulosOc([]); setItems([]); }} 
                     className="btn-secondary" 
-                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
                   >
                     Cambiar OC
                   </button>
                 </div>
 
-                <div className="responsive-grid-auto" style={{ alignItems: 'end', marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                {/* Fila 1: Documento de Recepción */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '16px', paddingBottom: '18px', borderBottom: '1px dashed var(--border-color)', marginBottom: '18px' }}>
                   <div>
                     <label style={labelStyle}>Documento</label>
-                    <select name="tipo_documento" value={form.tipo_documento} onChange={handleInputChange} className="input-field">
+                    <select name="tipo_documento" value={form.tipo_documento} onChange={handleInputChange} className="input-field" style={{ width: '100%' }}>
                       <option value="Factura">Factura</option>
                       <option value="Guía de Despacho">Guía de Despacho</option>
                       <option value="Otro">Otro</option>
                     </select>
                   </div>
-                  <div style={{ gridColumn: 'span 2' }}>
+                  <div>
                     <label style={labelStyle}>Nº de Documento</label>
-                    <input name="numero_documento" value={form.numero_documento} onChange={handleInputChange} className="input-field" placeholder="Escriba el número..." />
+                    <input 
+                      name="numero_documento" 
+                      value={form.numero_documento} 
+                      onChange={handleInputChange} 
+                      className="input-field" 
+                      placeholder="Escriba el número de factura o guía..." 
+                    />
                   </div>
                 </div>
 
-                <div className="responsive-grid-auto" style={{ alignItems: 'end', gap: '15px 20px' }}>
-                  <div>
-                    <label style={labelStyle}>Código Artículo</label>
-                    <select 
-                      name="codigo" 
-                      value={form.codigo} 
-                      onChange={handleInputChange} 
-                      className="input-field"
-                    >
-                      {articulosOc
-                        .filter(art => !items.some(item => item.codigo === art.codigo_articulo))
-                        .map(art => (
-                          <option key={art.id} value={art.codigo_articulo}>
-                            {art.codigo_articulo}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={labelStyle}>Descripción (Auto)</label>
-                    <div style={{ 
-                      padding: '12px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', 
-                      color: form.codigo ? '#3b82f6' : '#64748b', fontWeight: '600',
-                      border: '1px dashed var(--border-color)', minHeight: '45px', display: 'flex', alignItems: 'center'
-                    }}>
-                      {nombreArticulo}
-                    </div>
-                  </div>
+                {/* Fila 2: Selector Unificado de Artículo Recepcionado */}
+                <div style={{ background: 'var(--btn-secondary-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', marginBottom: '18px' }}>
+                  <label style={{ ...labelStyle, color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Seleccionar Artículo Recepcionado</span>
+                    <span style={{ color: '#10b981', fontSize: '0.75rem', textTransform: 'none', fontWeight: '600' }}>
+                      ✓ Solo artículos con estado 'Recepcionado' ({articulosOc.length})
+                    </span>
+                  </label>
+                  <select 
+                    name="codigo" 
+                    value={form.codigo} 
+                    onChange={handleInputChange} 
+                    className="input-field"
+                    style={{ fontWeight: '700', fontSize: '0.95rem', color: form.codigo ? '#3b82f6' : 'var(--text-secondary)' }}
+                  >
+                    <option value="">-- Seleccione un artículo recepcionado --</option>
+                    {articulosOc
+                      .filter(art => !items.some(item => item.codigo === art.codigo_articulo))
+                      .map(art => (
+                        <option key={art.id} value={art.codigo_articulo}>
+                          ({art.codigo_articulo}) {art.descripcion}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* Fila 3: Trazabilidad y Cantidad (4 columnas fluidas) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                   <div>
                     <label style={labelStyle}>Lote</label>
-                    <input name="lote" value={form.lote} onChange={handleInputChange} className="input-field" placeholder="Lote..." />
+                    <input 
+                      name="lote" 
+                      value={form.lote} 
+                      onChange={handleInputChange} 
+                      className="input-field" 
+                      placeholder="Lote..." 
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>F. Vencimiento</label>
-                    <input type="date" name="vencimiento" value={form.vencimiento} onChange={handleInputChange} className="input-field" />
+                    <input 
+                      type="date" 
+                      name="vencimiento" 
+                      value={form.vencimiento} 
+                      onChange={handleInputChange} 
+                      className="input-field" 
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Registro ISP</label>
-                    <input name="isp" value={form.isp} onChange={handleInputChange} className="input-field" placeholder="ISP..." />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Cantidad</label>
-                    <input type="number" name="cantidad" value={form.cantidad} onChange={handleInputChange} className="input-field" placeholder="0" />
-                  </div>
-
-                  {/* Campos nuevos */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '45px' }}>
                     <input 
-                      type="checkbox" 
-                      name="carta_canje" 
-                      id="carta_canje"
-                      checked={form.carta_canje} 
+                      name="isp" 
+                      value={form.isp} 
                       onChange={handleInputChange} 
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                      className="input-field" 
+                      placeholder="Registro ISP..." 
                     />
-                    <label htmlFor="carta_canje" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer', userSelect: 'none' }}>
-                      Carta de Canje
-                    </label>
                   </div>
                   <div>
-                    <label style={labelStyle}>P. Unitario S/IVA ($)</label>
+                    <label style={labelStyle}>Cantidad a Ingresar</label>
                     <input 
                       type="number" 
-                      step="0.01"
-                      name="valor_sin_iva" 
-                      value={form.valor_sin_iva} 
-                      onChange={(e) => handleValorSinIvaChange(e.target.value)} 
+                      name="cantidad" 
+                      value={form.cantidad} 
+                      onChange={handleInputChange} 
                       className="input-field" 
-                      placeholder="0"
+                      placeholder="0" 
+                      style={{ fontWeight: '700' }}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>P. Unitario C/IVA ($)</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      name="valor_con_iva" 
-                      value={form.valor_con_iva} 
-                      onChange={(e) => handleValorConIvaChange(e.target.value)} 
-                      className="input-field" 
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <button onClick={handleAddItem} className="btn-primary" style={{ width: '100%', padding: '12px', background: '#3b82f6' }}>
-                      <Plus size={20} /> Añadir
-                    </button>
                   </div>
                 </div>
+
+                {/* Fila 4: Precios y Carta de Canje */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end', marginBottom: '22px' }}>
+                  <div>
+                    <label style={labelStyle}>P. Unitario Sin IVA ($)</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      name="valor_sin_iva" 
+                      value={form.valor_sin_iva} 
+                      onChange={handleInputChange} 
+                      className="input-field" 
+                      placeholder="0" 
+                      style={{ fontWeight: '700' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Condición Especial</label>
+                    <label style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      background: 'var(--input-bg)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '8px', 
+                      padding: '9px 14px', 
+                      height: '42px', 
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>Carta de Canje</span>
+                      <input 
+                        type="checkbox" 
+                        name="carta_canje" 
+                        id="carta_canje"
+                        checked={form.carta_canje} 
+                        onChange={handleInputChange} 
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Botón de Añadir */}
+                <button 
+                  onClick={handleAddItem} 
+                  className="btn-primary" 
+                  style={{ width: '100%', padding: '14px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700', fontSize: '0.95rem' }}
+                >
+                  <Plus size={20} /> Añadir Artículo a la Revisión
+                </button>
               </div>
 
               {/* Tabla de Lista Actual */}
-              <div className="glass-card" style={{ overflow: 'hidden' }}>
-                <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
-                    Lista de Revisión Actual ({items.length} ítems)
-                  </h3>
+              <div className="glass-card" style={{ padding: '24px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
+                      Artículos Listos para Ingreso ({items.length})
+                    </h3>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      Total unidades: {items.reduce((acc, curr) => acc + curr.cantidad, 0)} uds.
+                    </span>
+                  </div>
                   {items.length > 0 && (
-                    <button onClick={handleFinalizar} className="btn-primary" style={{ background: '#10b981' }} disabled={loading}>
-                      {loading ? 'Procesando...' : <><Save size={18} /> Guardar y Cotejar</>}
+                    <button onClick={handleFinalizar} className="btn-primary" style={{ background: '#10b981', padding: '10px 20px', fontWeight: '700' }} disabled={loading}>
+                      {loading ? 'Procesando...' : <><Save size={18} /> Finalizar y Generar Informe</>}
                     </button>
                   )}
                 </div>
                 
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
                     <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                        <th style={thStyle}>CÓDIGO</th>
-                        <th style={thStyle}>DESCRIPCIÓN</th>
+                      <tr style={{ background: 'var(--btn-secondary-bg)' }}>
+                        <th style={thStyle}>CÓDIGO Y DESCRIPCIÓN</th>
                         <th style={thStyle}>LOTE / VENC.</th>
                         <th style={thStyle}>DOC. / ISP</th>
                         <th style={{ ...thStyle, textAlign: 'right' }}>CANTIDAD</th>
-                        <th style={{ ...thStyle, textAlign: 'center' }}>X</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>P. UNIT. S/IVA</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>TOTAL S/IVA</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>ACCIÓN</th>
                       </tr>
                     </thead>
                     <tbody>
                       <AnimatePresence>
                         {items.length === 0 ? (
                           <tr>
-                            <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                              No hay artículos agregados todavía.
+                            <td colSpan="7" style={{ padding: '35px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              No hay artículos añadidos a la revisión todavía.
                             </td>
                           </tr>
                         ) : (
                           items.map((item) => (
-                            <motion.tr key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                              <td style={tdStyle}><strong>{item.codigo}</strong></td>
-                              <td style={tdStyle}>{item.nombre}</td>
+                            <motion.tr key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} style={{ borderBottom: '1px solid var(--border-color)' }}>
                               <td style={tdStyle}>
-                                <div>{item.lote}</div>
+                                <strong>({item.codigo})</strong> {item.nombre}
+                              </td>
+                              <td style={tdStyle}>
+                                <div><strong>{item.lote}</strong></div>
                                 {item.vencimiento && <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Venc: {formatDate(item.vencimiento)}</div>}
                               </td>
                               <td style={tdStyle}>
                                 <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 'bold' }}>{item.tipo_documento} {item.numero_documento}</div>
-                                <div style={{ fontSize: '0.8rem' }}>ISP: {item.isp}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>ISP: {item.isp}</div>
                               </td>
                               <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800', color: '#10b981' }}>{item.cantidad}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right' }}>${(item.valor_sin_iva || 0).toLocaleString('es-CL')}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700' }}>${(item.total_sin_iva || 0).toLocaleString('es-CL')}</td>
                               <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                <button onClick={() => handleRemoveItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '5px' }}>
-                                  <Trash2 size={18} />
+                                <button onClick={() => handleRemoveItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '5px', fontWeight: '600', fontSize: '0.8rem' }}>
+                                  <Trash2 size={16} />
                                 </button>
                               </td>
                             </motion.tr>

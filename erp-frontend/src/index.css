@@ -20,6 +20,16 @@ select option {
   padding: 8px;
 }
 
+/* Ocultar flechitas de incremento/decremento en casillas numéricas */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 body.light-theme {
   --bg-main: #f8fafc;
   --bg-main-gradient: radial-gradient(circle at top right, #e2e8f0 0%, #f1f5f9 100%);
