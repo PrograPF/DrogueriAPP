@@ -41,43 +41,6 @@ const RevisionBodegaModule = () => {
 
   const nombreArticulo = useArsenalLookup(form.codigo);
 
-  // Auto-detectar lote, vencimiento e ISP desde la tabla 'articulos_variantes' en Supabase
-  useEffect(() => {
-    if (form.codigo) {
-      let isCurrent = true;
-
-      const timeoutId = setTimeout(async () => {
-        try {
-          const { data, error } = await supabase
-            .from('articulos_variantes')
-            .select('lote, vencimiento, isp')
-            .eq('codigo_articulo', form.codigo.trim())
-            .order('vencimiento', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-          if (!error && data && isCurrent) {
-            setForm(prev => ({
-              ...prev,
-              vencimiento: data.vencimiento || prev.vencimiento,
-              lote: prev.lote || data.lote || '',
-              isp: prev.isp || data.isp || ''
-            }));
-          }
-        } catch (err) {
-          if (isCurrent) {
-            console.error("Error auto-detectando lote/vencimiento/isp:", err);
-          }
-        }
-      }, 500);
-
-      return () => {
-        isCurrent = false;
-        clearTimeout(timeoutId);
-      };
-    }
-  }, [form.codigo]);
-
   // Cargar OCs disponibles para asociar a una revisión de bodega
   // Se muestran solo las OCs con recepción física iniciada o completada
   const cargarOcsDisponibles = async () => {
