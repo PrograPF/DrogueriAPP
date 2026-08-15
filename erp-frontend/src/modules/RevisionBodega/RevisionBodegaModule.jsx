@@ -982,7 +982,7 @@ const RevisionBodegaModule = () => {
                   <th style={thStyle} className="col-vencimiento">VENCIMIENTO</th>
                   <th style={thStyle} className="col-isp">REGISTRO ISP</th>
                   <th style={{ ...thStyle, textAlign: 'right' }} className="col-cantidad">CANTIDAD</th>
-                  <th style={thStyle} className="col-doc">TIPO DE DOCUMENTO</th>
+                  <th style={thStyle} className="col-doc">GD/FAC</th>
                   <th style={{ ...thStyle, textAlign: 'right' }} className="col-precio">PRECIO UNITARIO</th>
                 </tr>
               </thead>
@@ -1002,14 +1002,25 @@ const RevisionBodegaModule = () => {
               </tbody>
             </table>
 
-            <div className="print-only" style={{ display: 'none', marginTop: '25px', paddingTop: '15px', borderTop: '1px solid #000', fontSize: '9pt', pageBreakInside: 'avoid' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div style={{ textAlign: 'center', width: '250px' }}>
-                  <p style={{ margin: 0 }}><strong>_________________________________</strong></p>
-                  <p style={{ margin: '5px 0 0 0' }}>Firma y Timbre Responsable de Revisión</p>
+            <div className="print-only" style={{ display: 'none', marginTop: '20px', paddingTop: '12px', borderTop: '1px solid #000', fontSize: '9pt', pageBreakInside: 'avoid' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+                <p style={{ margin: 0, fontSize: '8pt' }}><strong>Fecha de Emisión:</strong> {formatDate(new Date())} {new Date().toLocaleTimeString()}</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'center' }}>
+                <div>
+                  <br />
+                  <p style={{ margin: 0 }}><strong>____________________________</strong></p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '8pt', fontWeight: '600' }}>Firma y Timbre</p>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ margin: 0 }}><strong>Fecha de Emisión:</strong> {formatDate(new Date())} {new Date().toLocaleTimeString()}</p>
+                <div>
+                  <br />
+                  <p style={{ margin: 0 }}><strong>____________________________</strong></p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '8pt', fontWeight: '600' }}>Firma y Timbre</p>
+                </div>
+                <div>
+                  <br />
+                  <p style={{ margin: 0 }}><strong>____________________________</strong></p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '8pt', fontWeight: '600' }}>Firma y Timbre</p>
                 </div>
               </div>
             </div>
