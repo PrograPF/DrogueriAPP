@@ -956,10 +956,10 @@ const InventarioModule = () => {
               {/* Formulario de Nueva Anotación */}
               <form onSubmit={handleAddComentarioLote} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8' }}>Tu Firma / Nombre:</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8' }}>Nombre</label>
                   <input
                     type="text"
-                    placeholder="Escribe tu nombre o iniciales (Ej: Juan P.)"
+                    placeholder=""
                     value={usuarioFirma}
                     onChange={(e) => {
                       setUsuarioFirma(e.target.value);
@@ -979,9 +979,9 @@ const InventarioModule = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8' }}>Comentario / Nota:</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8' }}>Comentario / Nota</label>
                   <textarea
-                    placeholder="Escribe una observación sobre este lote (ej. cuarentena, estado, ubicación, etc.)..."
+                    placeholder=""
                     value={nuevoComentario}
                     onChange={(e) => setNuevoComentario(e.target.value)}
                     rows={3}

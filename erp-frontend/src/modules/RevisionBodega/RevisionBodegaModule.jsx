@@ -18,6 +18,7 @@ const RevisionBodegaModule = () => {
   // Estado Historial
   const [historial, setHistorial] = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   // Estado del formulario actual
   const [form, setForm] = useState({
@@ -821,8 +822,8 @@ const RevisionBodegaModule = () => {
                   </div>
                 </div>
 
-                {/* Fila 4: Precios y Carta de Canje */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end', marginBottom: '22px' }}>
+                {/* Fila 4: Precios, Carta de Canje y Botón de Nota */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'end', marginBottom: '22px' }}>
                   <div>
                     <label style={labelStyle}>P. Unitario Sin IVA ($)</label>
                     <input 
@@ -861,29 +862,31 @@ const RevisionBodegaModule = () => {
                       />
                     </label>
                   </div>
-                </div>
-
-                {/* Fila 5: NOTA / OBSERVACIÓN y RESPONSABLE / AUTOR */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
                   <div>
-                    <label style={labelStyle}>NOTA / OBSERVACIÓN</label>
-                    <input 
-                      name="nota" 
-                      value={form.nota} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="Escriba una nota o comentario para este lote..." 
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>RESPONSABLE / AUTOR DE LA NOTA</label>
-                    <input 
-                      name="autor_nota" 
-                      value={form.autor_nota} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="Nombre o firma del funcionario..." 
-                    />
+                    <label style={labelStyle}>Bitácora / Anotación</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsNoteModalOpen(true)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        height: '42px',
+                        borderRadius: '8px',
+                        border: form.nota?.trim() ? '1px solid #a855f7' : '1px dashed var(--border-color)',
+                        background: form.nota?.trim() ? 'rgba(168, 85, 247, 0.15)' : 'var(--input-bg)',
+                        color: form.nota?.trim() ? '#c084fc' : 'var(--text-secondary)',
+                        fontWeight: '700',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <FileText size={16} />
+                      {form.nota?.trim() ? '✓ Nota Agregada (1)' : '+ Agregar Nota'}
+                    </button>
                   </div>
                 </div>
 
@@ -1157,6 +1160,126 @@ const RevisionBodegaModule = () => {
           `}</style>
         </motion.div>
       )}
+
+      {/* MODAL AGREGAR NOTA AL LOTE */}
+      <AnimatePresence>
+        {isNoteModalOpen && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '20px'
+            }}
+            onClick={() => setIsNoteModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                padding: '24px',
+                width: '100%',
+                maxWidth: '520px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}
+            >
+              {/* Encabezado */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                    Bitácora de Lote
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    {nombreArticulo || (form.codigo ? `Artículo ${form.codigo}` : 'Sin artículo seleccionado')}
+                  </p>
+                  {form.lote && (
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#a855f7', fontWeight: '700' }}>
+                      Lote: {form.lote} {form.vencimiento ? `• Vencimiento: ${formatDate(form.vencimiento)}` : ''}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsNoteModalOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    padding: '4px'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Formulario */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Nombre</label>
+                  <input
+                    type="text"
+                    placeholder=""
+                    value={form.autor_nota}
+                    onChange={(e) => {
+                      setForm(prev => ({ ...prev, autor_nota: e.target.value }));
+                      localStorage.setItem('firma_operador', e.target.value);
+                    }}
+                    className="input-field"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Comentario / Nota</label>
+                  <textarea
+                    placeholder=""
+                    value={form.nota}
+                    onChange={(e) => setForm(prev => ({ ...prev, nota: e.target.value }))}
+                    rows={4}
+                    className="input-field"
+                    style={{ width: '100%', resize: 'none', minHeight: '90px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsNoteModalOpen(false)}
+                    className="btn-secondary"
+                    style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsNoteModalOpen(false)}
+                    className="btn-primary"
+                    style={{ padding: '8px 20px', fontSize: '0.85rem', background: '#a855f7' }}
+                  >
+                    Guardar Nota
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
