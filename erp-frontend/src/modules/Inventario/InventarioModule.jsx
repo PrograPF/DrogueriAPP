@@ -38,13 +38,31 @@ const InventarioModule = () => {
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      // 1. Obtener catálogo de artículos
-      const { data: artsData, error: artsErr } = await supabase
-        .from('articulos')
-        .select('*')
-        .range(0, 9999)
-        .order('descripcion');
-      if (artsErr) throw artsErr;
+      // 1. Obtener catálogo completo de artículos mediante bloques paginados (supera el límite de 1000 de Supabase)
+      let allArts = [];
+      let from = 0;
+      const step = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: chunk, error: chunkErr } = await supabase
+          .from('articulos')
+          .select('*')
+          .range(from, from + step - 1)
+          .order('descripcion');
+
+        if (chunkErr) throw chunkErr;
+
+        if (chunk && chunk.length > 0) {
+          allArts = allArts.concat(chunk);
+          from += step;
+          if (chunk.length < step) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
       // 2. Obtener variantes de artículos (lotes/inventario físico)
       const { data: varData, error: varErr } = await supabase
@@ -78,7 +96,7 @@ const InventarioModule = () => {
         .order('created_at', { ascending: true });
       if (comErr) throw comErr;
 
-      setArticulos(artsData || []);
+      setArticulos(allArts || []);
       setVariantes(varData || []);
       setRevisiones(revData || []);
       setOrdenesCompra(ocData || []);
@@ -247,25 +265,48 @@ const InventarioModule = () => {
   // --- FILTROS ---
 
   // Filtrar artículos para la pestaña 1 (Stock)
-  const filteredArticulos = articulos.filter(art => {
-    const q = stockSearchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      art.codigo?.toLowerCase().includes(q) || 
-      art.descripcion?.toLowerCase().includes(q)
-    );
-  }).map(art => {
-    const code = art.codigo?.trim();
-    const items = variantesPorArticulo[code] || [];
-    const stockTotal = items.reduce((acc, curr) => acc + (curr.cantidad || 0), 0);
-    const categoriaNombre = art.categoria_id ? (categoriasMap[art.categoria_id] || 'Sin Categoría') : 'Sin Categoría';
-    return {
-      ...art,
-      categoriaNombre,
-      variantes: items,
-      stockTotal
-    };
-  });
+  const qStock = stockSearchQuery.toLowerCase().trim();
+  const filteredArticulos = articulos
+    .filter(art => {
+      if (!qStock) return true;
+      return (
+        art.codigo?.toLowerCase().includes(qStock) || 
+        art.descripcion?.toLowerCase().includes(qStock)
+      );
+    })
+    .map(art => {
+      const code = art.codigo?.trim();
+      const items = variantesPorArticulo[code] || [];
+      const stockTotal = items.reduce((acc, curr) => acc + (curr.cantidad || 0), 0);
+      const categoriaNombre = art.categoria_id ? (categoriasMap[art.categoria_id] || 'Sin Categoría') : 'Sin Categoría';
+      return {
+        ...art,
+        categoriaNombre,
+        variantes: items,
+        stockTotal
+      };
+    })
+    .sort((a, b) => {
+      if (!qStock) return 0;
+      const codeA = (a.codigo || '').toLowerCase().trim();
+      const codeB = (b.codigo || '').toLowerCase().trim();
+      const descA = (a.descripcion || '').toLowerCase().trim();
+      const descB = (b.descripcion || '').toLowerCase().trim();
+
+      // 1. Coincidencia exacta de código tiene prioridad máxima
+      if (codeA === qStock && codeB !== qStock) return -1;
+      if (codeB === qStock && codeA !== qStock) return 1;
+
+      // 2. Código que comienza con la búsqueda
+      if (codeA.startsWith(qStock) && !codeB.startsWith(qStock)) return -1;
+      if (codeB.startsWith(qStock) && !codeA.startsWith(qStock)) return 1;
+
+      // 3. Descripción que comienza con la búsqueda
+      if (descA.startsWith(qStock) && !descB.startsWith(qStock)) return -1;
+      if (descB.startsWith(qStock) && !descA.startsWith(qStock)) return 1;
+
+      return 0;
+    });
 
   // Filtrar revisiones para la pestaña 2 (Trazabilidad)
   const filteredTrazabilidad = revisiones.filter(rev => {
