@@ -96,7 +96,8 @@ const RecepcionArticulosModule = () => {
             codigo_articulo,
             cantidad,
             estado_recepcion,
-            fecha_recepcion
+            fecha_recepcion,
+            historial_cambios
           )
         `)
         .or('estado.eq.Enviada,estado.eq.Aceptada')
@@ -149,14 +150,28 @@ const RecepcionArticulosModule = () => {
     try {
       const now = new Date().toISOString();
 
-      // 1. Actualizar estado_recepcion de cada artículo cambiado
+      // 1. Actualizar estado_recepcion e historial_cambios de cada artículo cambiado
       for (const art of cambiados) {
         const nuevoEstado = localEstados[art.id];
+        const estadoAnterior = art.estado_recepcion || 'Pendiente';
+        const historialPrevio = Array.isArray(art.historial_cambios) ? art.historial_cambios : [];
+        
+        // Registrar la transición acumulativa sin borrar registros anteriores
+        const nuevoHistorial = [
+          ...historialPrevio,
+          {
+            de: estadoAnterior,
+            a: nuevoEstado,
+            fecha: now
+          }
+        ];
+
         const { error } = await supabase
           .from('ordenes_compra_articulos')
           .update({
             estado_recepcion: nuevoEstado,
             fecha_recepcion: nuevoEstado !== 'Pendiente' ? now : null,
+            historial_cambios: nuevoHistorial
           })
           .eq('id', art.id);
         if (error) throw error;
@@ -199,7 +214,8 @@ const RecepcionArticulosModule = () => {
             codigo_articulo,
             cantidad,
             estado_recepcion,
-            fecha_recepcion
+            fecha_recepcion,
+            historial_cambios
           )
         `)
         .eq('id', selectedOcForModal.id)
