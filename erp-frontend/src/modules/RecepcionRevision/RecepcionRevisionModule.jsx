@@ -133,26 +133,6 @@ const RecepcionRevisionModule = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 15 }}
           >
-            <button 
-              onClick={() => setView('selection')} 
-              className="btn-secondary" 
-              style={{ 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                marginBottom: '20px', 
-                padding: '8px 16px', 
-                borderRadius: '8px', 
-                cursor: 'pointer',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#cbd5e1',
-                fontSize: '0.88rem',
-                fontWeight: '600'
-              }}
-            >
-              <ArrowLeft size={16} /> Volver al Menú Recepción y Revisión
-            </button>
             <RecepcionArticulosModule />
           </motion.div>
         )}
@@ -164,26 +144,6 @@ const RecepcionRevisionModule = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 15 }}
           >
-            <button 
-              onClick={() => setView('selection')} 
-              className="btn-secondary" 
-              style={{ 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                marginBottom: '20px', 
-                padding: '8px 16px', 
-                borderRadius: '8px', 
-                cursor: 'pointer',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#cbd5e1',
-                fontSize: '0.88rem',
-                fontWeight: '600'
-              }}
-            >
-              <ArrowLeft size={16} /> Volver al Menú Recepción y Revisión
-            </button>
             <RevisionBodegaModule />
           </motion.div>
         )}

@@ -154,16 +154,19 @@ const RevisionBodegaModule = () => {
         });
       }
 
-      // Consultar variantes para tener vencimientos por lote
+      // Recuperar vencimientos y precios por lote
       const { data: variantes, error: varError } = await supabase
         .from('articulos_variantes')
-        .select('codigo_articulo, lote, vencimiento');
+        .select('codigo_articulo, lote, vencimiento, ultimo_valor_sin_iva');
 
-      const vencimientosMap = {};
+      const variantesMap = {};
       if (!varError && variantes) {
         variantes.forEach(v => {
           const key = `${v.codigo_articulo?.trim()}_${v.lote?.trim().toUpperCase()}`;
-          vencimientosMap[key] = v.vencimiento;
+          variantesMap[key] = {
+            vencimiento: v.vencimiento,
+            valor_sin_iva: v.ultimo_valor_sin_iva || 0
+          };
         });
       }
 
@@ -182,7 +185,9 @@ const RevisionBodegaModule = () => {
         
         const nombreArt = articulosMap[item.codigo_articulo] || 'Artículo ' + item.codigo_articulo;
         const keyVenc = `${item.codigo_articulo?.trim()}_${item.lote?.trim().toUpperCase()}`;
-        const vencimiento = vencimientosMap[keyVenc] || 'S/V';
+        const varData = variantesMap[keyVenc] || {};
+        const vencimiento = varData.vencimiento || 'S/V';
+        const valorSinIva = varData.valor_sin_iva || 0;
 
         grupos[item.session_id].items.push({
           id: item.id,
@@ -191,10 +196,10 @@ const RevisionBodegaModule = () => {
           lote: item.lote,
           vencimiento: vencimiento,
           isp: item.isp,
-          amount: item.cantidad, // wait, is it amount or cantidad? The original had cantidad. Let me keep cantidad.
           cantidad: item.cantidad,
           tipo_documento: item.tipo_documento || '',
-          numero_documento: item.numero_documento || ''
+          numero_documento: item.numero_documento || '',
+          valor_sin_iva: valorSinIva
         });
         grupos[item.session_id].totalUnidades += item.cantidad;
         grupos[item.session_id].totalArticulos += 1;
@@ -425,27 +430,33 @@ const RevisionBodegaModule = () => {
         });
       }
 
-      // Recuperar vencimientos por lote
+      // Recuperar vencimientos y precios por lote
       const { data: variantes, error: varError } = await supabase
         .from('articulos_variantes')
-        .select('codigo_articulo, lote, vencimiento');
+        .select('codigo_articulo, lote, vencimiento, ultimo_valor_sin_iva');
 
-      const vencimientosMap = {};
+      const variantesMap = {};
       if (!varError && variantes) {
         variantes.forEach(v => {
           const key = `${v.codigo_articulo?.trim()}_${v.lote?.trim().toUpperCase()}`;
-          vencimientosMap[key] = v.vencimiento;
+          variantesMap[key] = {
+            vencimiento: v.vencimiento,
+            valor_sin_iva: v.ultimo_valor_sin_iva || 0
+          };
         });
       }
       
       const itemsCompletos = sesion.items.map(it => {
         const nombreArt = articulosMap[it.codigo] || it.nombre;
         const keyVenc = `${it.codigo?.trim()}_${it.lote?.trim().toUpperCase()}`;
-        const vencimiento = vencimientosMap[keyVenc] || it.vencimiento || 'S/V';
+        const varData = variantesMap[keyVenc] || {};
+        const vencimiento = varData.vencimiento || it.vencimiento || 'S/V';
+        const valorSinIva = it.valor_sin_iva !== undefined ? it.valor_sin_iva : (varData.valor_sin_iva || 0);
         return {
           ...it,
           nombre: nombreArt,
-          vencimiento: vencimiento
+          vencimiento: vencimiento,
+          valor_sin_iva: valorSinIva
         };
       });
       
@@ -967,39 +978,38 @@ const RevisionBodegaModule = () => {
                 <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
                   <th style={thStyle} className="col-codigo">CÓDIGO</th>
                   <th style={thStyle} className="col-descripcion">DESCRIPCIÓN</th>
-                  <th style={thStyle} className="col-lote">LOTE / VENC.</th>
-                  <th style={thStyle} className="col-isp">DOCUMENTO / ISP</th>
+                  <th style={thStyle} className="col-lote">LOTE</th>
+                  <th style={thStyle} className="col-vencimiento">VENCIMIENTO</th>
+                  <th style={thStyle} className="col-isp">REGISTRO ISP</th>
                   <th style={{ ...thStyle, textAlign: 'right' }} className="col-cantidad">CANTIDAD</th>
+                  <th style={thStyle} className="col-doc">TIPO DE DOCUMENTO</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }} className="col-precio">PRECIO UNITARIO</th>
                 </tr>
               </thead>
               <tbody>
                 {(items || []).map((item, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    <td style={tdStyle}><strong>{item?.codigo}</strong></td>
-                    <td style={tdStyle}>{item?.nombre}</td>
-                    <td style={tdStyle}>
-                      <div>{item?.lote}</div>
-                      {item?.vencimiento && <div style={{ fontSize: '8pt', color: '#f59e0b' }}>Venc: {formatDate(item?.vencimiento)}</div>}
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{item?.tipo_documento} {item?.numero_documento}</div>
-                      <div style={{ fontSize: '8pt' }}>ISP: {item?.isp}</div>
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800' }}>{item?.cantidad}</td>
+                    <td style={tdStyle} className="col-codigo"><strong>{item?.codigo}</strong></td>
+                    <td style={tdStyle} className="col-descripcion">{item?.nombre}</td>
+                    <td style={tdStyle} className="col-lote">{item?.lote}</td>
+                    <td style={tdStyle} className="col-vencimiento">{item?.vencimiento && item.vencimiento !== 'S/V' ? formatDate(item.vencimiento) : (item?.vencimiento || '-')}</td>
+                    <td style={tdStyle} className="col-isp">{item?.isp}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800' }} className="col-cantidad">{item?.cantidad}</td>
+                    <td style={tdStyle} className="col-doc">{item?.tipo_documento} {item?.numero_documento}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }} className="col-precio">${(item?.valor_sin_iva || 0).toLocaleString('es-CL')}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <div className="print-only" style={{ display: 'none', marginTop: '60px', paddingTop: '20px', borderTop: '1px solid #000', fontSize: '10pt' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ textAlign: 'center', width: '300px' }}>
-                  <br /><br />
+            <div className="print-only" style={{ display: 'none', marginTop: '25px', paddingTop: '15px', borderTop: '1px solid #000', fontSize: '9pt', pageBreakInside: 'avoid' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div style={{ textAlign: 'center', width: '250px' }}>
                   <p style={{ margin: 0 }}><strong>_________________________________</strong></p>
                   <p style={{ margin: '5px 0 0 0' }}>Firma y Timbre Responsable de Revisión</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p><strong>Fecha de Emisión:</strong> {formatDate(new Date())} {new Date().toLocaleTimeString()}</p>
+                  <p style={{ margin: 0 }}><strong>Fecha de Emisión:</strong> {formatDate(new Date())} {new Date().toLocaleTimeString()}</p>
                 </div>
               </div>
             </div>
@@ -1007,27 +1017,70 @@ const RevisionBodegaModule = () => {
 
           <style>{`
             @media print {
-              body, html { background: white !important; color: black !important; padding: 1cm !important; box-sizing: border-box !important; }
-              .no-print { display: none !important; }
-              .print-only { display: block !important; }
-              .print-container { width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
-              .informes-container { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-              table { width: 100% !important; border: 1px solid #000 !important; table-layout: fixed; }
-              th, td { 
-                border: 1px solid #000 !important; color: black !important; padding: 6px !important; 
-                font-size: 9pt !important; opacity: 1 !important; background: white !important;
-                word-wrap: break-word; overflow-wrap: break-word;
+              @page { 
+                size: portrait; 
+                margin: 10mm 12mm 10mm 12mm; 
               }
-              th { background: #eee !important; font-weight: bold !important; }
-              .no-break { page-break-inside: avoid; }
+              html, body { 
+                background: white !important; 
+                color: black !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                height: auto !important; 
+                min-height: 0 !important; 
+                box-sizing: border-box !important; 
+              }
+              .app-container, .main-content, .informes-container, .print-container { 
+                height: auto !important; 
+                min-height: 0 !important; 
+                max-width: 100% !important; 
+                width: 100% !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                overflow: visible !important; 
+              }
+              .no-print, .sidebar, .sidebar-overlay, .mobile-header { 
+                display: none !important; 
+              }
+              .print-only { 
+                display: block !important; 
+              }
+              table { 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+                border: 1px solid #000 !important; 
+                table-layout: fixed !important; 
+                page-break-inside: auto;
+              }
+              tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+              }
+              th, td { 
+                border: 1px solid #000 !important; 
+                color: black !important; 
+                padding: 4px 6px !important; 
+                font-size: 8pt !important; 
+                line-height: 1.2 !important;
+                word-wrap: break-word !important; 
+                overflow-wrap: break-word !important; 
+              }
+              th { 
+                background: #f1f5f9 !important; 
+                font-weight: 700 !important; 
+              }
+              .col-codigo { width: 8% !important; text-align: center !important; }
+              .col-descripcion { width: 28% !important; }
+              .col-lote { width: 12% !important; text-align: center !important; }
+              .col-vencimiento { width: 11% !important; text-align: center !important; }
+              .col-isp { width: 11% !important; text-align: center !important; }
+              .col-cantidad { width: 8% !important; text-align: right !important; }
+              .col-doc { width: 11% !important; }
+              .col-precio { width: 11% !important; text-align: right !important; }
               
-              th.col-codigo { width: 10% !important; }
-              th.col-descripcion { width: 35% !important; }
-              th.col-lote { width: 25% !important; }
-              th.col-isp { width: 15% !important; }
-              th.col-cantidad { width: 15% !important; }
-
-              @page { size: portrait; margin: 0; }
+              .no-break { 
+                page-break-inside: avoid !important; 
+              }
             }
           `}</style>
         </motion.div>
