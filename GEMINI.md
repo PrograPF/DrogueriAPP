@@ -7,3 +7,7 @@ Se esperará la respuesta aprobatoria del usuario para proceder a ejecutar los c
 
 ## Regla de Testing Autónomo y Reporte de Resultados
 Cuando el usuario solicite probar o testear (ej: "testea", "haz las pruebas", "prueba el sistema"), el asistente analizará automáticamente los módulos y tablas modificadas recientemente sin que el usuario tenga que especificar qué probar. Diseñará los casos de prueba (flujo normal, retrocesos, casos de borde), ejecutará las pruebas con datos de prueba temporales, realizará la limpieza total de datos en la base de datos y entregará un reporte de resultados claro, detallado y resumido con el estado de cada validación.
+
+## Regla de Verificación de Componentes Visuales e Importaciones JSX
+Cada vez que se creen o modifiquen componentes visuales, botones, modales o vistas en React (JSX), el asistente realizará obligatoriamente una auditoría estática de todos los identificadores, íconos (ej: `lucide-react`), hooks y variables utilizados en el archivo modificado para asegurar que estén debidamente importados y declarados, previniendo errores de renderizado en tiempo de ejecución (pantallas negras o caídas de componentes al interactuar).
+
