@@ -133,6 +133,22 @@ const RecepcionRevisionModule = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 15 }}
           >
+            <div className="no-print" style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+              <button 
+                onClick={() => setView('selection')} 
+                className="btn-secondary" 
+                style={{ fontSize: '0.85rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ArrowLeft size={16} /> Volver al Menú
+              </button>
+              <button 
+                onClick={() => setView('revision')} 
+                className="btn-secondary" 
+                style={{ fontSize: '0.85rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ClipboardCheck size={16} /> Ir a Revisión en Bodega
+              </button>
+            </div>
             <RecepcionArticulosModule />
           </motion.div>
         )}
@@ -144,6 +160,22 @@ const RecepcionRevisionModule = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 15 }}
           >
+            <div className="no-print" style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+              <button 
+                onClick={() => setView('selection')} 
+                className="btn-secondary" 
+                style={{ fontSize: '0.85rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ArrowLeft size={16} /> Volver al Menú
+              </button>
+              <button 
+                onClick={() => setView('recepcion')} 
+                className="btn-secondary" 
+                style={{ fontSize: '0.85rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ClipboardList size={16} /> Ir a Recepción de Artículos
+              </button>
+            </div>
             <RevisionBodegaModule />
           </motion.div>
         )}

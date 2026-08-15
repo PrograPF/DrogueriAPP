@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye } from 'lucide-react';
+import { 
+  ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye, FileText, X 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import useArsenalLookup from '../../hooks/useArsenalLookup';
