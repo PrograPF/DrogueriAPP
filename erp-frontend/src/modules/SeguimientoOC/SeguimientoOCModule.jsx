@@ -2312,8 +2312,8 @@ const SeguimientoOCModule = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               style={{
-                background: '#1e293b',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '16px',
                 width: '100%',
                 maxWidth: '700px',
@@ -2330,24 +2330,16 @@ const SeguimientoOCModule = () => {
                   position: 'absolute',
                   top: '20px',
                   right: '20px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'var(--btn-secondary-bg)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '50%',
                   padding: '8px',
                   cursor: 'pointer',
-                  color: '#94a3b8',
+                  color: 'var(--text-secondary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.color = '#f8fafc';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.color = '#94a3b8';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
                 }}
               >
                 <X size={18} />
@@ -2359,7 +2351,7 @@ const SeguimientoOCModule = () => {
                   <Truck size={24} color="#3b82f6" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: '#f8fafc' }}>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
                     Orden de Compra: {selectedOcForModal.numero_oc}
                   </h3>
                 </div>
@@ -2370,20 +2362,20 @@ const SeguimientoOCModule = () => {
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
                 gap: '15px', 
-                background: 'rgba(255,255,255,0.01)',
-                border: '1px solid rgba(255,255,255,0.04)',
+                background: 'var(--btn-secondary-bg)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '10px',
                 padding: '16px',
                 marginBottom: '25px',
                 fontSize: '0.9rem'
               }}>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Proveedor</span>
-                  <strong style={{ color: '#f8fafc', fontSize: '0.95rem' }}>{selectedOcForModal.proveedor}</strong>
-                  <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.8rem', marginTop: '2px' }}>RUT: {selectedOcForModal.rut_proveedor || 'No registrado'}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Proveedor</span>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{selectedOcForModal.proveedor}</strong>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '2px' }}>RUT: {selectedOcForModal.rut_proveedor || 'No registrado'}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Estado de OC</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Estado de OC</span>
                   <span style={{ 
                     padding: '2px 8px', 
                     borderRadius: '6px', 
@@ -2402,8 +2394,8 @@ const SeguimientoOCModule = () => {
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Fecha de Envío</span>
-                  <strong style={{ color: '#cbd5e1' }}>{formatDate(selectedOcForModal.fecha_envio)}</strong>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Fecha de Envío</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{formatDate(selectedOcForModal.fecha_envio)}</strong>
                   {selectedOcForModal.fecha_aceptacion && (
                     <span style={{ display: 'block', color: '#10b981', fontSize: '0.8rem', marginTop: '2px' }}>
                       Aceptada: {formatDate(selectedOcForModal.fecha_aceptacion)}
@@ -2439,7 +2431,7 @@ const SeguimientoOCModule = () => {
               {/* Tabs navigation */}
               <div style={{ 
                 display: 'flex', 
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
+                borderBottom: '1px solid var(--border-color)', 
                 marginBottom: '20px',
                 gap: '10px'
               }}>
@@ -2450,7 +2442,7 @@ const SeguimientoOCModule = () => {
                     background: 'transparent',
                     border: 'none',
                     borderBottom: modalTab === 'articulos' ? '2px solid #3b82f6' : '2px solid transparent',
-                    color: modalTab === 'articulos' ? '#3b82f6' : '#94a3b8',
+                    color: modalTab === 'articulos' ? '#3b82f6' : 'var(--text-secondary)',
                     fontWeight: '700',
                     fontSize: '0.9rem',
                     cursor: 'pointer',
@@ -2467,7 +2459,7 @@ const SeguimientoOCModule = () => {
                     background: 'transparent',
                     border: 'none',
                     borderBottom: modalTab === 'bitacora' ? '2px solid #3b82f6' : '2px solid transparent',
-                    color: modalTab === 'bitacora' ? '#3b82f6' : '#94a3b8',
+                    color: modalTab === 'bitacora' ? '#3b82f6' : 'var(--text-secondary)',
                     fontWeight: '700',
                     fontSize: '0.9rem',
                     cursor: 'pointer',
@@ -2483,13 +2475,13 @@ const SeguimientoOCModule = () => {
               {modalTab === 'articulos' ? (
                 <>
                   {/* Modal Articles Table */}
-                  <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '12px', color: '#f8fafc' }}>Detalle de Artículos</h4>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '12px', color: 'var(--text-primary)' }}>Detalle de Artículos</h4>
                   <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.8rem' }}>
-                          <th style={{ padding: '10px 12px', color: '#94a3b8' }}>ARTÍCULO / DETALLE</th>
-                          <th style={{ padding: '10px 12px', color: '#94a3b8', width: '160px', textAlign: 'right' }}>ESTADO</th>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', fontSize: '0.8rem' }}>
+                          <th style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>ARTÍCULO / DETALLE</th>
+                          <th style={{ padding: '10px 12px', color: 'var(--text-secondary)', width: '160px', textAlign: 'right' }}>ESTADO</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2517,37 +2509,37 @@ const SeguimientoOCModule = () => {
                               <tr 
                                 onClick={() => setExpandedArticleId(isExpanded ? null : (art.id || idx))}
                                 style={{ 
-                                  borderBottom: isExpanded ? 'none' : '1px solid rgba(255,255,255,0.04)', 
+                                  borderBottom: isExpanded ? 'none' : '1px solid var(--border-color)', 
                                   fontSize: '0.85rem',
                                   cursor: 'pointer',
-                                  background: isExpanded ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                                  background: isExpanded ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
                                   transition: 'background 0.2s'
                                 }}
                                 onMouseEnter={(e) => {
-                                  if (!isExpanded) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                                  if (!isExpanded) e.currentTarget.style.background = 'var(--btn-secondary-bg)';
                                 }}
                                 onMouseLeave={(e) => {
                                   if (!isExpanded) e.currentTarget.style.background = 'transparent';
                                 }}
                               >
                                 <td style={{ padding: '12px 12px', verticalAlign: 'top' }}>
-                                  <div style={{ fontWeight: '600', color: '#f8fafc', lineHeight: '1.4' }}>
+                                  <div style={{ fontWeight: '600', color: 'var(--text-primary)', lineHeight: '1.4' }}>
                                     {tituloCompleto}
                                   </div>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
-                                    <span>Solicitado: <strong style={{ color: '#cbd5e1' }}>{cantSol} uds.</strong></span>
-                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                    <span>Solicitado: <strong style={{ color: 'var(--text-primary)' }}>{cantSol} uds.</strong></span>
+                                    <span style={{ color: 'var(--border-color)' }}>•</span>
                                     <span style={{ 
                                       display: 'inline-flex', 
                                       alignItems: 'center', 
                                       gap: '4px', 
-                                      color: isExpanded ? '#3b82f6' : '#94a3b8',
+                                      color: isExpanded ? '#3b82f6' : 'var(--text-secondary)',
                                       fontWeight: '600',
                                       fontSize: '0.74rem',
-                                      background: isExpanded ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                                      background: isExpanded ? 'rgba(59, 130, 246, 0.15)' : 'var(--btn-secondary-bg)',
                                       padding: '2px 8px',
                                       borderRadius: '6px',
-                                      border: isExpanded ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)'
+                                      border: isExpanded ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)'
                                     }}>
                                       <Clock size={12} />
                                       {historialList.length > 0 ? `${historialList.length} cambio(s)` : 'Ver historial'}
@@ -2571,19 +2563,19 @@ const SeguimientoOCModule = () => {
                               </tr>
                               {/* Fila expandible minimalista con el Historial */}
                               {isExpanded && (
-                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(15, 23, 42, 0.3)' }}>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--btn-secondary-bg)' }}>
                                   <td colSpan={2} style={{ padding: '0 12px 10px 12px' }}>
                                     <div style={{
                                       padding: '8px 12px',
-                                      background: 'rgba(15, 23, 42, 0.5)',
+                                      background: 'var(--input-bg)',
                                       borderRadius: '6px',
-                                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                                      border: '1px solid var(--border-color)',
                                       display: 'flex',
                                       flexDirection: 'column',
                                       gap: '6px'
                                     }}>
                                       {historialList.length === 0 ? (
-                                        <div style={{ fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic' }}>
+                                        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                                           Sin cambios registrados
                                         </div>
                                       ) : (
@@ -2610,12 +2602,12 @@ const SeguimientoOCModule = () => {
                                                   <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: deCfg.bg, color: deCfg.color }}>
                                                     {h.de}
                                                   </span>
-                                                  <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.75rem' }}>➔</span>
+                                                  <span style={{ color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.75rem' }}>➔</span>
                                                   <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: aCfg.bg, color: aCfg.color }}>
                                                     {h.a}
                                                   </span>
                                                 </div>
-                                                <span style={{ color: '#94a3b8', fontSize: '0.73rem' }}>
+                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.73rem' }}>
                                                   {h.fecha ? formatDateTime(h.fecha) : 'Fecha no registrada'}
                                                 </span>
                                               </div>
@@ -2640,35 +2632,35 @@ const SeguimientoOCModule = () => {
                   <div style={{ 
                     maxHeight: '230px', 
                     overflowY: 'auto', 
-                    background: 'rgba(0,0,0,0.15)', 
+                    background: 'var(--input-bg)', 
                     borderRadius: '10px', 
                     padding: '16px',
-                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    border: '1px solid var(--border-color)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px'
                   }}>
                     {loadingComentarios ? (
-                      <div style={{ color: '#94a3b8', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>
                         Cargando bitácora...
                       </div>
                     ) : comentarios.length === 0 ? (
-                      <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '30px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '30px' }}>
                         No hay anotaciones registradas en la bitácora de esta OC.
                       </div>
                     ) : (
                       comentarios.map((com, index) => (
                         <div key={com.id || index} style={{
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          background: 'var(--btn-secondary-bg)',
+                          border: '1px solid var(--border-color)',
                           borderRadius: '8px',
                           padding: '12px',
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.75rem', color: '#64748b' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                             <span style={{ fontWeight: '700', color: '#3b82f6' }}>Anotación #{index + 1}</span>
                             <span>{formatDateTime(com.created_at)}</span>
                           </div>
-                          <div style={{ color: '#cbd5e1', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                          <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                             {com.comentario}
                           </div>
                         </div>
@@ -2685,18 +2677,18 @@ const SeguimientoOCModule = () => {
                       rows={3}
                       style={{
                         width: '100%',
-                        background: '#0f172a',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: 'var(--input-bg)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '8px',
                         padding: '12px',
-                        color: '#f8fafc',
+                        color: 'var(--text-primary)',
                         fontSize: '0.85rem',
                         resize: 'none',
                         outline: 'none',
                         transition: 'border-color 0.2s'
                       }}
                       onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                      onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                      onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
                       required
                     />
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -2714,7 +2706,7 @@ const SeguimientoOCModule = () => {
               )}
 
               {/* Close Bottom Button */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '25px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '25px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
                 <button 
                   onClick={() => setSelectedOcForModal(null)} 
                   className="btn-secondary" 
