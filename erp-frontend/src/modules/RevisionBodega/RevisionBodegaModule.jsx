@@ -156,10 +156,10 @@ const RevisionBodegaModule = () => {
           });
         }
 
-        // Consultar variantes para obtener vencimiento y precio registrado si aplica
+        // Consultar variantes para obtener vencimiento, precio y carta de canje si aplica
         const { data: varsData } = await supabase
           .from('articulos_variantes')
-          .select('codigo_articulo, lote, vencimiento, ultimo_valor_sin_iva')
+          .select('codigo_articulo, lote, vencimiento, ultimo_valor_sin_iva, carta_canje')
           .in('codigo_articulo', codigosRevs);
 
         const varsMap = {};
@@ -167,7 +167,8 @@ const RevisionBodegaModule = () => {
           const key = `${v.codigo_articulo?.trim()}_${v.lote?.trim().toUpperCase()}`;
           varsMap[key] = {
             vencimiento: v.vencimiento,
-            valor_sin_iva: v.ultimo_valor_sin_iva || 0
+            valor_sin_iva: v.ultimo_valor_sin_iva || 0,
+            carta_canje: v.carta_canje || 'NO'
           };
         });
 
@@ -185,6 +186,7 @@ const RevisionBodegaModule = () => {
             cantidad: r.cantidad,
             tipo_documento: r.tipo_documento || '',
             numero_documento: r.numero_documento || '',
+            carta_canje: varInfo.carta_canje || 'NO',
             valor_sin_iva: varInfo.valor_sin_iva || 0,
             created_at: r.created_at || r.fecha
           };
@@ -1014,11 +1016,13 @@ const RevisionBodegaModule = () => {
                               <thead>
                                 <tr style={{ background: 'var(--btn-secondary-bg)' }}>
                                   <th style={thStyle}>CÓDIGO Y DESCRIPCIÓN</th>
-                                  <th style={thStyle}>LOTE / VENC.</th>
-                                  <th style={thStyle}>DOC. / ISP</th>
+                                  <th style={thStyle}>VENCIMIENTO</th>
+                                  <th style={thStyle}>LOTE</th>
+                                  <th style={thStyle}>DOCUMENTO</th>
+                                  <th style={thStyle}>REGISTRO ISP</th>
                                   <th style={{ ...thStyle, textAlign: 'right' }}>CANTIDAD</th>
+                                  <th style={{ ...thStyle, textAlign: 'center' }}>CARTA DE CANJE</th>
                                   <th style={thStyle}>FECHA REVISIÓN</th>
-                                  <th style={{ ...thStyle, textAlign: 'center' }}>ESTADO</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1028,40 +1032,40 @@ const RevisionBodegaModule = () => {
                                       <strong>({rev.codigo_articulo})</strong> {rev.descripcion}
                                     </td>
                                     <td style={tdStyle}>
-                                      <div><strong>{rev.lote}</strong></div>
                                       {rev.vencimiento && rev.vencimiento !== 'S/V' ? (
-                                        <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Venc: {formatDate(rev.vencimiento)}</div>
+                                        <span style={{ color: '#f59e0b', fontWeight: '600' }}>{formatDate(rev.vencimiento)}</span>
                                       ) : (
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>S/V</div>
+                                        <span style={{ color: 'var(--text-secondary)' }}>S/V</span>
                                       )}
                                     </td>
                                     <td style={tdStyle}>
-                                      <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700' }}>
+                                      <strong>{rev.lote}</strong>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <span style={{ color: '#3b82f6', fontWeight: '700' }}>
                                         {rev.tipo_documento} {rev.numero_documento}
-                                      </div>
-                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ISP: {rev.isp}</div>
+                                      </span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {rev.isp || 'S/I'}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800', color: '#10b981' }}>
                                       {rev.cantidad}
                                     </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      <span style={{
+                                        fontWeight: '700',
+                                        color: rev.carta_canje === 'SI' ? '#3b82f6' : 'var(--text-secondary)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        background: rev.carta_canje === 'SI' ? 'rgba(59, 130, 246, 0.12)' : 'transparent'
+                                      }}>
+                                        {rev.carta_canje || 'NO'}
+                                      </span>
+                                    </td>
                                     <td style={tdStyle}>
                                       <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                                         {formatDateTime(rev.created_at)}
-                                      </span>
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        padding: '2px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: '700',
-                                        background: 'rgba(16, 185, 129, 0.15)',
-                                        color: '#10b981'
-                                      }}>
-                                        <CheckCircle2 size={12} /> Revisado
                                       </span>
                                     </td>
                                   </tr>
