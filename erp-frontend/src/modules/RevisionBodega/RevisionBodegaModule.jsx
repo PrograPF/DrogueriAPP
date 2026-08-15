@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye, FileText, X 
+  ClipboardCheck, Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, History, Eye, FileText, X,
+  CheckCircle2, Clock, ChevronDown, ChevronUp, PackageCheck, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -17,7 +18,7 @@ const RevisionBodegaModule = () => {
   const [alertas, setAlertas] = useState([]);
   const [sessionId, setSessionId] = useState('');
   
-  // Estado Historial
+  // Estado Historial Global
   const [historial, setHistorial] = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -37,13 +38,16 @@ const RevisionBodegaModule = () => {
     autor_nota: localStorage.getItem('firma_operador') || ''
   });
 
-  // OCs y selección
+  // OCs, selección e Historial Previo de la OC
   const [loadingOcs, setLoadingOcs] = useState(false);
   const [ocs, setOcs] = useState([]);
   const [ocSeleccionada, setOcSeleccionada] = useState(null);
   const [articulosOc, setArticulosOc] = useState([]);
   const [articulosCatalog, setArticulosCatalog] = useState({});
   const [ocFilter, setOcFilter] = useState('pendientes'); // 'pendientes', 'revisadas', 'todas'
+  const [revisionesPreviasOc, setRevisionesPreviasOc] = useState([]);
+  const [loadingPrevias, setLoadingPrevias] = useState(false);
+  const [mostrarHistorialPrevio, setMostrarHistorialPrevio] = useState(true);
 
   const nombreArticulo = useArsenalLookup(form.codigo);
 
@@ -74,10 +78,12 @@ const RevisionBodegaModule = () => {
     }
   };
 
-  // Seleccionar una OC y cargar solo sus artículos recepcionados
+  // Seleccionar una OC y cargar solo sus artículos recepcionados y su historial previo
   const seleccionarOc = async (oc) => {
     setOcSeleccionada(oc);
     setItems([]);
+    setRevisionesPreviasOc([]);
+    setMostrarHistorialPrevio(true);
     setForm({
       tipo_documento: 'Factura',
       numero_documento: '',
@@ -96,35 +102,103 @@ const RevisionBodegaModule = () => {
     const arts = (oc.ordenes_compra_articulos || []).filter(a => a.estado_recepcion === 'Recepcionado');
     if (arts.length === 0) {
       setArticulosOc([]);
-      return;
     }
 
     const codigos = arts.map(a => a.codigo_articulo);
     try {
-      const { data, error } = await supabase
-        .from('articulos')
-        .select('codigo, descripcion')
-        .in('codigo', codigos);
+      let mapping = {};
+      if (codigos.length > 0) {
+        const { data, error } = await supabase
+          .from('articulos')
+          .select('codigo, descripcion')
+          .in('codigo', codigos);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const mapping = {};
-      (data || []).forEach(a => {
-        mapping[a.codigo.trim()] = a.descripcion;
-      });
+        (data || []).forEach(a => {
+          mapping[a.codigo.trim()] = a.descripcion;
+        });
 
-      setArticulosCatalog(mapping);
+        setArticulosCatalog(mapping);
 
-      const combinados = arts.map(art => ({
-        ...art,
-        descripcion: mapping[art.codigo_articulo?.trim()] || 'Artículo ' + art.codigo_articulo
-      }));
+        const combinados = arts.map(art => ({
+          ...art,
+          descripcion: mapping[art.codigo_articulo?.trim()] || 'Artículo ' + art.codigo_articulo
+        }));
 
-      setArticulosOc(combinados);
-      // El formulario inicia completamente vacío
+        setArticulosOc(combinados);
+      } else {
+        setArticulosOc([]);
+      }
+
+      // Cargar historial previo de revisiones para esta OC
+      setLoadingPrevias(true);
+      const { data: revsData, error: revsErr } = await supabase
+        .from('revisiones_bodega')
+        .select('*')
+        .eq('numero_oc', oc.numero_oc)
+        .order('created_at', { ascending: false });
+
+      if (revsErr) throw revsErr;
+
+      if (revsData && revsData.length > 0) {
+        const codigosRevs = [...new Set(revsData.map(r => r.codigo_articulo))];
+        
+        // Obtener descripciones para cualquier código de la revisión
+        const codigosFaltantes = codigosRevs.filter(c => !mapping[c?.trim()]);
+        if (codigosFaltantes.length > 0) {
+          const { data: extraArts } = await supabase
+            .from('articulos')
+            .select('codigo, descripcion')
+            .in('codigo', codigosFaltantes);
+          (extraArts || []).forEach(a => {
+            mapping[a.codigo.trim()] = a.descripcion;
+          });
+        }
+
+        // Consultar variantes para obtener vencimiento y precio registrado si aplica
+        const { data: varsData } = await supabase
+          .from('articulos_variantes')
+          .select('codigo_articulo, lote, vencimiento, ultimo_valor_sin_iva')
+          .in('codigo_articulo', codigosRevs);
+
+        const varsMap = {};
+        (varsData || []).forEach(v => {
+          const key = `${v.codigo_articulo?.trim()}_${v.lote?.trim().toUpperCase()}`;
+          varsMap[key] = {
+            vencimiento: v.vencimiento,
+            valor_sin_iva: v.ultimo_valor_sin_iva || 0
+          };
+        });
+
+        const revsDetalladas = revsData.map(r => {
+          const key = `${r.codigo_articulo?.trim()}_${r.lote?.trim().toUpperCase()}`;
+          const varInfo = varsMap[key] || {};
+          return {
+            id: r.id,
+            session_id: r.session_id,
+            codigo_articulo: r.codigo_articulo,
+            descripcion: mapping[r.codigo_articulo?.trim()] || 'Artículo ' + r.codigo_articulo,
+            lote: r.lote,
+            vencimiento: varInfo.vencimiento || 'S/V',
+            isp: r.isp || 'S/I',
+            cantidad: r.cantidad,
+            tipo_documento: r.tipo_documento || '',
+            numero_documento: r.numero_documento || '',
+            valor_sin_iva: varInfo.valor_sin_iva || 0,
+            created_at: r.created_at || r.fecha
+          };
+        });
+
+        setRevisionesPreviasOc(revsDetalladas);
+      } else {
+        setRevisionesPreviasOc([]);
+      }
     } catch (err) {
-      console.error('Error al obtener artículos de la OC:', err);
-      alert('Error al cargar artículos de la OC: ' + err.message);
+      console.error('Error al cargar datos de la OC e historial previo:', err);
+      alert('Error al cargar datos de la OC: ' + err.message);
+    } finally {
+      setLoadingPrevias(false);
     }
   };
 
@@ -238,6 +312,14 @@ const RevisionBodegaModule = () => {
     }
     if (!form.codigo?.trim()) {
       alert("Por favor seleccione un Artículo de la lista de recepcionados.");
+      return;
+    }
+    if (revisionesPreviasOc.some(r => r.codigo_articulo?.trim() === form.codigo?.trim())) {
+      alert("Este artículo ya fue revisado e ingresado previamente en esta Orden de Compra.");
+      return;
+    }
+    if (items.some(item => item.codigo?.trim() === form.codigo?.trim())) {
+      alert("Este artículo ya ha sido añadido a la lista actual de revisión.");
       return;
     }
     if (!form.lote?.trim()) {
@@ -569,8 +651,12 @@ const RevisionBodegaModule = () => {
     setItems([]);
     setAlertas([]);
     setSessionId('');
+    setOcSeleccionada(null);
+    setArticulosOc([]);
+    setRevisionesPreviasOc([]);
     setFlowStep('ingreso');
     setActiveTab('nueva');
+    cargarOcsDisponibles();
   };
 
   const handlePrint = () => window.print();
@@ -836,200 +922,350 @@ const RevisionBodegaModule = () => {
             </div>
           ) : (
             <>
-              <div className="glass-card" style={{ padding: '24px', marginBottom: '25px' }}>
-                {/* Header Banner de la OC */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' }}>
-                      OC EN REVISIÓN
-                    </span>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
-                      {ocSeleccionada.numero_oc}
-                    </h3>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      • Proveedor: {ocSeleccionada.proveedor}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => { setOcSeleccionada(null); setArticulosOc([]); setItems([]); }} 
-                    className="btn-secondary" 
-                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                  >
-                    Cambiar OC
-                  </button>
-                </div>
+              {(() => {
+                const codigosYaRevisados = new Set(revisionesPreviasOc.map(r => r.codigo_articulo?.trim()));
+                const totalRecepcionados = articulosOc.length;
+                const articulosYaRevisadosList = articulosOc.filter(a => codigosYaRevisados.has(a.codigo_articulo?.trim()));
+                const totalYaRevisados = articulosYaRevisadosList.length;
+                const totalPendientes = articulosOc.filter(a => !codigosYaRevisados.has(a.codigo_articulo?.trim())).length;
+                const esOcCompletada = totalRecepcionados > 0 && totalPendientes === 0;
+                const articulosDisponibles = articulosOc.filter(
+                  art => !codigosYaRevisados.has(art.codigo_articulo?.trim()) && !items.some(item => item.codigo?.trim() === art.codigo_articulo?.trim())
+                );
 
-                {/* Fila 1: Documento de Recepción */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '16px', paddingBottom: '18px', borderBottom: '1px dashed var(--border-color)', marginBottom: '18px' }}>
-                  <div>
-                    <label style={labelStyle}>Documento</label>
-                    <select name="tipo_documento" value={form.tipo_documento} onChange={handleInputChange} className="input-field" style={{ width: '100%' }}>
-                      <option value="Factura">Factura</option>
-                      <option value="Guía de Despacho">Guía de Despacho</option>
-                      <option value="Otro">Otro</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Nº de Documento</label>
-                    <input 
-                      name="numero_documento" 
-                      value={form.numero_documento} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="Escriba el número de factura o guía..." 
-                    />
-                  </div>
-                </div>
+                return (
+                  <div className="glass-card" style={{ padding: '24px', marginBottom: '25px' }}>
+                    {/* Header Banner de la OC */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' }}>
+                          OC EN REVISIÓN
+                        </span>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
+                          {ocSeleccionada.numero_oc}
+                        </h3>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                          • Proveedor: {ocSeleccionada.proveedor}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => { setOcSeleccionada(null); setArticulosOc([]); setItems([]); setRevisionesPreviasOc([]); }} 
+                        className="btn-secondary" 
+                        style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                      >
+                        Cambiar OC
+                      </button>
+                    </div>
 
-                {/* Fila 2: Selector Unificado de Artículo Recepcionado */}
-                <div style={{ background: 'var(--btn-secondary-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', marginBottom: '18px' }}>
-                  <label style={{ ...labelStyle, color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Seleccionar Artículo Recepcionado</span>
-                    <span style={{ color: '#10b981', fontSize: '0.75rem', textTransform: 'none', fontWeight: '600' }}>
-                      ✓ Solo artículos con estado 'Recepcionado' ({articulosOc.length})
-                    </span>
-                  </label>
-                  <select 
-                    name="codigo" 
-                    value={form.codigo} 
-                    onChange={handleInputChange} 
-                    className="input-field"
-                    style={{ fontWeight: '700', fontSize: '0.95rem', color: form.codigo ? '#3b82f6' : 'var(--text-secondary)' }}
-                  >
-                    <option value="">-- Seleccione un artículo recepcionado --</option>
-                    {articulosOc
-                      .filter(art => !items.some(item => item.codigo === art.codigo_articulo))
-                      .map(art => (
-                        <option key={art.id} value={art.codigo_articulo}>
-                          ({art.codigo_articulo}) {art.descripcion}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                {/* Fila 3: Trazabilidad y Cantidad (4 columnas fluidas) */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={labelStyle}>Lote</label>
-                    <input 
-                      name="lote" 
-                      value={form.lote} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="Lote..." 
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>F. Vencimiento</label>
-                    <input 
-                      type="date" 
-                      name="vencimiento" 
-                      value={form.vencimiento} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Registro ISP</label>
-                    <input 
-                      name="isp" 
-                      value={form.isp} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="Registro ISP..." 
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Cantidad a Ingresar</label>
-                    <input 
-                      type="number" 
-                      name="cantidad" 
-                      value={form.cantidad} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="0" 
-                      style={{ fontWeight: '700' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Fila 4: Precios, Carta de Canje y Botón de Nota */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'end', marginBottom: '22px' }}>
-                  <div>
-                    <label style={labelStyle}>P. Unitario Sin IVA ($)</label>
-                    <input 
-                      type="number" 
-                      step="any"
-                      name="valor_sin_iva" 
-                      value={form.valor_sin_iva} 
-                      onChange={handleInputChange} 
-                      className="input-field" 
-                      placeholder="0" 
-                      style={{ fontWeight: '700' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Condición Especial</label>
-                    <label style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between',
-                      background: 'var(--input-bg)', 
-                      border: '1px solid var(--border-color)', 
-                      borderRadius: '8px', 
-                      padding: '9px 14px', 
-                      height: '42px', 
-                      cursor: 'pointer',
-                      userSelect: 'none'
+                    {/* PANEL VISUAL: HISTORIAL DE ARTÍCULOS YA REVISADOS EN ESTA OC */}
+                    <div style={{
+                      background: revisionesPreviasOc.length > 0 ? 'rgba(59, 130, 246, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+                      border: revisionesPreviasOc.length > 0 ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      marginBottom: '22px'
                     }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>Carta de Canje</span>
-                      <input 
-                        type="checkbox" 
-                        name="carta_canje" 
-                        id="carta_canje"
-                        checked={form.carta_canje} 
-                        onChange={handleInputChange} 
-                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }}
-                      />
-                    </label>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Bitácora / Anotación</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsNoteModalOpen(true)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        width: '100%',
-                        height: '42px',
-                        borderRadius: '8px',
-                        border: form.nota?.trim() ? '1px solid #a855f7' : '1px dashed var(--border-color)',
-                        background: form.nota?.trim() ? 'rgba(168, 85, 247, 0.15)' : 'var(--input-bg)',
-                        color: form.nota?.trim() ? '#c084fc' : 'var(--text-secondary)',
-                        fontWeight: '700',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <FileText size={16} />
-                      {form.nota?.trim() ? '✓ Nota Agregada (1)' : '+ Agregar Nota'}
-                    </button>
-                  </div>
-                </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <History size={18} color={revisionesPreviasOc.length > 0 ? '#3b82f6' : 'var(--text-secondary)'} />
+                          <span style={{ fontWeight: '800', fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                            Historial de Artículos Revisados en esta OC
+                          </span>
+                          <span style={{
+                            background: esOcCompletada ? 'rgba(16, 185, 129, 0.15)' : revisionesPreviasOc.length > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                            color: esOcCompletada ? '#10b981' : revisionesPreviasOc.length > 0 ? '#f59e0b' : 'var(--text-secondary)',
+                            padding: '3px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: '700'
+                          }}>
+                            {totalYaRevisados} de {totalRecepcionados} artículos revisados ({totalPendientes} pendientes)
+                          </span>
+                        </div>
 
-                {/* Botón de Añadir */}
-                <button 
-                  onClick={handleAddItem} 
-                  className="btn-primary" 
-                  style={{ width: '100%', padding: '14px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700', fontSize: '0.95rem' }}
-                >
-                  <Plus size={20} /> Añadir Artículo a la Revisión
-                </button>
-              </div>
+                        {revisionesPreviasOc.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setMostrarHistorialPrevio(!mostrarHistorialPrevio)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.78rem', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            {mostrarHistorialPrevio ? (
+                              <>Ocultar detalle <ChevronUp size={14} /></>
+                            ) : (
+                              <>Ver detalle ({revisionesPreviasOc.length}) <ChevronDown size={14} /></>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      {loadingPrevias ? (
+                        <div style={{ padding: '15px 0', color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Clock size={16} /> Consultando historial previo de esta OC...
+                        </div>
+                      ) : revisionesPreviasOc.length === 0 ? (
+                        <div style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                          No hay artículos revisados previamente en esta Orden de Compra. Todos sus artículos recepcionados ({totalRecepcionados}) están disponibles para revisión.
+                        </div>
+                      ) : (
+                        mostrarHistorialPrevio && (
+                          <div style={{ marginTop: '14px', overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+                              <thead>
+                                <tr style={{ background: 'var(--btn-secondary-bg)' }}>
+                                  <th style={thStyle}>CÓDIGO Y DESCRIPCIÓN</th>
+                                  <th style={thStyle}>LOTE / VENC.</th>
+                                  <th style={thStyle}>DOC. / ISP</th>
+                                  <th style={{ ...thStyle, textAlign: 'right' }}>CANTIDAD</th>
+                                  <th style={thStyle}>FECHA REVISIÓN</th>
+                                  <th style={{ ...thStyle, textAlign: 'center' }}>ESTADO</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {revisionesPreviasOc.map((rev, idx) => (
+                                  <tr key={rev.id || idx} style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(16, 185, 129, 0.02)' }}>
+                                    <td style={tdStyle}>
+                                      <strong>({rev.codigo_articulo})</strong> {rev.descripcion}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div><strong>{rev.lote}</strong></div>
+                                      {rev.vencimiento && rev.vencimiento !== 'S/V' ? (
+                                        <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Venc: {formatDate(rev.vencimiento)}</div>
+                                      ) : (
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>S/V</div>
+                                      )}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700' }}>
+                                        {rev.tipo_documento} {rev.numero_documento}
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ISP: {rev.isp}</div>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '800', color: '#10b981' }}>
+                                      {rev.cantidad}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                        {formatDateTime(rev.created_at)}
+                                      </span>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '2px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: '700',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        color: '#10b981'
+                                      }}>
+                                        <CheckCircle2 size={12} /> Revisado
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )
+                      )}
+                    </div>
+
+                    {/* FORMULARIO DE INGRESO O AVISO DE OC COMPLETADA */}
+                    {esOcCompletada ? (
+                      <div style={{
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        textAlign: 'center',
+                        marginBottom: '10px'
+                      }}>
+                        <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 10px auto' }} />
+                        <h4 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#10b981', margin: '0 0 6px 0' }}>
+                          ✓ Todos los artículos recepcionados de esta OC ya fueron revisados
+                        </h4>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                          Esta Orden de Compra ya tiene el 100% ({totalRecepcionados}/{totalRecepcionados}) de sus artículos ingresados a inventario. No quedan artículos pendientes para ingresar.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Fila 1: Documento de Recepción */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '16px', paddingBottom: '18px', borderBottom: '1px dashed var(--border-color)', marginBottom: '18px' }}>
+                          <div>
+                            <label style={labelStyle}>Documento</label>
+                            <select name="tipo_documento" value={form.tipo_documento} onChange={handleInputChange} className="input-field" style={{ width: '100%' }}>
+                              <option value="Factura">Factura</option>
+                              <option value="Guía de Despacho">Guía de Despacho</option>
+                              <option value="Otro">Otro</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Nº de Documento</label>
+                            <input 
+                              name="numero_documento" 
+                              value={form.numero_documento} 
+                              onChange={handleInputChange} 
+                              className="input-field" 
+                              placeholder="Escriba el número de factura o guía..." 
+                            />
+                          </div>
+                        </div>
+
+                        {/* Fila 2: Selector Unificado de Artículo Recepcionado */}
+                        <div style={{ background: 'var(--btn-secondary-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', marginBottom: '18px' }}>
+                          <label style={{ ...labelStyle, color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Seleccionar Artículo Recepcionado</span>
+                            <span style={{ color: articulosDisponibles.length > 0 ? '#10b981' : '#f59e0b', fontSize: '0.75rem', textTransform: 'none', fontWeight: '600' }}>
+                              ✓ {articulosDisponibles.length} artículo(s) pendiente(s) por revisar
+                            </span>
+                          </label>
+                          <select 
+                            name="codigo" 
+                            value={form.codigo} 
+                            onChange={handleInputChange} 
+                            className="input-field"
+                            style={{ fontWeight: '700', fontSize: '0.95rem', color: form.codigo ? '#3b82f6' : 'var(--text-secondary)' }}
+                          >
+                            <option value="">-- Seleccione un artículo pendiente --</option>
+                            {articulosDisponibles.map(art => (
+                              <option key={art.id} value={art.codigo_articulo}>
+                                ({art.codigo_articulo}) {art.descripcion}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Fila 3: Trazabilidad y Cantidad (4 columnas fluidas) */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                          <div>
+                            <label style={labelStyle}>Lote</label>
+                            <input 
+                              name="lote" 
+                              value={form.lote} 
+                              onChange={handleInputChange} 
+                              className="input-field" 
+                              placeholder="Lote..." 
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>F. Vencimiento</label>
+                            <input 
+                              type="date" 
+                              name="vencimiento" 
+                              value={form.vencimiento} 
+                              onChange={handleInputChange} 
+                              className="input-field" 
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Registro ISP</label>
+                            <input 
+                              name="isp" 
+                              value={form.isp} 
+                              onChange={handleInputChange} 
+                              className="input-field" 
+                              placeholder="Registro ISP..." 
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Cantidad a Ingresar</label>
+                            <input 
+                              type="number" 
+                              name="cantidad" 
+                              value={form.cantidad} 
+                              onChange={handleInputChange} 
+                              className="input-field" 
+                              placeholder="0" 
+                              style={{ fontWeight: '700' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Fila 4: Precios, Carta de Canje y Botón de Nota */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'end', marginBottom: '22px' }}>
+                          <div>
+                            <label style={labelStyle}>P. Unitario Sin IVA ($)</label>
+                            <input 
+                              type="number" 
+                              step="any"
+                              name="valor_sin_iva" 
+                              value={form.valor_sin_iva} 
+                              onChange={handleInputChange} 
+                              className="input-field" 
+                              placeholder="0" 
+                              style={{ fontWeight: '700' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Condición Especial</label>
+                            <label style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between',
+                              background: 'var(--input-bg)', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '8px', 
+                              padding: '9px 14px', 
+                              height: '42px', 
+                              cursor: 'pointer',
+                              userSelect: 'none'
+                            }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>Carta de Canje</span>
+                              <input 
+                                type="checkbox" 
+                                name="carta_canje" 
+                                id="carta_canje"
+                                checked={form.carta_canje} 
+                                onChange={handleInputChange} 
+                                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }}
+                              />
+                            </label>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Bitácora / Anotación</label>
+                            <button
+                              type="button"
+                              onClick={() => setIsNoteModalOpen(true)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                height: '42px',
+                                borderRadius: '8px',
+                                border: form.nota?.trim() ? '1px solid #a855f7' : '1px dashed var(--border-color)',
+                                background: form.nota?.trim() ? 'rgba(168, 85, 247, 0.15)' : 'var(--input-bg)',
+                                color: form.nota?.trim() ? '#c084fc' : 'var(--text-secondary)',
+                                fontWeight: '700',
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <FileText size={16} />
+                              {form.nota?.trim() ? '✓ Nota Agregada (1)' : '+ Agregar Nota'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Botón de Añadir */}
+                        <button 
+                          onClick={handleAddItem} 
+                          className="btn-primary" 
+                          style={{ width: '100%', padding: '14px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700', fontSize: '0.95rem' }}
+                        >
+                          <Plus size={20} /> Añadir Artículo a la Revisión
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Tabla de Lista Actual */}
               <div className="glass-card" style={{ padding: '24px', overflow: 'hidden' }}>
