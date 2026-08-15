@@ -2494,9 +2494,11 @@ const SeguimientoOCModule = () => {
                       </thead>
                       <tbody>
                         {(selectedOcForModal.ordenes_compra_articulos || []).map((art, idx) => {
-                          const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
+                          const descripcionArt = articulosCatalog[art.codigo_articulo] || '';
+                          const tituloCompleto = art.codigo_articulo 
+                            ? `(${art.codigo_articulo}) ${descripcionArt || 'Artículo ' + art.codigo_articulo}`
+                            : (descripcionArt || 'Artículo');
                           const cantSol = art.cantidad || 0;
-                          const cantRec = art.cantidad_recepcionada || 0;
                           const estadoArt = art.estado_recepcion || 'Pendiente';
                           const historialList = Array.isArray(art.historial_cambios) ? art.historial_cambios : [];
                           const isExpanded = expandedArticleId === (art.id || idx);
@@ -2529,15 +2531,11 @@ const SeguimientoOCModule = () => {
                                 }}
                               >
                                 <td style={{ padding: '12px 12px', verticalAlign: 'top' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    <div style={{ fontWeight: '600', color: '#f8fafc', lineHeight: '1.4' }}>{nombreArt}</div>
+                                  <div style={{ fontWeight: '600', color: '#f8fafc', lineHeight: '1.4' }}>
+                                    {tituloCompleto}
                                   </div>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
-                                    <span style={{ color: '#64748b' }}>Cód: {art.codigo_articulo}</span>
-                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
                                     <span>Solicitado: <strong style={{ color: '#cbd5e1' }}>{cantSol} uds.</strong></span>
-                                    <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
-                                    <span>Recibido: <strong style={{ color: cantRec >= cantSol ? '#10b981' : '#f59e0b' }}>{cantRec} uds.</strong></span>
                                     <span style={{ color: 'rgba(255,255,255,0.1)' }}>•</span>
                                     <span style={{ 
                                       display: 'inline-flex', 
@@ -2571,28 +2569,25 @@ const SeguimientoOCModule = () => {
                                   </span>
                                 </td>
                               </tr>
-                              {/* Fila expandible con el Historial Acumulativo */}
+                              {/* Fila expandible minimalista con el Historial */}
                               {isExpanded && (
-                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(15, 23, 42, 0.4)' }}>
-                                  <td colSpan={2} style={{ padding: '0 12px 14px 12px' }}>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(15, 23, 42, 0.3)' }}>
+                                  <td colSpan={2} style={{ padding: '0 12px 10px 12px' }}>
                                     <div style={{
-                                      padding: '12px 14px',
-                                      background: 'rgba(15, 23, 42, 0.65)',
-                                      borderRadius: '8px',
-                                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                                      padding: '8px 12px',
+                                      background: 'rgba(15, 23, 42, 0.5)',
+                                      borderRadius: '6px',
+                                      border: '1px solid rgba(255, 255, 255, 0.06)',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '8px'
+                                      gap: '6px'
                                     }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Clock size={13} color="#3b82f6" /> Historial de Cambios de Estado ({historialList.length})
-                                      </div>
                                       {historialList.length === 0 ? (
-                                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '4px 0' }}>
-                                          Sin cambios registrados aún (Estado actual: <strong style={{ color: cfg.color }}>{estadoArt}</strong>)
+                                        <div style={{ fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic' }}>
+                                          Sin cambios registrados
                                         </div>
                                       ) : (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                           {historialList.map((h, hIdx) => {
                                             const deCfg = estadoConfig[h.de] || estadoConfig['Pendiente'];
                                             const aCfg = estadoConfig[h.a] || estadoConfig['Pendiente'];
@@ -2606,23 +2601,21 @@ const SeguimientoOCModule = () => {
                                                   flexWrap: 'wrap', 
                                                   gap: '8px', 
                                                   fontSize: '0.78rem', 
-                                                  padding: '6px 8px',
-                                                  background: 'rgba(255, 255, 255, 0.02)',
-                                                  borderRadius: '6px',
-                                                  border: '1px solid rgba(255, 255, 255, 0.03)'
+                                                  padding: '4px 6px',
+                                                  borderRadius: '4px'
                                                 }}
                                               >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: aCfg.color }}></span>
-                                                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: deCfg.bg, color: deCfg.color }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                  <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: aCfg.color }}></span>
+                                                  <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: deCfg.bg, color: deCfg.color }}>
                                                     {h.de}
                                                   </span>
-                                                  <span style={{ color: '#64748b', fontWeight: '700' }}>➔</span>
-                                                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: aCfg.bg, color: aCfg.color }}>
+                                                  <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.75rem' }}>➔</span>
+                                                  <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: aCfg.bg, color: aCfg.color }}>
                                                     {h.a}
                                                   </span>
                                                 </div>
-                                                <span style={{ color: '#cbd5e1', fontSize: '0.74rem' }}>
+                                                <span style={{ color: '#94a3b8', fontSize: '0.73rem' }}>
                                                   {h.fecha ? formatDateTime(h.fecha) : 'Fecha no registrada'}
                                                 </span>
                                               </div>
