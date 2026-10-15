@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Plus, Search, Edit2, Trash2, X, Save, Phone, Mail, MapPin, Building2, Hash, FileCheck } from 'lucide-react';
+import { 
+  Plus, Search, Edit2, Trash2, X, Save, Phone, Mail, 
+  MapPin, Building2, Hash, FileCheck, FolderOpen, ExternalLink, Check 
+} from 'lucide-react';
 
 const ProveedoresModule = () => {
   const [proveedores, setProveedores] = useState([]);
@@ -11,9 +14,25 @@ const ProveedoresModule = () => {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
 
-  const formVacio = { rut: '', nombre_proveedor: '', telefono_contacto: '', correo: '', direccion: '', resolucion_sanitaria: '' };
+  const NEXTCLOUD_BASE_URL = 'http://10.129.96.22:8080/index.php/apps/files/files';
+
+  const formVacio = { 
+    rut: '', 
+    nombre_proveedor: '', 
+    telefono_contacto: '', 
+    correo: '', 
+    direccion: '', 
+    resolucion_sanitaria: '',
+    ruta_documento: ''
+  };
   const [form, setForm] = useState(formVacio);
+
+  const mostrarToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 4000);
+  };
 
   const cargarProveedores = useCallback(async () => {
     setLoading(true);
@@ -43,6 +62,7 @@ const ProveedoresModule = () => {
       correo: prov.correo || '',
       direccion: prov.direccion || '',
       resolucion_sanitaria: prov.resolucion_sanitaria || '',
+      ruta_documento: prov.ruta_documento || '',
     });
     setError('');
     setShowModal(true);
@@ -67,18 +87,43 @@ const ProveedoresModule = () => {
     setGuardando(false);
     cerrarModal();
     cargarProveedores();
+    mostrarToast(editando ? 'Proveedor actualizado con éxito.' : 'Proveedor creado con éxito.');
   };
 
   const eliminar = async (id) => {
     await supabase.from('proveedores').delete().eq('id', id);
     setConfirmDelete(null);
     cargarProveedores();
+    mostrarToast('Proveedor eliminado.');
+  };
+
+  const manejarAbrirDocumento = (prov) => {
+    const ruta = prov.ruta_documento?.trim();
+    if (!ruta) {
+      // Si no tiene ruta específica, abrir la vista principal de Nextcloud Files
+      window.open(NEXTCLOUD_BASE_URL, '_blank', 'noopener,noreferrer');
+      mostrarToast('Abriendo Nextcloud Files...');
+      return;
+    }
+
+    if (ruta.startsWith('http://') || ruta.startsWith('https://')) {
+      window.open(ruta, '_blank', 'noopener,noreferrer');
+    } else {
+      // Es una ruta local o de red tipo Windows (C:\... o \\...)
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(ruta);
+        mostrarToast(`Ruta copiada al portapapeles: ${ruta}`);
+      } else {
+        alert(`Ruta del documento:\n${ruta}`);
+      }
+    }
   };
 
   const filtrados = proveedores.filter(p =>
     p.nombre_proveedor?.toLowerCase().includes(search.toLowerCase()) ||
     p.rut?.toLowerCase().includes(search.toLowerCase()) ||
-    p.resolucion_sanitaria?.toLowerCase().includes(search.toLowerCase())
+    p.resolucion_sanitaria?.toLowerCase().includes(search.toLowerCase()) ||
+    p.ruta_documento?.toLowerCase().includes(search.toLowerCase())
   );
 
   const s = {
@@ -123,7 +168,7 @@ const ProveedoresModule = () => {
         <Search size={16} color="#64748b" />
         <input
           style={s.searchInput}
-          placeholder="Buscar por nombre, RUT o resolución..."
+          placeholder="Buscar por nombre, RUT, resolución o documento..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -170,7 +215,25 @@ const ProveedoresModule = () => {
                   <td style={s.td}>{p.telefono_contacto || <span style={{ color: '#334155' }}>—</span>}</td>
                   <td style={s.td}>{p.correo || <span style={{ color: '#334155' }}>—</span>}</td>
                   <td style={s.td}>{p.direccion || <span style={{ color: '#334155' }}>—</span>}</td>
-                  <td style={{ ...s.td, textAlign: 'right' }}>
+                  <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {/* Botón para ver/abrir archivo o carpeta en Nextcloud */}
+                    <button 
+                      style={{
+                        ...s.btnIcon,
+                        color: p.ruta_documento ? '#38bdf8' : '#64748b',
+                        background: p.ruta_documento ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255,255,255,0.04)',
+                        borderColor: p.ruta_documento ? 'rgba(56, 189, 248, 0.35)' : 'rgba(255,255,255,0.08)',
+                      }} 
+                      title={p.ruta_documento ? `Abrir archivo/carpeta: ${p.ruta_documento}` : 'Abrir Nextcloud Files'} 
+                      onClick={() => manejarAbrirDocumento(p)}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)'; e.currentTarget.style.color = '#38bdf8'; }}
+                      onMouseLeave={e => { 
+                        e.currentTarget.style.background = p.ruta_documento ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255,255,255,0.04)'; 
+                        e.currentTarget.style.color = p.ruta_documento ? '#38bdf8' : '#64748b'; 
+                      }}
+                    >
+                      <FolderOpen size={15} />
+                    </button>
                     <button style={s.btnIcon} title="Editar" onClick={() => abrirEditar(p)}
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; e.currentTarget.style.color = '#3b82f6'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#94a3b8'; }}>
@@ -214,6 +277,28 @@ const ProveedoresModule = () => {
             <div style={s.inputGroup}>
               <FileCheck size={16} color="#10b981" />
               <input style={s.input} placeholder="Ej: Res. N° 12345/2023" value={form.resolucion_sanitaria} onChange={e => setForm({ ...form, resolucion_sanitaria: e.target.value })} />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={s.label}>Documento / Carpeta en Nextcloud</label>
+              <a 
+                href={NEXTCLOUD_BASE_URL} 
+                target="_blank" 
+                rel="noreferrer"
+                style={{ fontSize: '0.74rem', color: '#38bdf8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}
+                title="Abrir Nextcloud Files en pestaña nueva"
+              >
+                <ExternalLink size={12} /> Abrir Nextcloud
+              </a>
+            </div>
+            <div style={s.inputGroup}>
+              <FolderOpen size={16} color="#38bdf8" />
+              <input 
+                style={s.input} 
+                placeholder="Enlace Nextcloud (http://...) o ruta local (C:\...)" 
+                value={form.ruta_documento} 
+                onChange={e => setForm({ ...form, ruta_documento: e.target.value })} 
+              />
             </div>
 
             <label style={s.label}>Teléfono Contacto</label>
@@ -261,6 +346,30 @@ const ProveedoresModule = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Notificación Toast flotante */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: '#0f172a',
+          border: '1px solid #38bdf8',
+          color: '#f1f5f9',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          zIndex: 9999,
+          fontSize: '0.88rem',
+          maxWidth: '90vw'
+        }}>
+          <Check size={18} color="#38bdf8" />
+          <span>{toast}</span>
         </div>
       )}
     </div>
