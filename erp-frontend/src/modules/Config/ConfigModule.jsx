@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit2, Trash2, Save, X, MapPin, Search, Database, AlertTriangle, List, Calendar, DollarSign, Info, Building2 } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, Save, X, MapPin, Search, Database, AlertTriangle, List, Calendar, DollarSign, Info, Building2, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import ProveedoresModule from '../Proveedores/ProveedoresModule';
+import PlantillasCorreoConfig from './PlantillasCorreoConfig';
 import { formatDate } from '../../utils/dateFormatter';
 
 const ConfigModule = () => {
@@ -630,6 +631,13 @@ const ConfigModule = () => {
         >
           <Building2 size={18} /> Proveedores
         </button>
+        <button 
+          onClick={() => setActiveTab('plantillas_correo')}
+          className={activeTab === 'plantillas_correo' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Mail size={18} /> Tipos de Correo
+        </button>
       </div>
 
       {/* ==========================================
@@ -882,6 +890,13 @@ const ConfigModule = () => {
           ========================================== */}
       {activeTab === 'proveedores' && (
         <ProveedoresModule />
+      )}
+
+      {/* ==========================================
+          VISTA: TIPOS Y PLANTILLAS DE CORREO
+          ========================================== */}
+      {activeTab === 'plantillas_correo' && (
+        <PlantillasCorreoConfig />
       )}
 
       {/* ==========================================

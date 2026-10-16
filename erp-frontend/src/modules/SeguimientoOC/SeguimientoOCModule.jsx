@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
-  Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp
+  Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -207,6 +207,19 @@ const SeguimientoOCModule = () => {
 
   // Option A state: Items already assigned in other OCs for the same request
   const [articulosYaAsignados, setArticulosYaAsignados] = useState([]);
+
+  // States for Email Modal (Outlook Web)
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [selectedOcForEmail, setSelectedOcForEmail] = useState(null);
+  const [plantillasCorreo, setPlantillasCorreo] = useState([]);
+  const [selectedPlantillaId, setSelectedPlantillaId] = useState('');
+  const [loadingEmailData, setLoadingEmailData] = useState(false);
+  const [emailPara, setEmailPara] = useState('');
+  const [emailCc, setEmailCc] = useState('');
+  const [emailAsunto, setEmailAsunto] = useState('');
+  const [emailCuerpo, setEmailCuerpo] = useState('');
+  const [proveedorTieneEmail, setProveedorTieneEmail] = useState(false);
+  const [copiadoFeedback, setCopiadoFeedback] = useState(false);
 
   const handleDateDisplayChange = (e) => {
     const val = e.target.value;
@@ -517,6 +530,119 @@ const SeguimientoOCModule = () => {
     cargarProveedores();
     cargarSolicitudesOptions();
   }, []);
+
+  // Helper para sustituir variables dinámicas en asunto y cuerpo
+  const aplicarVariablesCorreo = (texto, oc) => {
+    if (!texto) return '';
+    return texto
+      .replace(/{numero_oc}/gi, oc?.numero_oc || '')
+      .replace(/{proveedor}/gi, oc?.proveedor || '')
+      .replace(/{solicitud_compra}/gi, oc?.solicitud_compra || '')
+      .replace(/{tipo_oc}/gi, oc?.tipo_oc || '')
+      .replace(/{fecha_tope_aceptacion}/gi, formatISOToDisplay(oc?.fecha_tope_aceptacion) || '-')
+      .replace(/{fecha_tope_entrega}/gi, formatISOToDisplay(oc?.fecha_tope_entrega) || '-')
+      .replace(/{fecha_tope_multa}/gi, formatISOToDisplay(oc?.fecha_tope_multa) || '-');
+  };
+
+  // Abrir ventana modal para preparar correo a proveedor
+  const handleAbrirModalCorreo = async (oc) => {
+    setSelectedOcForEmail(oc);
+    setIsEmailModalOpen(true);
+    setLoadingEmailData(true);
+    setCopiadoFeedback(false);
+
+    try {
+      // 1. Buscar email del proveedor en tabla 'proveedores'
+      let provEmail = '';
+      let hasEmail = false;
+
+      if (oc.rut_proveedor) {
+        const { data: provData } = await supabase
+          .from('proveedores')
+          .select('correo, nombre_proveedor')
+          .eq('rut', oc.rut_proveedor.trim())
+          .maybeSingle();
+
+        if (provData && provData.correo) {
+          provEmail = provData.correo.trim();
+          hasEmail = true;
+        }
+      }
+
+      if (!provEmail && oc.proveedor) {
+        const { data: provByName } = await supabase
+          .from('proveedores')
+          .select('correo')
+          .ilike('nombre_proveedor', `%${oc.proveedor.trim()}%`)
+          .maybeSingle();
+
+        if (provByName && provByName.correo) {
+          provEmail = provByName.correo.trim();
+          hasEmail = true;
+        }
+      }
+
+      setEmailPara(provEmail);
+      setProveedorTieneEmail(hasEmail);
+
+      // 2. Cargar plantillas de correo desde 'plantillas_correo'
+      const { data: templates } = await supabase
+        .from('plantillas_correo')
+        .select('*')
+        .order('id', { ascending: true });
+
+      const tList = templates || [];
+      setPlantillasCorreo(tList);
+
+      if (tList.length > 0) {
+        const first = tList[0];
+        setSelectedPlantillaId(String(first.id));
+        setEmailCc(first.con_copia || '');
+        setEmailAsunto(aplicarVariablesCorreo(first.asunto, oc));
+        setEmailCuerpo(aplicarVariablesCorreo(first.cuerpo, oc));
+      } else {
+        setSelectedPlantillaId('');
+        setEmailCc('');
+        setEmailAsunto(`ORDEN DE COMPRA ${oc.numero_oc} - DROGUERÍA MUNICIPAL`);
+        setEmailCuerpo(`Estimados ${oc.proveedor},\n\nJunto con saludar, nos comunicamos respecto a la Orden de Compra N° ${oc.numero_oc}.\n\nSaludos cordiales,\nDroguería`);
+      }
+
+    } catch (err) {
+      console.error('Error al preparar modal de correo:', err);
+    } finally {
+      setLoadingEmailData(false);
+    }
+  };
+
+  // Cambiar plantilla seleccionada en el modal
+  const handleCambiarPlantilla = (plantillaId) => {
+    setSelectedPlantillaId(plantillaId);
+    const plantilla = plantillasCorreo.find(p => String(p.id) === String(plantillaId));
+    if (plantilla && selectedOcForEmail) {
+      setEmailCc(plantilla.con_copia || '');
+      setEmailAsunto(aplicarVariablesCorreo(plantilla.asunto, selectedOcForEmail));
+      setEmailCuerpo(aplicarVariablesCorreo(plantilla.cuerpo, selectedOcForEmail));
+    }
+  };
+
+  // Abrir deeplink oficial de Outlook Web en nueva pestaña
+  const handleAbrirOutlookWeb = () => {
+    if (!emailPara.trim()) {
+      if (!window.confirm('No has ingresado correo de destinatario en la casilla "Para". ¿Deseas abrir Outlook Web de todas formas?')) {
+        return;
+      }
+    }
+    const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(emailPara.trim())}&cc=${encodeURIComponent(emailCc.trim())}&subject=${encodeURIComponent(emailAsunto)}&body=${encodeURIComponent(emailCuerpo)}`;
+    window.open(outlookUrl, '_blank');
+  };
+
+  // Copiar asunto y cuerpo al portapapeles
+  const handleCopiarContenido = () => {
+    const fullText = `PARA: ${emailPara}\nCC: ${emailCc}\nASUNTO: ${emailAsunto}\n\n${emailCuerpo}`;
+    navigator.clipboard.writeText(fullText);
+    setCopiadoFeedback(true);
+    setTimeout(() => setCopiadoFeedback(false), 2500);
+  };
 
   // Update status directly from table
   const handleUpdateEstado = async (ocId, nuevoEstado) => {
@@ -955,7 +1081,7 @@ const SeguimientoOCModule = () => {
               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>PROVEEDOR / RUT</th>
               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>FECHAS CLAVE</th>
               <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>ESTADO OC</th>
-              <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600', width: '80px', textAlign: 'center' }}>ACCIONES</th>
+              <th style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600', width: '150px', textAlign: 'center' }}>ACCIONES</th>
             </tr>
           </thead>
           <tbody>
@@ -1063,26 +1189,50 @@ const SeguimientoOCModule = () => {
                     </select>
                   </td>
                   <td style={{ padding: '16px', textAlign: 'center' }}>
-                    <button 
-                      onClick={() => handleDeleteOC(oc.id, oc.numero_oc)}
-                      style={{ 
-                        color: '#ef4444', 
-                        background: 'none', 
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        padding: '6px', 
-                        borderRadius: '6px',
-                        transition: 'all 0.2s',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                      onMouseOut={(e) => e.currentTarget.style.background = 'none'}
-                      title="Eliminar Orden de Compra"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                      <button 
+                        onClick={() => handleAbrirModalCorreo(oc)}
+                        style={{ 
+                          color: '#38bdf8', 
+                          background: 'rgba(56, 189, 248, 0.12)', 
+                          border: '1px solid rgba(56, 189, 248, 0.3)', 
+                          cursor: 'pointer', 
+                          padding: '6px 10px', 
+                          borderRadius: '6px',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.78rem',
+                          fontWeight: '700'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)'}
+                        title="Enviar correo a proveedor vía Outlook Web"
+                      >
+                        <Mail size={14} /> Correo
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteOC(oc.id, oc.numero_oc)}
+                        style={{ 
+                          color: '#ef4444', 
+                          background: 'none', 
+                          border: 'none', 
+                          cursor: 'pointer', 
+                          padding: '6px', 
+                          borderRadius: '6px',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'none'}
+                        title="Eliminar Orden de Compra"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -2643,6 +2793,202 @@ const SeguimientoOCModule = () => {
                   Cerrar Ventana
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: ENVIAR CORREO A PROVEEDOR (OUTLOOK WEB) */}
+      <AnimatePresence>
+        {isEmailModalOpen && selectedOcForEmail && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '20px'
+            }}
+            onClick={() => setIsEmailModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#0f172a',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '720px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '26px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
+              }}
+            >
+              {/* Header Modal */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '14px', marginBottom: '18px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Mail size={22} color="#38bdf8" />
+                    Enviar Correo a Proveedor (OC: {selectedOcForEmail.numero_oc})
+                  </h3>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '4px' }}>
+                    {selectedOcForEmail.proveedor} {selectedOcForEmail.rut_proveedor ? `(RUT: ${selectedOcForEmail.rut_proveedor})` : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsEmailModalOpen(false)}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {loadingEmailData ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                  <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 10px auto' }} />
+                  Cargando datos del proveedor y plantillas...
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Selector de Tipo de Correo */}
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: '700', display: 'block', marginBottom: '6px' }}>
+                      Tipo de Correo (Plantilla Configurada en Ajustes)
+                    </label>
+                    <select
+                      value={selectedPlantillaId}
+                      onChange={(e) => handleCambiarPlantilla(e.target.value)}
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem', fontWeight: '600' }}
+                    >
+                      {plantillasCorreo.length === 0 ? (
+                        <option value="">(No hay plantillas creadas en Ajustes - Redacción libre)</option>
+                      ) : (
+                        plantillasCorreo.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.titulo}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Campo Para (Destinatario) */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600' }}>
+                        Para (Correo del Proveedor) *
+                      </label>
+                      {proveedorTieneEmail ? (
+                        <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Check size={12} /> Obtenido de ficha de proveedores
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', color: '#eab308' }}>
+                          ⚠️ Sin correo registrado en ficha (escríbelo aquí)
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      value={emailPara}
+                      onChange={(e) => setEmailPara(e.target.value)}
+                      placeholder="proveedor@empresa.cl"
+                    />
+                  </div>
+
+                  {/* Campo Con Copia (CC) */}
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                      Con Copia (CC)
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      value={emailCc}
+                      onChange={(e) => setEmailCc(e.target.value)}
+                      placeholder="adquisiciones@salud.cl, bodega@salud.cl"
+                    />
+                  </div>
+
+                  {/* Campo Asunto */}
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                      Asunto
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem', fontWeight: '600' }}
+                      value={emailAsunto}
+                      onChange={(e) => setEmailAsunto(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Campo Cuerpo del Mensaje */}
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                      Cuerpo del Mensaje (Pre-rellenado con datos de la OC)
+                    </label>
+                    <textarea
+                      rows={8}
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem', lineHeight: 1.5, resize: 'vertical' }}
+                      value={emailCuerpo}
+                      onChange={(e) => setEmailCuerpo(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Botonera de Envío */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={handleCopiarContenido}
+                      className="btn-secondary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    >
+                      {copiadoFeedback ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                      {copiadoFeedback ? '¡Copiado al portapapeles!' : 'Copiar Asunto y Mensaje'}
+                    </button>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsEmailModalOpen(false)}
+                        className="btn-secondary"
+                      >
+                        Cerrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAbrirOutlookWeb}
+                        className="btn-primary"
+                        style={{
+                          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 18px',
+                          fontWeight: '700'
+                        }}
+                      >
+                        <ExternalLink size={16} /> Abrir en Outlook Web
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
