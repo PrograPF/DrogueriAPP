@@ -215,7 +215,7 @@ const SeguimientoOCModule = () => {
   const [selectedPlantillaId, setSelectedPlantillaId] = useState('');
   const [loadingEmailData, setLoadingEmailData] = useState(false);
   const [emailPara, setEmailPara] = useState('');
-  const [emailCc, setEmailCc] = useState('');
+  const [proveedorCantidadCorreos, setProveedorCantidadCorreos] = useState(0);
   const [emailAsunto, setEmailAsunto] = useState('');
   const [emailCuerpo, setEmailCuerpo] = useState('');
   const [proveedorTieneEmail, setProveedorTieneEmail] = useState(false);
@@ -644,9 +644,19 @@ const SeguimientoOCModule = () => {
       const descArt = await resolverDescriptorArticuloOc(oc);
       setEmailDescriptorArticulo(descArt);
 
-      // 2. Buscar email del proveedor en tabla 'proveedores'
+      // 2. Buscar email(s) del proveedor en tabla 'proveedores'
       let provEmail = '';
-      let hasEmail = false;
+      let cantCorreos = 0;
+
+      const procesarCorreos = (rawCorreo) => {
+        if (!rawCorreo) return '';
+        const list = rawCorreo
+          .split(/[,;]+/)
+          .map(e => e.trim())
+          .filter(Boolean);
+        cantCorreos = list.length;
+        return list.join(', ');
+      };
 
       if (oc.rut_proveedor) {
         const { data: provData } = await supabase
@@ -656,8 +666,7 @@ const SeguimientoOCModule = () => {
           .maybeSingle();
 
         if (provData && provData.correo) {
-          provEmail = provData.correo.trim();
-          hasEmail = true;
+          provEmail = procesarCorreos(provData.correo);
         }
       }
 
@@ -669,13 +678,13 @@ const SeguimientoOCModule = () => {
           .maybeSingle();
 
         if (provByName && provByName.correo) {
-          provEmail = provByName.correo.trim();
-          hasEmail = true;
+          provEmail = procesarCorreos(provByName.correo);
         }
       }
 
       setEmailPara(provEmail);
-      setProveedorTieneEmail(hasEmail);
+      setProveedorTieneEmail(cantCorreos > 0);
+      setProveedorCantidadCorreos(cantCorreos);
 
       // 3. Cargar plantillas de correo desde 'plantillas_correo'
       const { data: templates } = await supabase
@@ -689,12 +698,10 @@ const SeguimientoOCModule = () => {
       if (tList.length > 0) {
         const first = tList[0];
         setSelectedPlantillaId(String(first.id));
-        setEmailCc(first.con_copia || '');
         setEmailAsunto(aplicarVariablesCorreo(first.asunto, oc, descArt));
         setEmailCuerpo(aplicarVariablesCorreo(first.cuerpo, oc, descArt));
       } else {
         setSelectedPlantillaId('');
-        setEmailCc('');
         setEmailAsunto(`ORDEN DE COMPRA ${oc.numero_oc} - DROGUERÍA MUNICIPAL`);
         setEmailCuerpo(`Estimados ${oc.proveedor},\n\nJunto con saludar, nos comunicamos respecto a la Orden de Compra N° ${oc.numero_oc}.\n\nSaludos cordiales,\nDroguería`);
       }
@@ -711,7 +718,6 @@ const SeguimientoOCModule = () => {
     setSelectedPlantillaId(plantillaId);
     const plantilla = plantillasCorreo.find(p => String(p.id) === String(plantillaId));
     if (plantilla && selectedOcForEmail) {
-      setEmailCc(plantilla.con_copia || '');
       setEmailAsunto(aplicarVariablesCorreo(plantilla.asunto, selectedOcForEmail, emailDescriptorArticulo));
       setEmailCuerpo(aplicarVariablesCorreo(plantilla.cuerpo, selectedOcForEmail, emailDescriptorArticulo));
     }
@@ -724,13 +730,21 @@ const SeguimientoOCModule = () => {
         return;
       }
     }
-    const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(emailPara.trim())}&cc=${encodeURIComponent(emailCc.trim())}&subject=${encodeURIComponent(emailAsunto)}&body=${encodeURIComponent(emailCuerpo)}`;
+
+    // Normalizar múltiples correos separados por comas sin espacios para el parámetro 'to'
+    const destinatarios = emailPara
+      .split(/[,;]+/)
+      .map(e => e.trim())
+      .filter(Boolean)
+      .join(',');
+
+    const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(destinatarios)}&subject=${encodeURIComponent(emailAsunto)}&body=${encodeURIComponent(emailCuerpo)}`;
     window.open(outlookUrl, '_blank');
   };
 
   // Copiar asunto y cuerpo al portapapeles
   const handleCopiarContenido = () => {
-    const fullText = `PARA: ${emailPara}\nCC: ${emailCc}\nASUNTO: ${emailAsunto}\n\n${emailCuerpo}`;
+    const fullText = `PARA: ${emailPara}\nASUNTO: ${emailAsunto}\n\n${emailCuerpo}`;
     navigator.clipboard.writeText(fullText);
     setCopiadoFeedback(true);
     setTimeout(() => setCopiadoFeedback(false), 2500);
@@ -2973,19 +2987,19 @@ const SeguimientoOCModule = () => {
                     </select>
                   </div>
 
-                  {/* Campo Para (Destinatario) */}
+                  {/* Campo Para (Destinatarios del Proveedor) */}
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600' }}>
-                        Para (Correo del Proveedor) *
+                        Para (Destinatario{proveedorCantidadCorreos > 1 ? 's' : ''}) *
                       </label>
                       {proveedorTieneEmail ? (
                         <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Check size={12} /> Obtenido de ficha de proveedores
+                          <Check size={12} /> {proveedorCantidadCorreos > 1 ? `${proveedorCantidadCorreos} correos obtenidos de ficha de proveedores` : 'Obtenido de ficha de proveedores'}
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.72rem', color: '#eab308' }}>
-                          ⚠️ Sin correo registrado en ficha (escríbelo aquí)
+                          ⚠️ Sin correo registrado en ficha (sepáralos con coma si son varios)
                         </span>
                       )}
                     </div>
@@ -2995,22 +3009,7 @@ const SeguimientoOCModule = () => {
                       style={{ width: '100%', fontSize: '0.85rem' }}
                       value={emailPara}
                       onChange={(e) => setEmailPara(e.target.value)}
-                      placeholder="proveedor@empresa.cl"
-                    />
-                  </div>
-
-                  {/* Campo Con Copia (CC) */}
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
-                      Con Copia (CC)
-                    </label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      style={{ width: '100%', fontSize: '0.85rem' }}
-                      value={emailCc}
-                      onChange={(e) => setEmailCc(e.target.value)}
-                      placeholder="adquisiciones@salud.cl, bodega@salud.cl"
+                      placeholder="ventas@proveedor.cl, contacto@proveedor.cl"
                     />
                   </div>
 

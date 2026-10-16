@@ -77,11 +77,24 @@ const ProveedoresModule = () => {
     }
     setGuardando(true);
     setError('');
+
+    // Normalizar múltiples correos separados por comas o punto y coma
+    const correosLimpios = (form.correo || '')
+      .split(/[,;]+/)
+      .map(c => c.trim())
+      .filter(Boolean)
+      .join(', ');
+
+    const datosGuardar = {
+      ...form,
+      correo: correosLimpios
+    };
+
     if (editando) {
-      const { error } = await supabase.from('proveedores').update(form).eq('id', editando.id);
+      const { error } = await supabase.from('proveedores').update(datosGuardar).eq('id', editando.id);
       if (error) { setError('Error al actualizar: ' + error.message); setGuardando(false); return; }
     } else {
-      const { error } = await supabase.from('proveedores').insert([form]);
+      const { error } = await supabase.from('proveedores').insert([datosGuardar]);
       if (error) { setError('Error al guardar: ' + error.message); setGuardando(false); return; }
     }
     setGuardando(false);
@@ -213,7 +226,19 @@ const ProveedoresModule = () => {
                     )}
                   </td>
                   <td style={s.td}>{p.telefono_contacto || <span style={{ color: '#334155' }}>—</span>}</td>
-                  <td style={s.td}>{p.correo || <span style={{ color: '#334155' }}>—</span>}</td>
+                  <td style={s.td}>
+                    {p.correo ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxWidth: '240px' }}>
+                        {p.correo.split(/[,;]+/).map(c => c.trim()).filter(Boolean).map((email, idx) => (
+                          <span key={idx} style={{ fontSize: '0.82rem', color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {email}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: '#334155' }}>—</span>
+                    )}
+                  </td>
                   <td style={s.td}>{p.direccion || <span style={{ color: '#334155' }}>—</span>}</td>
                   <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {/* Botón para ver/abrir archivo o carpeta en Nextcloud */}
@@ -307,10 +332,21 @@ const ProveedoresModule = () => {
               <input style={s.input} placeholder="+56 9 1234 5678" value={form.telefono_contacto} onChange={e => setForm({ ...form, telefono_contacto: e.target.value })} />
             </div>
 
-            <label style={s.label}>Correo</label>
-            <div style={s.inputGroup}>
-              <Mail size={16} color="#64748b" />
-              <input style={s.input} placeholder="contacto@proveedor.cl" type="email" value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} />
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ ...s.label, marginBottom: 0 }}>Correo(s) de Contacto</label>
+                <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>Separar con coma ( , ) si son varios</span>
+              </div>
+              <div style={{ ...s.inputGroup, marginBottom: 0 }}>
+                <Mail size={16} color="#38bdf8" />
+                <input 
+                  style={s.input} 
+                  placeholder="ventas@proveedor.cl, contacto@proveedor.cl" 
+                  type="text" 
+                  value={form.correo} 
+                  onChange={e => setForm({ ...form, correo: e.target.value })} 
+                />
+              </div>
             </div>
 
             <label style={s.label}>Dirección</label>

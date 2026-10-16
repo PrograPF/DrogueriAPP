@@ -17,7 +17,6 @@ const PlantillasCorreoConfig = () => {
   const formVacio = {
     titulo: '',
     asunto: '',
-    con_copia: '',
     cuerpo: ''
   };
   const [form, setForm] = useState(formVacio);
@@ -74,7 +73,6 @@ const PlantillasCorreoConfig = () => {
     setForm({
       titulo: p.titulo || '',
       asunto: p.asunto || '',
-      con_copia: p.con_copia || '',
       cuerpo: p.cuerpo || ''
     });
     setShowModal(true);
@@ -98,7 +96,6 @@ const PlantillasCorreoConfig = () => {
       const payload = {
         titulo: form.titulo.trim(),
         asunto: form.asunto.trim(),
-        con_copia: form.con_copia.trim(),
         cuerpo: form.cuerpo.trim()
       };
 
@@ -255,11 +252,6 @@ const PlantillasCorreoConfig = () => {
                   <div style={{ fontSize: '0.85rem', color: '#38bdf8', marginTop: '4px', fontWeight: '600' }}>
                     Asunto: <span style={{ color: '#cbd5e1', fontWeight: '400' }}>{p.asunto}</span>
                   </div>
-                  {p.con_copia && (
-                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
-                      Con copia (CC): <span style={{ color: '#e2e8f0' }}>{p.con_copia}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -379,23 +371,6 @@ const PlantillasCorreoConfig = () => {
                   value={form.asunto}
                   onChange={e => setForm(prev => ({ ...prev, asunto: e.target.value }))}
                 />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
-                  Correos con Copia (CC) - Opcional
-                </label>
-                <input
-                  type="text"
-                  placeholder="ej: adquisiciones@salud.cl, bodega@salud.cl"
-                  className="input-field"
-                  style={{ width: '100%' }}
-                  value={form.con_copia}
-                  onChange={e => setForm(prev => ({ ...prev, con_copia: e.target.value }))}
-                />
-                <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '3px', display: 'block' }}>
-                  Separa múltiples correos con comas o puntos y coma.
-                </small>
               </div>
 
               <div>
