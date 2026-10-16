@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { labelStyle } from '../../styles/sharedStyles';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
-import { fetchArticulosCatalogMap } from '../../utils/catalogHelper';
+import { fetchArticulosCatalogMap, resolveArticuloNombre } from '../../utils/catalogHelper';
 import { evaluarYActualizarEstadoSolicitud } from '../../utils/solicitudHelper';
 import { TIPOS_OC, evaluarPlazos, validarOrdenFechas, formatISOToDisplay } from '../../utils/plazosHelper';
 
@@ -219,6 +219,7 @@ const SeguimientoOCModule = () => {
   const [emailAsunto, setEmailAsunto] = useState('');
   const [emailCuerpo, setEmailCuerpo] = useState('');
   const [proveedorTieneEmail, setProveedorTieneEmail] = useState(false);
+  const [emailDescriptorArticulo, setEmailDescriptorArticulo] = useState('');
   const [copiadoFeedback, setCopiadoFeedback] = useState(false);
 
   const handleDateDisplayChange = (e) => {
@@ -532,16 +533,103 @@ const SeguimientoOCModule = () => {
   }, []);
 
   // Helper para sustituir variables dinámicas en asunto y cuerpo
-  const aplicarVariablesCorreo = (texto, oc) => {
+  const aplicarVariablesCorreo = (texto, oc, descriptorArt = '') => {
     if (!texto) return '';
     return texto
       .replace(/{numero_oc}/gi, oc?.numero_oc || '')
       .replace(/{proveedor}/gi, oc?.proveedor || '')
       .replace(/{solicitud_compra}/gi, oc?.solicitud_compra || '')
       .replace(/{tipo_oc}/gi, oc?.tipo_oc || '')
+      .replace(/{articulo}/gi, descriptorArt || '')
+      .replace(/{articulos}/gi, descriptorArt || '')
       .replace(/{fecha_tope_aceptacion}/gi, formatISOToDisplay(oc?.fecha_tope_aceptacion) || '-')
       .replace(/{fecha_tope_entrega}/gi, formatISOToDisplay(oc?.fecha_tope_entrega) || '-')
       .replace(/{fecha_tope_multa}/gi, formatISOToDisplay(oc?.fecha_tope_multa) || '-');
+  };
+
+  // Helper para obtener el descriptor del artículo asociado a la OC o solicitud
+  const resolverDescriptorArticuloOc = async (oc) => {
+    if (!oc) return '';
+    let nombres = [];
+
+    // Asegurar catálogo de artículos cargado
+    let cat = articulosCatalog;
+    if (!cat || Object.keys(cat).length === 0) {
+      try {
+        cat = await fetchArticulosCatalogMap();
+        setArticulosCatalog(cat);
+      } catch (e) {
+        console.warn('No se pudo recargar catálogo:', e);
+      }
+    }
+
+    // 1. Artículos asociados directamente a la OC
+    let artsOc = oc.ordenes_compra_articulos || [];
+    if (artsOc.length === 0 && oc.id) {
+      try {
+        const { data: directArts } = await supabase
+          .from('ordenes_compra_articulos')
+          .select('codigo_articulo')
+          .eq('oc_id', oc.id);
+        if (directArts && directArts.length > 0) {
+          artsOc = directArts;
+        }
+      } catch (err) {
+        console.warn('Error al buscar artículos de OC por ID:', err);
+      }
+    }
+
+    artsOc.forEach(a => {
+      const desc = resolveArticuloNombre(cat, a.codigo_articulo, a.descripcion_articulo || '');
+      if (desc && !desc.startsWith('Artículo [') && desc !== 'Sin código') {
+        nombres.push(desc.trim());
+      } else if (a.codigo_articulo) {
+        nombres.push(`Cód. ${a.codigo_articulo}`);
+      }
+    });
+
+    // 2. Si no tenía artículos o nombres en catálogo, buscar en solicitudes_compra
+    if (nombres.length === 0 && oc.solicitud_compra) {
+      const cleanSol = oc.solicitud_compra.trim();
+      const solNum = cleanSol.startsWith('S-') ? cleanSol : `S-${cleanSol}`;
+      try {
+        const { data: solData } = await supabase
+          .from('solicitudes_compra')
+          .select(`
+            descripcion_articulo,
+            codigo_articulo,
+            solicitudes_compra_articulos (
+              descripcion_articulo,
+              codigo_articulo
+            )
+          `)
+          .or(`numero_solicitud.eq.${cleanSol},numero_solicitud.eq.${solNum}`)
+          .maybeSingle();
+
+        if (solData) {
+          if (solData.solicitudes_compra_articulos && solData.solicitudes_compra_articulos.length > 0) {
+            nombres = solData.solicitudes_compra_articulos
+              .map(s => {
+                const desc = s.descripcion_articulo || resolveArticuloNombre(cat, s.codigo_articulo, '');
+                return (desc && !desc.startsWith('Artículo [')) ? desc : s.codigo_articulo;
+              })
+              .filter(Boolean);
+          } else if (solData.descripcion_articulo) {
+            nombres = [solData.descripcion_articulo.trim()];
+          } else if (solData.codigo_articulo) {
+            const desc = resolveArticuloNombre(cat, solData.codigo_articulo, '');
+            if (desc && !desc.startsWith('Artículo [')) nombres = [desc];
+          }
+        }
+      } catch (err) {
+        console.warn('Error al buscar descriptor en solicitud:', err);
+      }
+    }
+
+    if (nombres.length === 0) return '';
+    if (nombres.length === 1) return nombres[0];
+    if (nombres.length === 2) return `${nombres[0]}, ${nombres[1]}`;
+    return `${nombres[0]} (+ ${nombres.length - 1} más)`;
   };
 
   // Abrir ventana modal para preparar correo a proveedor
@@ -552,7 +640,11 @@ const SeguimientoOCModule = () => {
     setCopiadoFeedback(false);
 
     try {
-      // 1. Buscar email del proveedor en tabla 'proveedores'
+      // 1. Resolver descriptor de artículo(s)
+      const descArt = await resolverDescriptorArticuloOc(oc);
+      setEmailDescriptorArticulo(descArt);
+
+      // 2. Buscar email del proveedor en tabla 'proveedores'
       let provEmail = '';
       let hasEmail = false;
 
@@ -585,7 +677,7 @@ const SeguimientoOCModule = () => {
       setEmailPara(provEmail);
       setProveedorTieneEmail(hasEmail);
 
-      // 2. Cargar plantillas de correo desde 'plantillas_correo'
+      // 3. Cargar plantillas de correo desde 'plantillas_correo'
       const { data: templates } = await supabase
         .from('plantillas_correo')
         .select('*')
@@ -598,8 +690,8 @@ const SeguimientoOCModule = () => {
         const first = tList[0];
         setSelectedPlantillaId(String(first.id));
         setEmailCc(first.con_copia || '');
-        setEmailAsunto(aplicarVariablesCorreo(first.asunto, oc));
-        setEmailCuerpo(aplicarVariablesCorreo(first.cuerpo, oc));
+        setEmailAsunto(aplicarVariablesCorreo(first.asunto, oc, descArt));
+        setEmailCuerpo(aplicarVariablesCorreo(first.cuerpo, oc, descArt));
       } else {
         setSelectedPlantillaId('');
         setEmailCc('');
@@ -620,8 +712,8 @@ const SeguimientoOCModule = () => {
     const plantilla = plantillasCorreo.find(p => String(p.id) === String(plantillaId));
     if (plantilla && selectedOcForEmail) {
       setEmailCc(plantilla.con_copia || '');
-      setEmailAsunto(aplicarVariablesCorreo(plantilla.asunto, selectedOcForEmail));
-      setEmailCuerpo(aplicarVariablesCorreo(plantilla.cuerpo, selectedOcForEmail));
+      setEmailAsunto(aplicarVariablesCorreo(plantilla.asunto, selectedOcForEmail, emailDescriptorArticulo));
+      setEmailCuerpo(aplicarVariablesCorreo(plantilla.cuerpo, selectedOcForEmail, emailDescriptorArticulo));
     }
   };
 

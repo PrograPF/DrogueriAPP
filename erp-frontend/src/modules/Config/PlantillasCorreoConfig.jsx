@@ -24,6 +24,7 @@ const PlantillasCorreoConfig = () => {
 
   const tagsDisponibles = [
     { tag: '{numero_oc}', desc: 'N° de la Orden de Compra (ej: OC-2026-001)' },
+    { tag: '{articulo}', desc: 'Nombre o descriptor del artículo/producto de la compra' },
     { tag: '{proveedor}', desc: 'Nombre de la empresa proveedora' },
     { tag: '{solicitud_compra}', desc: 'N° de Solicitud de Compra (ej: S-1234)' },
     { tag: '{tipo_oc}', desc: 'Tipo de OC (ej: AG, SE, CM, L1, etc.)' },
