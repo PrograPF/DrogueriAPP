@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
 import { formatDate } from '../../utils/dateFormatter';
 import { labelStyle } from '../../styles/sharedStyles';
+import { TIPOS_OC, validarOrdenFechas, formatISOToDisplay } from '../../utils/plazosHelper';
 
 // Helper to format date YYYY-MM-DD
 const getTodayDateString = () => {
@@ -49,6 +50,12 @@ const QFModule = () => {
   const [formCentroCostoId, setFormCentroCostoId] = useState('');
   const [formFechaCreacion, setFormFechaCreacion] = useState(getTodayDateString());
   const [formObservaciones, setFormObservaciones] = useState('');
+
+  // Tipo de compra y fechas tope (plazos de calendario)
+  const [formTipoOc, setFormTipoOc] = useState('AG');
+  const [formTopeAceptacion, setFormTopeAceptacion] = useState('');
+  const [formTopeEntrega, setFormTopeEntrega] = useState('');
+  const [formTopeMulta, setFormTopeMulta] = useState('');
 
   // Sub-Centros de Costo options (for RESOLUTIVIDAD)
   const [subCentrosOptions, setSubCentrosOptions] = useState(['UAPO', 'ORL', 'TD']);
@@ -162,6 +169,10 @@ const QFModule = () => {
     setFormCentroCostoId(centrosCosto[0]?.id ? String(centrosCosto[0].id) : '');
     setFormFechaCreacion(getTodayDateString());
     setFormObservaciones('');
+    setFormTipoOc('AG');
+    setFormTopeAceptacion('');
+    setFormTopeEntrega('');
+    setFormTopeMulta('');
     setArticulosForm([
       { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
     ]);
@@ -175,6 +186,10 @@ const QFModule = () => {
     setFormCentroCostoId(item.centro_costo_id ? String(item.centro_costo_id) : '');
     setFormFechaCreacion(item.fecha_creacion || getTodayDateString());
     setFormObservaciones(item.observaciones || '');
+    setFormTipoOc(item.tipo_oc || 'AG');
+    setFormTopeAceptacion((item.fecha_tope_aceptacion || '').slice(0, 10));
+    setFormTopeEntrega((item.fecha_tope_entrega || '').slice(0, 10));
+    setFormTopeMulta((item.fecha_tope_multa || '').slice(0, 10));
 
     if (item.solicitudes_compra_articulos && item.solicitudes_compra_articulos.length > 0) {
       setArticulosForm(
@@ -287,6 +302,17 @@ const QFModule = () => {
     const matchingOcs = assignedOcsMap[formattedNumero.toUpperCase()] || [];
     const calculatedEstado = matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada';
 
+    const fechasTope = {
+      fecha_tope_aceptacion: formTopeAceptacion || null,
+      fecha_tope_entrega: formTopeEntrega || null,
+      fecha_tope_multa: formTopeMulta || null
+    };
+    const errorFechas = validarOrdenFechas(fechasTope);
+    if (errorFechas) {
+      alert(errorFechas);
+      return;
+    }
+
     try {
       const parentPayload = {
         numero_solicitud: formattedNumero,
@@ -297,7 +323,9 @@ const QFModule = () => {
         observaciones: formObservaciones.trim(),
         codigo_articulo: validArticles[0].codigo.trim().toUpperCase(),
         descripcion_articulo: validArticles[0].descripcion.trim().toUpperCase(),
-        cantidad: parseInt(validArticles[0].cantidad) || 1
+        cantidad: parseInt(validArticles[0].cantidad) || 1,
+        tipo_oc: formTipoOc,
+        ...fechasTope
       };
 
       let parentId = editingSolicitudId;
@@ -572,6 +600,9 @@ const QFModule = () => {
                             {/* Fecha */}
                             <td style={{ padding: '16px', color: '#cbd5e1' }}>
                               {s.fecha_creacion ? formatDate(s.fecha_creacion) : '-'}
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                                {s.tipo_oc || 'AG'} · Entrega: {formatISOToDisplay(s.fecha_tope_entrega)}
+                              </div>
                             </td>
 
                             {/* Centro de costo */}
@@ -730,6 +761,49 @@ const QFModule = () => {
                     value={formFechaCreacion}
                     onChange={(e) => setFormFechaCreacion(e.target.value)}
                   />
+                </div>
+
+                {/* Tipo de Compra y Fechas Tope */}
+                <div style={{
+                  background: 'rgba(59, 130, 246, 0.06)',
+                  border: '1px solid rgba(59, 130, 246, 0.22)',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <strong style={{ color: '#3b82f6', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={16} /> Tipo de Compra y Fechas Tope
+                  </strong>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tipo de OC</label>
+                    <select
+                      className="input-field"
+                      style={{ width: '100%' }}
+                      value={formTipoOc}
+                      onChange={(e) => setFormTipoOc(e.target.value)}
+                    >
+                      {TIPOS_OC.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope aceptación</label>
+                      <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeAceptacion} onChange={(e) => setFormTopeAceptacion(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope entrega (sin multa)</label>
+                      <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeEntrega} onChange={(e) => setFormTopeEntrega(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Fecha tope máxima con multa</label>
+                      <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }} value={formTopeMulta} onChange={(e) => setFormTopeMulta(e.target.value)} />
+                    </div>
+                  </div>
+                  <small style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1.5 }}>
+                    Semáforo: <span style={{ color: '#eab308' }}>amarillo</span> 1 día antes de cada fecha tope · <span style={{ color: '#fb923c' }}>naranja</span> atrasado con multa · <span style={{ color: '#ea580c' }}>naranjo intenso</span> 1 día antes del tope de multa · <span style={{ color: '#ef4444' }}>rojo</span> plazo vencido. El estado de la OC siempre se cambia manualmente.
+                  </small>
                 </div>
 
                 {/* Observaciones */}
@@ -1006,6 +1080,22 @@ const QFModule = () => {
                 <div>
                   <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Estado:</span>
                   <strong style={{ color: '#3b82f6' }}>{selectedSolicitudForModal.estado}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Tipo de OC:</span>
+                  <strong style={{ color: '#f8fafc' }}>{selectedSolicitudForModal.tipo_oc || 'AG'}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Fecha tope aceptación:</span>
+                  <strong style={{ color: '#f8fafc' }}>{formatISOToDisplay(selectedSolicitudForModal.fecha_tope_aceptacion)}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Fecha tope entrega (sin multa):</span>
+                  <strong style={{ color: '#f8fafc' }}>{formatISOToDisplay(selectedSolicitudForModal.fecha_tope_entrega)}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Fecha tope máxima con multa:</span>
+                  <strong style={{ color: '#fb923c' }}>{formatISOToDisplay(selectedSolicitudForModal.fecha_tope_multa)}</strong>
                 </div>
                 {selectedSolicitudForModal.observaciones && (
                   <div style={{ gridColumn: 'span 2' }}>
