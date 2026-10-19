@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
-  Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check
+  Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check,
+  Edit, Edit2, Edit3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -221,6 +222,31 @@ const SeguimientoOCModule = () => {
   const [proveedorTieneEmail, setProveedorTieneEmail] = useState(false);
   const [emailDescriptorArticulo, setEmailDescriptorArticulo] = useState('');
   const [copiadoFeedback, setCopiadoFeedback] = useState(false);
+
+  // States for Edit OC Modal
+  const [editingOc, setEditingOc] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    numero_oc: '',
+    solicitud_compra: '',
+    proveedor: '',
+    rut_proveedor: '',
+    tipo_oc: 'AG',
+    estado: 'Enviada',
+    fecha_envio: '',
+    fecha_aceptacion: '',
+    fecha_tope_aceptacion: '',
+    fecha_tope_entrega: '',
+    fecha_tope_multa: ''
+  });
+  const [editArticulos, setEditArticulos] = useState([]);
+  const [deletedArticleIds, setDeletedArticleIds] = useState([]);
+  const [editProveedorSearch, setEditProveedorSearch] = useState('');
+  const [showEditProveedorSuggestions, setShowEditProveedorSuggestions] = useState(false);
+  const [editSolicitudSearch, setEditSolicitudSearch] = useState('');
+  const [showEditSolicitudSuggestions, setShowEditSolicitudSuggestions] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [nuevoArticuloCodigo, setNuevoArticuloCodigo] = useState('');
+  const [nuevoArticuloCantidad, setNuevoArticuloCantidad] = useState(1);
 
   const handleDateDisplayChange = (e) => {
     const val = e.target.value;
@@ -843,6 +869,289 @@ const SeguimientoOCModule = () => {
     }
   };
 
+  // Open Edit OC Modal
+  const handleAbrirModalEditar = (oc) => {
+    setEditingOc(oc);
+
+    const toDateInputString = (val) => {
+      if (!val) return '';
+      if (typeof val === 'string' && val.length >= 10 && val.includes('-')) {
+        return val.slice(0, 10);
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return '';
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    setEditFormData({
+      numero_oc: oc.numero_oc || '',
+      solicitud_compra: oc.solicitud_compra || '',
+      proveedor: oc.proveedor || '',
+      rut_proveedor: oc.rut_proveedor || '',
+      tipo_oc: oc.tipo_oc || 'AG',
+      estado: oc.estado || 'Enviada',
+      fecha_envio: toDateInputString(oc.fecha_envio),
+      fecha_aceptacion: toDateInputString(oc.fecha_aceptacion),
+      fecha_tope_aceptacion: toDateInputString(oc.fecha_tope_aceptacion),
+      fecha_tope_entrega: toDateInputString(oc.fecha_tope_entrega),
+      fecha_tope_multa: toDateInputString(oc.fecha_tope_multa)
+    });
+
+    setEditProveedorSearch(oc.proveedor || '');
+    setShowEditProveedorSuggestions(false);
+    setEditSolicitudSearch(oc.solicitud_compra || '');
+    setShowEditSolicitudSuggestions(false);
+
+    // Map existing articles
+    const arts = (oc.ordenes_compra_articulos || []).map(a => ({
+      id: a.id,
+      codigo_articulo: a.codigo_articulo,
+      descripcion: articulosCatalog[a.codigo_articulo] || a.codigo_articulo,
+      cantidad: a.cantidad || 1,
+      cantidad_recepcionada: a.cantidad_recepcionada || 0,
+      estado_recepcion: a.estado_recepcion || 'Pendiente'
+    }));
+    setEditArticulos(arts);
+    setDeletedArticleIds([]);
+    setNuevoArticuloCodigo('');
+    setNuevoArticuloCantidad(1);
+  };
+
+  const handleEditArticuloCantidad = (index, newQty) => {
+    const val = parseInt(newQty, 10);
+    setEditArticulos(prev => prev.map((art, idx) => {
+      if (idx !== index) return art;
+      const minQty = art.cantidad_recepcionada || 1;
+      return { ...art, cantidad: isNaN(val) ? '' : Math.max(minQty, val) };
+    }));
+  };
+
+  const handleEliminarArticuloEdit = (index) => {
+    const art = editArticulos[index];
+    if (art.cantidad_recepcionada > 0) {
+      alert(`No se puede eliminar el artículo "${art.codigo_articulo}" porque ya tiene ${art.cantidad_recepcionada} unidad(es) recepcionada(s).`);
+      return;
+    }
+    if (art.id) {
+      setDeletedArticleIds(prev => [...prev, art.id]);
+    }
+    setEditArticulos(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAgregarArticuloEdit = () => {
+    const codigoLimpio = nuevoArticuloCodigo.trim();
+    if (!codigoLimpio) {
+      alert('Debe ingresar el código del artículo.');
+      return;
+    }
+    const yaExiste = editArticulos.some(a => (a.codigo_articulo || '').toLowerCase() === codigoLimpio.toLowerCase());
+    if (yaExiste) {
+      alert(`El artículo "${codigoLimpio}" ya está en la lista de esta Orden de Compra.`);
+      return;
+    }
+
+    const desc = articulosCatalog[codigoLimpio] || `Artículo ${codigoLimpio}`;
+    setEditArticulos(prev => [
+      ...prev,
+      {
+        id: null,
+        codigo_articulo: codigoLimpio,
+        descripcion: desc,
+        cantidad: parseInt(nuevoArticuloCantidad, 10) || 1,
+        cantidad_recepcionada: 0,
+        estado_recepcion: 'Pendiente'
+      }
+    ]);
+    setNuevoArticuloCodigo('');
+    setNuevoArticuloCantidad(1);
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!editingOc) return;
+    const nuevoNumeroOc = editFormData.numero_oc.trim();
+    if (!nuevoNumeroOc) {
+      alert('El Número de OC / AG es obligatorio.');
+      return;
+    }
+
+    if (editArticulos.length === 0) {
+      alert('La Orden de Compra debe tener al menos un artículo.');
+      return;
+    }
+
+    // Validar orden de fechas tope
+    const fechasTope = {
+      fecha_tope_aceptacion: editFormData.fecha_tope_aceptacion || null,
+      fecha_tope_entrega: editFormData.fecha_tope_entrega || null,
+      fecha_tope_multa: editFormData.fecha_tope_multa || null
+    };
+    const errorFechas = validarOrdenFechas(fechasTope);
+    if (errorFechas) {
+      alert(errorFechas);
+      return;
+    }
+
+    // Check if new numero_oc clashes with another OC
+    const { data: ocExistente, error: checkErr } = await supabase
+      .from('ordenes_compra')
+      .select('id')
+      .eq('numero_oc', nuevoNumeroOc)
+      .neq('id', editingOc.id)
+      .maybeSingle();
+
+    if (checkErr) {
+      console.warn('Error checking unique OC:', checkErr);
+    }
+    if (ocExistente) {
+      alert(`Ya existe otra Orden de Compra con el número "${nuevoNumeroOc}". Ingrese un número distinto.`);
+      return;
+    }
+
+    // Confirm cancel if state changed to Cancelado
+    const nuevoEstado = editFormData.estado;
+    if ((nuevoEstado === 'Cancelado' || nuevoEstado === 'Cancelada') && editingOc.estado !== 'Cancelado' && editingOc.estado !== 'Cancelada') {
+      const confirmCancel = window.confirm(
+        `⚠️ ¿Está seguro de cambiar el estado de la Orden de Compra "${editingOc.numero_oc}" a CANCELADO?\n\nEsta acción liberará los artículos asociados para que puedan ser asignados a otra OC.`
+      );
+      if (!confirmCancel) return;
+    }
+
+    setSavingEdit(true);
+    try {
+      // 1. Format dates
+      const parseInputDateToISO = (dateStr) => {
+        if (!dateStr) return null;
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const d = parseInt(parts[2], 10);
+          const dt = new Date(y, m, d, 12, 0, 0);
+          return isNaN(dt.getTime()) ? null : dt.toISOString();
+        }
+        return null;
+      };
+
+      let fechaEnvioISO = parseInputDateToISO(editFormData.fecha_envio) || editingOc.fecha_envio;
+      let fechaAceptacionISO = parseInputDateToISO(editFormData.fecha_aceptacion);
+      if (!fechaAceptacionISO && nuevoEstado === 'Aceptada') {
+        fechaAceptacionISO = editingOc.fecha_aceptacion || new Date().toISOString();
+      }
+
+      const formattedSol = editFormData.solicitud_compra && editFormData.solicitud_compra.trim() ? (
+        editFormData.solicitud_compra.trim().toUpperCase().startsWith('S-')
+          ? editFormData.solicitud_compra.trim().toUpperCase()
+          : `S-${editFormData.solicitud_compra.trim().toUpperCase()}`
+      ) : null;
+
+      // 2. Update ordenes_compra
+      const updates = {
+        numero_oc: nuevoNumeroOc,
+        solicitud_compra: formattedSol,
+        proveedor: editFormData.proveedor.trim(),
+        rut_proveedor: editFormData.rut_proveedor.trim(),
+        tipo_oc: editFormData.tipo_oc,
+        estado: nuevoEstado,
+        fecha_envio: fechaEnvioISO,
+        fecha_aceptacion: fechaAceptacionISO,
+        ...fechasTope
+      };
+
+      const { error: updateErr } = await supabase
+        .from('ordenes_compra')
+        .update(updates)
+        .eq('id', editingOc.id);
+
+      if (updateErr) throw updateErr;
+
+      // 3. Update revisiones_bodega if numero_oc changed
+      const oldNum = editingOc.numero_oc ? editingOc.numero_oc.trim() : '';
+      if (oldNum && nuevoNumeroOc && oldNum !== nuevoNumeroOc) {
+        await supabase
+          .from('revisiones_bodega')
+          .update({ numero_oc: nuevoNumeroOc })
+          .eq('numero_oc', oldNum);
+      }
+
+      // 4. Delete removed articles
+      if (deletedArticleIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from('ordenes_compra_articulos')
+          .delete()
+          .in('id', deletedArticleIds);
+        if (delErr) throw delErr;
+      }
+
+      // 5. Update and insert articles
+      for (const art of editArticulos) {
+        if (art.id) {
+          const qty = parseInt(art.cantidad, 10) || 1;
+          const { error: updArtErr } = await supabase
+            .from('ordenes_compra_articulos')
+            .update({ cantidad: qty })
+            .eq('id', art.id);
+          if (updArtErr) throw updArtErr;
+        } else if (art.codigo_articulo && art.codigo_articulo.trim()) {
+          const qty = parseInt(art.cantidad, 10) || 1;
+          const { error: insArtErr } = await supabase
+            .from('ordenes_compra_articulos')
+            .insert([{
+              oc_id: editingOc.id,
+              codigo_articulo: art.codigo_articulo.trim(),
+              cantidad: qty,
+              cantidad_recepcionada: 0,
+              estado_recepcion: 'Pendiente'
+            }]);
+          if (insArtErr) throw insArtErr;
+        }
+      }
+
+      // 6. Re-evaluate solicitudes if solicitud_compra changed or estado changed
+      const oldSol = editingOc.solicitud_compra ? editingOc.solicitud_compra.trim() : null;
+      if (oldSol && oldSol !== formattedSol) {
+        await evaluarYActualizarEstadoSolicitud(oldSol);
+      }
+      if (formattedSol) {
+        const isCancelling = (nuevoEstado === 'Cancelado' || nuevoEstado === 'Cancelada');
+        await evaluarYActualizarEstadoSolicitud(formattedSol, isCancelling ? [editingOc.id] : []);
+      }
+
+      alert('Orden de Compra / AG actualizada correctamente.');
+      setEditingOc(null);
+      await cargarOcs();
+      await cargarSolicitudesOptions();
+
+      // If details modal was open with this OC, refresh it
+      if (selectedOcForModal && selectedOcForModal.id === editingOc.id) {
+        const { data: refreshedOc } = await supabase
+          .from('ordenes_compra')
+          .select(`
+            *,
+            ordenes_compra_articulos (
+              id,
+              codigo_articulo,
+              cantidad,
+              cantidad_recepcionada,
+              estado_recepcion,
+              historial_cambios
+            )
+          `)
+          .eq('id', editingOc.id)
+          .maybeSingle();
+        if (refreshedOc) setSelectedOcForModal(refreshedOc);
+      }
+
+    } catch (err) {
+      console.error('Error al actualizar OC:', err);
+      alert('Error al guardar cambios: ' + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   // Add a new row to article sub-form
   const handleAddRow = () => {
     setArticulosForm(prev => [
@@ -1296,6 +1605,28 @@ const SeguimientoOCModule = () => {
                   </td>
                   <td style={{ padding: '16px', textAlign: 'center' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                      <button 
+                        onClick={() => handleAbrirModalEditar(oc)}
+                        style={{ 
+                          color: '#f59e0b', 
+                          background: 'rgba(245, 158, 11, 0.12)', 
+                          border: '1px solid rgba(245, 158, 11, 0.3)', 
+                          cursor: 'pointer', 
+                          padding: '6px 10px', 
+                          borderRadius: '6px',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.78rem',
+                          fontWeight: '700'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.22)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.12)'}
+                        title="Editar AG y datos de la Orden de Compra"
+                      >
+                        <Edit size={14} /> Editar
+                      </button>
                       <button 
                         onClick={() => handleAbrirModalCorreo(oc)}
                         style={{ 
@@ -3080,6 +3411,498 @@ const SeguimientoOCModule = () => {
                   </div>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: EDITAR ORDEN DE COMPRA / AG */}
+      <AnimatePresence>
+        {editingOc && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '20px'
+            }}
+            onClick={() => !savingEdit && setEditingOc(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg-card, #0f172a)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '820px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.85)',
+                position: 'relative'
+              }}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => !savingEdit && setEditingOc(null)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'var(--btn-secondary-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '50%',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              {/* Title & Badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '22px' }}>
+                <div style={{ padding: '10px', background: 'rgba(245, 158, 11, 0.15)', borderRadius: '12px' }}>
+                  <Edit3 size={24} color="#f59e0b" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.35rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                    Editar Orden de Compra / AG
+                  </h3>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '3px' }}>
+                    Actualice el número de AG, proveedor, solicitud asignada, plazos y artículos.
+                  </div>
+                </div>
+              </div>
+
+              {/* 2-Column Form Fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginBottom: '22px' }}>
+                {/* Col 1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={labelStyle}><FileText size={15} /> Número de OC / AG *</label>
+                    <input 
+                      type="text"
+                      className="input-field"
+                      value={editFormData.numero_oc}
+                      onChange={e => setEditFormData(prev => ({ ...prev, numero_oc: e.target.value }))}
+                      placeholder="Ej: 2332-1259-AG26"
+                      style={{ fontWeight: '700', color: '#38bdf8' }}
+                    />
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <label style={labelStyle}><ShoppingBag size={15} /> Solicitud de Compra Vinculada</label>
+                    <input 
+                      type="text"
+                      className="input-field"
+                      value={editSolicitudSearch}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditSolicitudSearch(val);
+                        setEditFormData(prev => ({ ...prev, solicitud_compra: val }));
+                        setShowEditSolicitudSuggestions(true);
+                      }}
+                      onFocus={() => setShowEditSolicitudSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowEditSolicitudSuggestions(false), 200)}
+                      placeholder="Ej: S-8018 o buscar solicitud..."
+                    />
+                    {showEditSolicitudSuggestions && solicitudesOptions.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: '#1e293b',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        maxHeight: '180px',
+                        overflowY: 'auto',
+                        zIndex: 100,
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                        marginTop: '4px'
+                      }}>
+                        {solicitudesOptions
+                          .filter(s => (s.numero_solicitud || '').toLowerCase().includes(editSolicitudSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map(s => (
+                            <div
+                              key={s.id}
+                              onMouseDown={() => {
+                                setEditSolicitudSearch(s.numero_solicitud);
+                                setEditFormData(prev => ({ 
+                                  ...prev, 
+                                  solicitud_compra: s.numero_solicitud,
+                                  fecha_tope_aceptacion: s.fecha_tope_aceptacion ? s.fecha_tope_aceptacion.slice(0, 10) : prev.fecha_tope_aceptacion,
+                                  fecha_tope_entrega: s.fecha_tope_entrega ? s.fecha_tope_entrega.slice(0, 10) : prev.fecha_tope_entrega,
+                                  fecha_tope_multa: s.fecha_tope_multa ? s.fecha_tope_multa.slice(0, 10) : prev.fecha_tope_multa
+                                }));
+                                setShowEditSolicitudSuggestions(false);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                color: '#cbd5e1',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                display: 'flex',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <strong style={{ color: '#3b82f6' }}>{s.numero_solicitud}</strong>
+                              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{s.centro_costo_nombre || ''}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Tipo de OC</label>
+                    <select
+                      value={editFormData.tipo_oc}
+                      onChange={e => setEditFormData(prev => ({ ...prev, tipo_oc: e.target.value }))}
+                      className="input-field"
+                    >
+                      {TIPOS_OC.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Estado de la OC</label>
+                    <select
+                      value={editFormData.estado}
+                      onChange={e => setEditFormData(prev => ({ ...prev, estado: e.target.value }))}
+                      className="input-field"
+                      style={{ fontWeight: '700' }}
+                    >
+                      <option value="Enviada">Enviada</option>
+                      <option value="Aceptada">Aceptada</option>
+                      <option value="Recepción Conforme">Recepción Conforme</option>
+                      <option value="Recepción Con Multa">Recepción Con Multa</option>
+                      <option value="Cancelado">Cancelado (Liberar artículos)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Col 2 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <label style={labelStyle}>Proveedor</label>
+                    <input 
+                      type="text"
+                      className="input-field"
+                      value={editProveedorSearch}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditProveedorSearch(val);
+                        setEditFormData(prev => ({
+                          ...prev,
+                          proveedor: val,
+                          rut_proveedor: proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === val.toLowerCase())?.rut || prev.rut_proveedor
+                        }));
+                        setShowEditProveedorSuggestions(true);
+                      }}
+                      onFocus={() => setShowEditProveedorSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowEditProveedorSuggestions(false), 200)}
+                      placeholder="Nombre del proveedor..."
+                    />
+                    {showEditProveedorSuggestions && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: '#1e293b',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        maxHeight: '180px',
+                        overflowY: 'auto',
+                        zIndex: 100,
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                        marginTop: '4px'
+                      }}>
+                        {proveedores
+                          .filter(p => (p.nombre_proveedor || '').toLowerCase().includes(editProveedorSearch.toLowerCase()) || (p.rut || '').toLowerCase().includes(editProveedorSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map(p => (
+                            <div
+                              key={p.id}
+                              onMouseDown={() => {
+                                setEditProveedorSearch(p.nombre_proveedor);
+                                setEditFormData(prev => ({
+                                  ...prev,
+                                  proveedor: p.nombre_proveedor,
+                                  rut_proveedor: p.rut
+                                }));
+                                setShowEditProveedorSuggestions(false);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                color: '#cbd5e1',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                              }}
+                            >
+                              <span style={{ fontWeight: '600' }}>{p.nombre_proveedor}</span>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '8px' }}>({p.rut})</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>RUT Proveedor</label>
+                    <input 
+                      type="text"
+                      className="input-field"
+                      value={editFormData.rut_proveedor}
+                      onChange={e => setEditFormData(prev => ({ ...prev, rut_proveedor: e.target.value }))}
+                      placeholder="Ej: 78027120-5"
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={labelStyle}><Calendar size={14} /> Fecha Envío</label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        value={editFormData.fecha_envio}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_envio: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}><Calendar size={14} /> Fecha Aceptación</label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        value={editFormData.fecha_aceptacion}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_aceptacion: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fechas Tope Box */}
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                padding: '16px',
+                borderRadius: '12px',
+                marginBottom: '22px'
+              }}>
+                <div style={{ color: '#3b82f6', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <Clock size={16} /> Fechas Tope y Plazos de Entrega (Semáforo)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación</label>
+                    <input 
+                      type="date"
+                      className="input-field"
+                      style={{ fontSize: '0.85rem' }}
+                      value={editFormData.fecha_tope_aceptacion}
+                      onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Entrega (sin multa)</label>
+                    <input 
+                      type="date"
+                      className="input-field"
+                      style={{ fontSize: '0.85rem' }}
+                      value={editFormData.fecha_tope_entrega}
+                      onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope Máximo con multa</label>
+                    <input 
+                      type="date"
+                      className="input-field"
+                      style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
+                      value={editFormData.fecha_tope_multa}
+                      onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Articulos de la OC Section */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '18px', marginBottom: '22px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: '700' }}>
+                    Artículos Asociados ({editArticulos.length})
+                  </h4>
+                </div>
+
+                {/* Table of articles */}
+                <div style={{ overflowX: 'auto', marginBottom: '14px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 10px' }}>Código</th>
+                        <th style={{ padding: '8px 10px' }}>Descripción</th>
+                        <th style={{ padding: '8px 10px', width: '130px' }}>Cant. Solicitada</th>
+                        <th style={{ padding: '8px 10px', width: '110px' }}>Recepcionado</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', width: '60px' }}>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editArticulos.map((art, idx) => (
+                        <tr key={art.id || `temp-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '8px 10px' }}>
+                            <span style={{ fontWeight: '700', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                              {art.codigo_articulo}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 10px', color: '#e2e8f0' }}>
+                            {art.descripcion || articulosCatalog[art.codigo_articulo] || art.codigo_articulo}
+                          </td>
+                          <td style={{ padding: '8px 10px' }}>
+                            <input 
+                              type="number"
+                              min={art.cantidad_recepcionada || 1}
+                              value={art.cantidad}
+                              onChange={e => handleEditArticuloCantidad(idx, e.target.value)}
+                              className="input-field"
+                              style={{ width: '90px', padding: '4px 8px', fontSize: '0.85rem' }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 10px' }}>
+                            <span style={{ 
+                              padding: '2px 8px', 
+                              borderRadius: '4px', 
+                              fontSize: '0.78rem',
+                              fontWeight: '600',
+                              background: art.cantidad_recepcionada > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.05)',
+                              color: art.cantidad_recepcionada > 0 ? '#10b981' : '#94a3b8'
+                            }}>
+                              {art.cantidad_recepcionada || 0} un.
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarArticuloEdit(idx)}
+                              disabled={art.cantidad_recepcionada > 0}
+                              title={art.cantidad_recepcionada > 0 ? 'No se puede eliminar porque ya tiene recepciones' : 'Quitar artículo de esta OC'}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: art.cantidad_recepcionada > 0 ? '#475569' : '#ef4444',
+                                cursor: art.cantidad_recepcionada > 0 ? 'not-allowed' : 'pointer',
+                                padding: '4px',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Bar to add a new article to this OC */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px dashed var(--border-color)',
+                  padding: '10px 14px',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <input 
+                      type="text"
+                      className="input-field"
+                      placeholder="Código del artículo (ej: 10452)..."
+                      value={nuevoArticuloCodigo}
+                      onChange={e => setNuevoArticuloCodigo(e.target.value)}
+                      style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                    />
+                  </div>
+                  <div style={{ width: '100px' }}>
+                    <input 
+                      type="number"
+                      min="1"
+                      className="input-field"
+                      placeholder="Cant."
+                      value={nuevoArticuloCantidad}
+                      onChange={e => setNuevoArticuloCantidad(e.target.value)}
+                      style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAgregarArticuloEdit}
+                    className="btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.85rem', fontWeight: '600' }}
+                  >
+                    <Plus size={14} /> Añadir
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '18px' }}>
+                <button
+                  type="button"
+                  onClick={() => !savingEdit && setEditingOc(null)}
+                  disabled={savingEdit}
+                  className="btn-secondary"
+                  style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGuardarEdicion}
+                  disabled={savingEdit}
+                  className="btn-primary"
+                  style={{ 
+                    padding: '10px 24px', 
+                    fontSize: '0.85rem', 
+                    fontWeight: '700',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    border: 'none',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {savingEdit ? (
+                    <>
+                      <RefreshCw size={15} className="spin-animation" /> Guardando Cambios...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} /> Guardar Cambios
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
