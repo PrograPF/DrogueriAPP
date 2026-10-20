@@ -989,19 +989,17 @@ const SeguimientoOCModule = () => {
     }
 
     // Validar orden de fechas tope
-    const isAG = editFormData.tipo_oc === 'AG';
+    const isSE = editFormData.tipo_oc === 'SE';
     const fechasTope = {
       fecha_tope_aceptacion: editFormData.fecha_tope_aceptacion || null,
-      fecha_tope_entrega: isAG ? null : (editFormData.fecha_tope_entrega || null),
-      fecha_tope_multa: isAG ? null : (editFormData.fecha_tope_multa || null),
-      fecha_insistencia: isAG ? (editFormData.fecha_insistencia || null) : null
+      fecha_tope_entrega: editFormData.fecha_tope_entrega || null,
+      fecha_tope_multa: editFormData.fecha_tope_multa || null,
+      fecha_insistencia: isSE ? (editFormData.fecha_insistencia || null) : null
     };
-    if (!isAG) {
-      const errorFechas = validarOrdenFechas(fechasTope);
-      if (errorFechas) {
-        alert(errorFechas);
-        return;
-      }
+    const errorFechas = validarOrdenFechas(fechasTope);
+    if (errorFechas) {
+      alert(errorFechas);
+      return;
     }
 
     // Check if new numero_oc clashes with another OC
@@ -1236,19 +1234,17 @@ const SeguimientoOCModule = () => {
           : `S-${formData.solicitud_compra.trim().toUpperCase()}`
       ) : null;
 
-      const isAG = formData.tipo_oc === 'AG';
+      const isSE = formData.tipo_oc === 'SE';
       const fechasTope = {
         fecha_tope_aceptacion: formData.fecha_tope_aceptacion || null,
-        fecha_tope_entrega: isAG ? null : (formData.fecha_tope_entrega || null),
-        fecha_tope_multa: isAG ? null : (formData.fecha_tope_multa || null),
-        fecha_insistencia: isAG ? (formData.fecha_insistencia || null) : null
+        fecha_tope_entrega: formData.fecha_tope_entrega || null,
+        fecha_tope_multa: formData.fecha_tope_multa || null,
+        fecha_insistencia: isSE ? (formData.fecha_insistencia || null) : null
       };
-      if (!isAG) {
-        const errorFechas = validarOrdenFechas(fechasTope);
-        if (errorFechas) {
-          alert(errorFechas);
-          return;
-        }
+      const errorFechas = validarOrdenFechas(fechasTope);
+      if (errorFechas) {
+        alert(errorFechas);
+        return;
       }
 
       const baseOcInsert = {
@@ -1625,18 +1621,14 @@ const SeguimientoOCModule = () => {
                         Acept.: {formatDate(oc.fecha_aceptacion)}
                       </div>
                     )}
-                    {oc.tipo_oc === 'AG' ? (
+                    {(oc.fecha_tope_aceptacion || oc.fecha_tope_entrega || oc.fecha_tope_multa) && (
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', lineHeight: 1.5 }}>
-                        Tope acept.: {formatISOToDisplay(oc.fecha_tope_aceptacion)}
-                        {oc.fecha_insistencia && (
+                        Tope acept.: {formatISOToDisplay(oc.fecha_tope_aceptacion)} · Entrega: {formatISOToDisplay(oc.fecha_tope_entrega)} · Multa: {formatISOToDisplay(oc.fecha_tope_multa)}
+                        {oc.tipo_oc === 'SE' && oc.fecha_insistencia && (
                           <span style={{ color: '#f4c2c2', marginLeft: '6px', fontWeight: '600' }}>
                             · Insistencia: {formatISOToDisplay(oc.fecha_insistencia)}
                           </span>
                         )}
-                      </div>
-                    ) : (oc.fecha_tope_aceptacion || oc.fecha_tope_entrega || oc.fecha_tope_multa) && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', lineHeight: 1.5 }}>
-                        Tope acept.: {formatISOToDisplay(oc.fecha_tope_aceptacion)} · Entrega: {formatISOToDisplay(oc.fecha_tope_entrega)} · Multa: {formatISOToDisplay(oc.fecha_tope_multa)}
                       </div>
                     )}
                     {(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || plazos.nivel === 'sin_fecha') && (
@@ -2073,7 +2065,7 @@ const SeguimientoOCModule = () => {
                         </h3>
                       </div>
                       <div style={{ background: 'rgba(244, 194, 194, 0.06)', border: '1px solid rgba(244, 194, 194, 0.3)', borderRadius: '12px', padding: '15px 20px' }}>
-                        <span style={{ fontSize: '0.85rem', color: '#f4c2c2', fontWeight: '500' }}>INSISTENCIA AG (ROSA)</span>
+                        <span style={{ fontSize: '0.85rem', color: '#f4c2c2', fontWeight: '500' }}>INSISTENCIA SE (ROSA)</span>
                         <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#f4c2c2' }}>
                           {rosaOcsCount}
                         </h3>
@@ -2176,7 +2168,7 @@ const SeguimientoOCModule = () => {
                       {[
                         { id: 'TODAS', label: 'Todas las Alertas', count: totalAlertasCount, color: '#f8fafc', bg: 'rgba(255,255,255,0.08)' },
                         { id: 'AMARILLAS', label: '🟡 Amarillas', count: yellowOcsCount, color: '#eab308', bg: 'rgba(234, 179, 8, 0.12)' },
-                        { id: 'ROSA', label: '🌸 Rosa (Insistencia AG)', count: rosaOcsCount, color: '#f4c2c2', bg: 'rgba(244, 194, 194, 0.12)' },
+                        { id: 'ROSA', label: '🌸 Rosa (Insistencia SE)', count: rosaOcsCount, color: '#f4c2c2', bg: 'rgba(244, 194, 194, 0.12)' },
                         { id: 'NARANJAS', label: '🟠 Naranjas (Multas)', count: orangeOcsCount, color: '#fb923c', bg: 'rgba(251, 146, 60, 0.12)' },
                         { id: 'EXCEPCIONES', label: '🟣 Excepciones', count: purpuraOcsCount, color: '#c080c0', bg: 'rgba(192, 128, 192, 0.12)' },
                         { id: 'ROJAS', label: '🔴 Rojas (Vencidas)', count: redOcsCount, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' }
@@ -2225,7 +2217,7 @@ const SeguimientoOCModule = () => {
                           border: 'rgba(59, 130, 246, 0.25)',
                           color: '#60a5fa',
                           title: `Panel Consolidado de Alertas (${totalAlertasCount})`,
-                          desc: 'Visualización global de todas las órdenes con alerta amarilla, insistencia AG, multa, excepciones y vencimiento.',
+                          desc: 'Visualización global de todas las órdenes con alerta amarilla, insistencia SE, multa, excepciones y vencimiento.',
                           icon: <Bell size={24} color="#60a5fa" style={{ flexShrink: 0 }} />
                         },
                         AMARILLAS: {
@@ -2240,8 +2232,8 @@ const SeguimientoOCModule = () => {
                           bg: 'rgba(244, 194, 194, 0.08)',
                           border: 'rgba(244, 194, 194, 0.3)',
                           color: '#f4c2c2',
-                          title: `Órdenes AG para Insistencia de Despacho (${rosaOcsCount})`,
-                          desc: 'Órdenes de tipo AG en o tras la fecha de insistencia. Debe requerirse por correo el despacho parcializado.',
+                          title: `Órdenes SE para Insistencia de Despacho (${rosaOcsCount})`,
+                          desc: 'Órdenes de tipo SE en o tras la fecha de insistencia. Debe requerirse por correo el despacho parcializado.',
                           icon: <Mail size={24} color="#f4c2c2" style={{ flexShrink: 0 }} />
                         },
                         NARANJAS: {
@@ -2348,7 +2340,7 @@ const SeguimientoOCModule = () => {
                         : alertasSubFilter === 'AMARILLAS'
                         ? "No hay Órdenes de Compra en alerta amarilla actualmente."
                         : alertasSubFilter === 'ROSA'
-                        ? "No hay Órdenes AG pendientes de insistencia de despacho."
+                        ? "No hay Órdenes SE pendientes de insistencia de despacho."
                         : alertasSubFilter === 'NARANJAS'
                         ? "No hay Órdenes de Compra en período de multa actualmente."
                         : alertasSubFilter === 'EXCEPCIONES'
@@ -2925,31 +2917,53 @@ const SeguimientoOCModule = () => {
                     </small>
                   )}
 
-                  {formData.tipo_oc === 'AG' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación (Envío Proveedor)</label>
-                        <input
-                          type="date"
-                          className="input-field"
-                          style={{ fontSize: '0.85rem' }}
-                          value={formData.fecha_tope_aceptacion}
-                          onChange={e => setFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
-                        />
+                  {formData.tipo_oc === 'SE' ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope aceptación</label>
+                          <input
+                            type="date"
+                            className="input-field"
+                            style={{ fontSize: '0.85rem' }}
+                            value={formData.fecha_tope_aceptacion}
+                            onChange={e => setFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope entrega (sin multa)</label>
+                          <input
+                            type="date"
+                            className="input-field"
+                            style={{ fontSize: '0.85rem' }}
+                            value={formData.fecha_tope_entrega}
+                            onChange={e => setFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope máximo con multa</label>
+                          <input
+                            type="date"
+                            className="input-field"
+                            style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
+                            value={formData.fecha_tope_multa}
+                            onChange={e => setFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
+                          />
+                        </div>
                       </div>
-                      <div>
+                      <div style={{ marginTop: '10px' }}>
                         <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>
-                          Fecha de Insistencia (Despacho Parcial)
+                          Fecha de Insistencia (SE: Despacho Parcial)
                         </label>
                         <input
                           type="date"
                           className="input-field"
-                          style={{ fontSize: '0.85rem', borderColor: '#f4c2c2' }}
+                          style={{ fontSize: '0.85rem', borderColor: 'rgba(244, 194, 194, 0.6)' }}
                           value={formData.fecha_insistencia}
                           onChange={e => setFormData(prev => ({ ...prev, fecha_insistencia: e.target.value }))}
                         />
                       </div>
-                    </div>
+                    </>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                       <div>
@@ -2986,8 +3000,8 @@ const SeguimientoOCModule = () => {
                   )}
 
                   <small style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1.5 }}>
-                    {formData.tipo_oc === 'AG'
-                      ? 'Para órdenes AG: alerta rosa bebé 1 día antes de la fecha de insistencia para solicitar despacho parcial por correo.'
+                    {formData.tipo_oc === 'SE'
+                      ? 'Para órdenes SE: además de los plazos habituales, activa alerta rosa bebé 1 día antes de la fecha de insistencia para solicitar despacho parcial por correo.'
                       : 'Semáforo: amarillo 1 día antes de cada tope · naranja atrasado con multa · rojo vencido.'}
                   </small>
                 </div>
@@ -3161,7 +3175,7 @@ const SeguimientoOCModule = () => {
                       Aceptada: {formatDate(selectedOcForModal.fecha_aceptacion)}
                     </span>
                   )}
-                  {selectedOcForModal.tipo_oc === 'AG' && selectedOcForModal.fecha_insistencia && (
+                  {selectedOcForModal.tipo_oc === 'SE' && selectedOcForModal.fecha_insistencia && (
                     <span style={{ display: 'block', color: '#f4c2c2', fontSize: '0.8rem', marginTop: '2px', fontWeight: '600' }}>
                       Insistencia: {formatISOToDisplay(selectedOcForModal.fecha_insistencia)}
                     </span>
@@ -3963,31 +3977,53 @@ const SeguimientoOCModule = () => {
                   <Clock size={16} /> Fechas Tope y Plazos de Entrega (Semáforo)
                 </div>
 
-                {editFormData.tipo_oc === 'AG' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación (Envío Proveedor)</label>
-                      <input 
-                        type="date"
-                        className="input-field"
-                        style={{ fontSize: '0.85rem' }}
-                        value={editFormData.fecha_tope_aceptacion}
-                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
-                      />
+                {editFormData.tipo_oc === 'SE' ? (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación</label>
+                        <input 
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={editFormData.fecha_tope_aceptacion}
+                          onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Entrega (sin multa)</label>
+                        <input 
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={editFormData.fecha_tope_entrega}
+                          onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope Máximo con multa</label>
+                        <input 
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
+                          value={editFormData.fecha_tope_multa}
+                          onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
+                        />
+                      </div>
                     </div>
-                    <div>
+                    <div style={{ marginTop: '12px' }}>
                       <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>
-                        Fecha de Insistencia (Despacho Parcial)
+                        Fecha de Insistencia (SE: Despacho Parcial)
                       </label>
                       <input 
                         type="date"
                         className="input-field"
-                        style={{ fontSize: '0.85rem', borderColor: '#f4c2c2' }}
+                        style={{ fontSize: '0.85rem', borderColor: 'rgba(244, 194, 194, 0.6)' }}
                         value={editFormData.fecha_insistencia}
                         onChange={e => setEditFormData(prev => ({ ...prev, fecha_insistencia: e.target.value }))}
                       />
                     </div>
-                  </div>
+                  </>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                     <div>

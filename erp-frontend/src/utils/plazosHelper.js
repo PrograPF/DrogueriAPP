@@ -87,8 +87,6 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
     return build('final', COLORS.gris, estado);
   }
 
-  const isAG = (oc.tipo_oc === 'AG');
-
   // 3. Estado Enviada: Evalúa plazo de aceptación para todos los tipos de OC
   if (estado === 'Enviada') {
     const tA = normalizeISO(oc.fecha_tope_aceptacion);
@@ -101,23 +99,22 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
 
   // 4. Estado Aceptada
   if (estado === 'Aceptada') {
-    // Caso especial AG: No tiene fecha tope de entrega ni multa; se guía por fecha_insistencia
-    if (isAG) {
-      const tI = normalizeISO(oc.fecha_insistencia);
-      if (!tI) {
-        return build('ok', COLORS.verde, 'Aceptada (AG: sin fecha de insistencia definida)');
-      }
-      const fI = formatISOToDisplay(tI);
-      // 1 día antes de la fecha seleccionada cambia a color Rosa Bebé #F4C2C2
-      if (hoy >= addDaysISO(tI, -1)) {
-        return build('rosa', COLORS.rosa, `🌸 Insistir por correo: despacho parcializado requerido (insistencia ${fI})`);
-      }
-      return build('ok', COLORS.verde, `Aceptada (AG: próxima insistencia el ${fI})`);
-    }
-
-    // Para los demás tipos de OC (SE, CM, L1, Pedido Especial, OC Especial)
+    const isSE = (oc.tipo_oc === 'SE');
     const tE = normalizeISO(oc.fecha_tope_entrega);
     const tM = normalizeISO(oc.fecha_tope_multa);
+    const tI = normalizeISO(oc.fecha_insistencia);
+
+    // Si venció el plazo máximo de multa, siempre es rojo
+    if (tM && hoy > tM) {
+      return build('rojo', COLORS.rojo, '⛔ Venció el plazo máximo de multa: pase a Excepciones o cancele manualmente');
+    }
+
+    // Caso especial SE: Alerta Rosa Bebé #F4C2C2 1 día antes de la fecha de insistencia
+    if (isSE && tI && hoy >= addDaysISO(tI, -1)) {
+      const fI = formatISOToDisplay(tI);
+      return build('rosa', COLORS.rosa, `🌸 Insistir por correo: despacho parcializado requerido (insistencia ${fI})`);
+    }
+
     if (!tE) return build('sin_fecha', COLORS.gris, 'Sin fecha tope de entrega definida');
     const fE = formatISOToDisplay(tE);
 
@@ -129,7 +126,6 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
     // hoy > tope de entrega → período de multa
     if (!tM) return build('multa', COLORS.multa, 'Atrasado con multa (sin fecha tope de multa)');
     const fM = formatISOToDisplay(tM);
-    if (hoy > tM) return build('rojo', COLORS.rojo, '⛔ Venció el plazo máximo de multa: pase a Excepciones o cancele manualmente');
     if (hoy >= addDaysISO(tM, -1)) return build('naranjo', COLORS.naranjo, `⚠️ Atrasado con multa: pronto vence el plazo máximo de multa (${fM})`);
     return build('multa', COLORS.multa, `Atrasado con multa (tope de multa ${fM})`);
   }

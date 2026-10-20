@@ -305,19 +305,17 @@ const QFModule = () => {
     const matchingOcs = assignedOcsMap[formattedNumero.toUpperCase()] || [];
     const calculatedEstado = matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada';
 
-    const isAG = (formTipoOc === 'AG');
+    const isSE = (formTipoOc === 'SE');
     const fechasTope = {
       fecha_tope_aceptacion: formTopeAceptacion || null,
-      fecha_tope_entrega: isAG ? null : (formTopeEntrega || null),
-      fecha_tope_multa: isAG ? null : (formTopeMulta || null),
-      fecha_insistencia: isAG ? (formFechaInsistencia || null) : null
+      fecha_tope_entrega: formTopeEntrega || null,
+      fecha_tope_multa: formTopeMulta || null,
+      fecha_insistencia: isSE ? (formFechaInsistencia || null) : null
     };
-    if (!isAG) {
-      const errorFechas = validarOrdenFechas(fechasTope);
-      if (errorFechas) {
-        alert(errorFechas);
-        return;
-      }
+    const errorFechas = validarOrdenFechas(fechasTope);
+    if (errorFechas) {
+      alert(errorFechas);
+      return;
     }
 
     try {
@@ -794,17 +792,27 @@ const QFModule = () => {
                       {TIPOS_OC.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
-                  {formTipoOc === 'AG' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope aceptación</label>
-                        <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeAceptacion} onChange={(e) => setFormTopeAceptacion(e.target.value)} />
+                  {formTipoOc === 'SE' ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope aceptación</label>
+                          <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeAceptacion} onChange={(e) => setFormTopeAceptacion(e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope entrega (sin multa)</label>
+                          <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeEntrega} onChange={(e) => setFormTopeEntrega(e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Fecha tope máxima con multa</label>
+                          <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }} value={formTopeMulta} onChange={(e) => setFormTopeMulta(e.target.value)} />
+                        </div>
                       </div>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Fecha de insistencia (AG)</label>
+                      <div style={{ marginTop: '10px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Fecha de insistencia (SE: despacho parcial)</label>
                         <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(244, 194, 194, 0.5)' }} value={formFechaInsistencia} onChange={(e) => setFormFechaInsistencia(e.target.value)} />
                       </div>
-                    </div>
+                    </>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                       <div>
@@ -822,8 +830,8 @@ const QFModule = () => {
                     </div>
                   )}
                   <small style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1.5 }}>
-                    {formTipoOc === 'AG'
-                      ? 'Tipo AG: No aplica multa fija. 1 día antes de la fecha de insistencia alertará en color Rosa Bebé (#F4C2C2) para insistir el despacho parcializado.'
+                    {formTipoOc === 'SE'
+                      ? 'Tipo SE: Mantiene sus fechas de entrega y multa. Además, 1 día antes de la fecha de insistencia alertará en Rosa Bebé (#F4C2C2) para solicitar despacho parcial por correo.'
                       : 'Semáforo: amarillo 1 día antes · naranja atrasado con multa · naranjo intenso 1 día antes del tope · rojo vencido.'}
                   </small>
                 </div>
