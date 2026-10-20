@@ -4178,10 +4178,11 @@ const SeguimientoOCModule = () => {
 
                           // Colores del Sistema 2
                           const estadoConfig = {
-                            'Pendiente':    { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)'  },
-                            'Recepcionado': { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)'  },
-                            'Rechazado':    { color: '#ef4444', bg: 'rgba(239,68,68,0.12)'   },
-                            'Revisado':     { color: '#10b981', bg: 'rgba(16,185,129,0.12)'  },
+                            'Pendiente':            { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)'  },
+                            'Recepcionado':         { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)'  },
+                            'Recepción Incompleto': { color: '#f59e0b', bg: 'rgba(245,158,11,0.14)' },
+                            'Revisado':             { color: '#10b981', bg: 'rgba(16,185,129,0.12)'  },
+                            'Rechazado':            { color: '#ef4444', bg: 'rgba(239,68,68,0.12)'   },
                           };
                           const cfg = estadoConfig[estadoArt] || estadoConfig['Pendiente'];
 

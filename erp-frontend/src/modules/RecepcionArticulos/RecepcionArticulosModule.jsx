@@ -29,7 +29,7 @@ function calcularEstadoRecepcionOc(articulos) {
   const todosPendientes  = estados.every(e => e === 'Pendiente');
   const todosListos      = estados.every(e => e === 'Recepcionado' || e === 'Revisado');
   const todosRechazados  = estados.every(e => e === 'Rechazado');
-  const hayRecepcionado  = estados.some(e => e === 'Recepcionado' || e === 'Revisado');
+  const hayRecepcionado  = estados.some(e => e === 'Recepcionado' || e === 'Revisado' || e === 'Recepción Incompleto');
   const hayRechazado     = estados.some(e => e === 'Rechazado');
 
   if (todosPendientes)                    return null;
@@ -42,10 +42,11 @@ function calcularEstadoRecepcionOc(articulos) {
 }
 
 const ESTADO_ART_CONFIG = {
-  'Pendiente':     { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)',  icon: Clock,        label: 'Pendiente'    },
-  'Recepcionado':  { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  icon: CheckCircle,  label: 'Recepcionado' },
-  'Revisado':      { color: '#10b981', bg: 'rgba(16,185,129,0.12)',  icon: CheckCircle,  label: 'Revisado'     },
-  'Rechazado':     { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   icon: XCircle,      label: 'Rechazado'    },
+  'Pendiente':            { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)',  icon: Clock,         label: 'Pendiente' },
+  'Recepcionado':         { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  icon: CheckCircle,   label: 'Recepcionado' },
+  'Recepción Incompleto': { color: '#f59e0b', bg: 'rgba(245,158,11,0.14)',  icon: AlertTriangle, label: 'Recepción Incompleto' },
+  'Revisado':             { color: '#10b981', bg: 'rgba(16,185,129,0.12)',  icon: CheckCircle,   label: 'Revisado' },
+  'Rechazado':            { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   icon: XCircle,       label: 'Rechazado' },
 };
 
 const ESTADO_OC_CONFIG = {
@@ -307,7 +308,7 @@ const RecepcionArticulosModule = () => {
 
   // Resumen rápido de artículos en una OC para la tarjeta de lista
   const ResumenArts = ({ arts }) => {
-    const counts = { Pendiente: 0, Recepcionado: 0, Revisado: 0, Rechazado: 0 };
+    const counts = { Pendiente: 0, Recepcionado: 0, 'Recepción Incompleto': 0, Revisado: 0, Rechazado: 0 };
     (arts || []).forEach(a => {
       const e = a.estado_recepcion || 'Pendiente';
       if (counts[e] !== undefined) counts[e]++;
@@ -647,7 +648,7 @@ const RecepcionArticulosModule = () => {
 
                             {/* Selector de estado */}
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {['Pendiente', 'Recepcionado', 'Rechazado'].map(estado => {
+                              {['Pendiente', 'Recepcionado', 'Recepción Incompleto', 'Rechazado'].map(estado => {
                                 const eCfg = ESTADO_ART_CONFIG[estado];
                                 const activo = estadoActivo === estado;
                                 return (

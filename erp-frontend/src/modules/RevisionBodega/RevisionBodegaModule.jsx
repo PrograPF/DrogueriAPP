@@ -107,8 +107,10 @@ const RevisionBodegaModule = () => {
       autor_nota: localStorage.getItem('firma_operador') || ''
     });
 
-    // Filtrar estrictamente los artículos con estado 'Recepcionado'
-    const arts = (oc.ordenes_compra_articulos || []).filter(a => a.estado_recepcion === 'Recepcionado');
+    // Filtrar los artículos listos para revisión (Recepcionado o Recepción Incompleto)
+    const arts = (oc.ordenes_compra_articulos || []).filter(
+      a => a.estado_recepcion === 'Recepcionado' || a.estado_recepcion === 'Recepción Incompleto'
+    );
     if (arts.length === 0) {
       setArticulosOc([]);
     }
@@ -669,7 +671,7 @@ const RevisionBodegaModule = () => {
       if (ocSeleccionada) {
         try {
           const artsRecepcionados = (ocSeleccionada.ordenes_compra_articulos || [])
-            .filter(a => a.estado_recepcion === 'Recepcionado');
+            .filter(a => a.estado_recepcion === 'Recepcionado' || a.estado_recepcion === 'Recepción Incompleto');
 
           const todosCompletos = artsRecepcionados.length > 0 && artsRecepcionados.every(art => {
             const revPrevia = revisionesPreviasOc
@@ -1073,7 +1075,7 @@ const RevisionBodegaModule = () => {
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'right' }}>
                         <div><strong>Fecha:</strong> {formatDate(oc.fecha_envio)}</div>
                         <div style={{ color: '#3b82f6', marginTop: '2px', fontWeight: '600' }}>
-                          {oc.ordenes_compra_articulos?.length || 0} ítems recepcionados
+                          {(oc.ordenes_compra_articulos || []).filter(a => a.estado_recepcion === 'Recepcionado' || a.estado_recepcion === 'Recepción Incompleto').length} ítems para revisión
                         </div>
                       </div>
                     </div>
@@ -1372,7 +1374,7 @@ const RevisionBodegaModule = () => {
                             <option value="">-- Seleccione un artículo pendiente --</option>
                             {articulosDisponibles.map(art => (
                               <option key={art.id} value={art.codigo_articulo}>
-                                ({art.codigo_articulo}) {art.descripcion} — [Pendiente: {art.saldoPendiente.toLocaleString('es-CL')} uds / Total OC: {(art.cantidad || 0).toLocaleString('es-CL')} uds]
+                                ({art.codigo_articulo}) {art.descripcion} — [{art.estado_recepcion === 'Recepción Incompleto' ? '⚠️ Recep. Incompleto | ' : ''}Pendiente: {art.saldoPendiente.toLocaleString('es-CL')} uds / Total OC: {(art.cantidad || 0).toLocaleString('es-CL')} uds]
                               </option>
                             ))}
                           </select>
@@ -1403,6 +1405,39 @@ const RevisionBodegaModule = () => {
                                 <div>
                                   <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>⏳ Saldo Pendiente</div>
                                   <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b' }}>{artSeleccionadoInfo.saldoPendiente.toLocaleString('es-CL')} uds</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>📋 Estado Bahía</div>
+                                  <div style={{ marginTop: '2px' }}>
+                                    {artSeleccionadoInfo.estado_recepcion === 'Recepción Incompleto' ? (
+                                      <span style={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        color: '#f59e0b',
+                                        background: 'rgba(245, 158, 11, 0.15)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        padding: '2px 8px',
+                                        borderRadius: '6px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        <AlertTriangle size={12} /> Recep. Incompleto
+                                      </span>
+                                    ) : (
+                                      <span style={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        color: '#3b82f6',
+                                        background: 'rgba(59, 130, 246, 0.15)',
+                                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                                        padding: '2px 8px',
+                                        borderRadius: '6px'
+                                      }}>
+                                        ✓ Recepcionado
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
