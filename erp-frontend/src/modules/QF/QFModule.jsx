@@ -56,6 +56,7 @@ const QFModule = () => {
   const [formTopeAceptacion, setFormTopeAceptacion] = useState('');
   const [formTopeEntrega, setFormTopeEntrega] = useState('');
   const [formTopeMulta, setFormTopeMulta] = useState('');
+  const [formFechaInsistencia, setFormFechaInsistencia] = useState('');
 
   // Sub-Centros de Costo options (for RESOLUTIVIDAD)
   const [subCentrosOptions, setSubCentrosOptions] = useState(['UAPO', 'ORL', 'TD']);
@@ -173,6 +174,7 @@ const QFModule = () => {
     setFormTopeAceptacion('');
     setFormTopeEntrega('');
     setFormTopeMulta('');
+    setFormFechaInsistencia('');
     setArticulosForm([
       { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
     ]);
@@ -190,6 +192,7 @@ const QFModule = () => {
     setFormTopeAceptacion((item.fecha_tope_aceptacion || '').slice(0, 10));
     setFormTopeEntrega((item.fecha_tope_entrega || '').slice(0, 10));
     setFormTopeMulta((item.fecha_tope_multa || '').slice(0, 10));
+    setFormFechaInsistencia((item.fecha_insistencia || '').slice(0, 10));
 
     if (item.solicitudes_compra_articulos && item.solicitudes_compra_articulos.length > 0) {
       setArticulosForm(
@@ -302,15 +305,19 @@ const QFModule = () => {
     const matchingOcs = assignedOcsMap[formattedNumero.toUpperCase()] || [];
     const calculatedEstado = matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada';
 
+    const isAG = (formTipoOc === 'AG');
     const fechasTope = {
       fecha_tope_aceptacion: formTopeAceptacion || null,
-      fecha_tope_entrega: formTopeEntrega || null,
-      fecha_tope_multa: formTopeMulta || null
+      fecha_tope_entrega: isAG ? null : (formTopeEntrega || null),
+      fecha_tope_multa: isAG ? null : (formTopeMulta || null),
+      fecha_insistencia: isAG ? (formFechaInsistencia || null) : null
     };
-    const errorFechas = validarOrdenFechas(fechasTope);
-    if (errorFechas) {
-      alert(errorFechas);
-      return;
+    if (!isAG) {
+      const errorFechas = validarOrdenFechas(fechasTope);
+      if (errorFechas) {
+        alert(errorFechas);
+        return;
+      }
     }
 
     try {
@@ -787,22 +794,37 @@ const QFModule = () => {
                       {TIPOS_OC.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope aceptación</label>
-                      <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeAceptacion} onChange={(e) => setFormTopeAceptacion(e.target.value)} />
+                  {formTipoOc === 'AG' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope aceptación</label>
+                        <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeAceptacion} onChange={(e) => setFormTopeAceptacion(e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Fecha de insistencia (AG)</label>
+                        <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(244, 194, 194, 0.5)' }} value={formFechaInsistencia} onChange={(e) => setFormFechaInsistencia(e.target.value)} />
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope entrega (sin multa)</label>
-                      <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeEntrega} onChange={(e) => setFormTopeEntrega(e.target.value)} />
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope aceptación</label>
+                        <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeAceptacion} onChange={(e) => setFormTopeAceptacion(e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Fecha tope entrega (sin multa)</label>
+                        <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem' }} value={formTopeEntrega} onChange={(e) => setFormTopeEntrega(e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Fecha tope máxima con multa</label>
+                        <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }} value={formTopeMulta} onChange={(e) => setFormTopeMulta(e.target.value)} />
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Fecha tope máxima con multa</label>
-                      <input type="date" className="input-field" style={{ width: '100%', fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }} value={formTopeMulta} onChange={(e) => setFormTopeMulta(e.target.value)} />
-                    </div>
-                  </div>
+                  )}
                   <small style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1.5 }}>
-                    Semáforo: <span style={{ color: '#eab308' }}>amarillo</span> 1 día antes de cada fecha tope · <span style={{ color: '#fb923c' }}>naranja</span> atrasado con multa · <span style={{ color: '#ea580c' }}>naranjo intenso</span> 1 día antes del tope de multa · <span style={{ color: '#ef4444' }}>rojo</span> plazo vencido. El estado de la OC siempre se cambia manualmente.
+                    {formTipoOc === 'AG'
+                      ? 'Tipo AG: No aplica multa fija. 1 día antes de la fecha de insistencia alertará en color Rosa Bebé (#F4C2C2) para insistir el despacho parcializado.'
+                      : 'Semáforo: amarillo 1 día antes · naranja atrasado con multa · naranjo intenso 1 día antes del tope · rojo vencido.'}
                   </small>
                 </div>
 

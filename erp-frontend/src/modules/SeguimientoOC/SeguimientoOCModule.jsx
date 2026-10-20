@@ -3,7 +3,7 @@ import {
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
   Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check,
-  Edit, Edit2, Edit3
+  Edit, Edit2, Edit3, Bell, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -158,6 +158,7 @@ const SeguimientoOCModule = () => {
   const [activeSubTab, setActiveSubTab] = useState('list'); // 'list' | 'alertas' | 'recepcion'
   const [filtroEstadoList, setFiltroEstadoList] = useState('TODOS');
   const [filtroEstadoAlertas, setFiltroEstadoAlertas] = useState('TODOS');
+  const [alertasSubFilter, setAlertasSubFilter] = useState('TODAS'); // 'TODAS' | 'AMARILLAS' | 'ROSA' | 'NARANJAS' | 'EXCEPCIONES' | 'ROJAS'
   const [searchQueryAlertas, setSearchQueryAlertas] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -191,7 +192,8 @@ const SeguimientoOCModule = () => {
     fecha_tope_aceptacion: '',
     fecha_tope_entrega: '',
     fecha_tope_multa: '',
-    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Recepción Conforme', 'Recepción Con Multa', 'Cancelado'
+    fecha_insistencia: '',
+    estado: 'Enviada', // 'Enviada', 'Aceptada', 'Recepción Conforme', 'Recepción Con Multa', 'Cancelado', 'Excepciones'
     fecha_envio_display: getTodayDisplayString(),
     fecha_aceptacion_display: ''
   });
@@ -236,7 +238,8 @@ const SeguimientoOCModule = () => {
     fecha_aceptacion: '',
     fecha_tope_aceptacion: '',
     fecha_tope_entrega: '',
-    fecha_tope_multa: ''
+    fecha_tope_multa: '',
+    fecha_insistencia: ''
   });
   const [editArticulos, setEditArticulos] = useState([]);
   const [deletedArticleIds, setDeletedArticleIds] = useState([]);
@@ -318,7 +321,8 @@ const SeguimientoOCModule = () => {
       tipo_oc: s.tipo_oc || prev.tipo_oc,
       fecha_tope_aceptacion: (s.fecha_tope_aceptacion || '').slice(0, 10),
       fecha_tope_entrega: (s.fecha_tope_entrega || '').slice(0, 10),
-      fecha_tope_multa: (s.fecha_tope_multa || '').slice(0, 10)
+      fecha_tope_multa: (s.fecha_tope_multa || '').slice(0, 10),
+      fecha_insistencia: (s.fecha_insistencia || '').slice(0, 10)
     }));
     setShowSolicitudSuggestions(false);
 
@@ -539,6 +543,7 @@ const SeguimientoOCModule = () => {
       fecha_tope_aceptacion: '',
       fecha_tope_entrega: '',
       fecha_tope_multa: '',
+      fecha_insistencia: '',
       estado: 'Enviada',
       fecha_envio_display: getTodayDisplayString(),
       fecha_aceptacion_display: ''
@@ -897,7 +902,8 @@ const SeguimientoOCModule = () => {
       fecha_aceptacion: toDateInputString(oc.fecha_aceptacion),
       fecha_tope_aceptacion: toDateInputString(oc.fecha_tope_aceptacion),
       fecha_tope_entrega: toDateInputString(oc.fecha_tope_entrega),
-      fecha_tope_multa: toDateInputString(oc.fecha_tope_multa)
+      fecha_tope_multa: toDateInputString(oc.fecha_tope_multa),
+      fecha_insistencia: toDateInputString(oc.fecha_insistencia)
     });
 
     setEditProveedorSearch(oc.proveedor || '');
@@ -983,15 +989,19 @@ const SeguimientoOCModule = () => {
     }
 
     // Validar orden de fechas tope
+    const isAG = editFormData.tipo_oc === 'AG';
     const fechasTope = {
       fecha_tope_aceptacion: editFormData.fecha_tope_aceptacion || null,
-      fecha_tope_entrega: editFormData.fecha_tope_entrega || null,
-      fecha_tope_multa: editFormData.fecha_tope_multa || null
+      fecha_tope_entrega: isAG ? null : (editFormData.fecha_tope_entrega || null),
+      fecha_tope_multa: isAG ? null : (editFormData.fecha_tope_multa || null),
+      fecha_insistencia: isAG ? (editFormData.fecha_insistencia || null) : null
     };
-    const errorFechas = validarOrdenFechas(fechasTope);
-    if (errorFechas) {
-      alert(errorFechas);
-      return;
+    if (!isAG) {
+      const errorFechas = validarOrdenFechas(fechasTope);
+      if (errorFechas) {
+        alert(errorFechas);
+        return;
+      }
     }
 
     // Check if new numero_oc clashes with another OC
@@ -1226,15 +1236,19 @@ const SeguimientoOCModule = () => {
           : `S-${formData.solicitud_compra.trim().toUpperCase()}`
       ) : null;
 
+      const isAG = formData.tipo_oc === 'AG';
       const fechasTope = {
         fecha_tope_aceptacion: formData.fecha_tope_aceptacion || null,
-        fecha_tope_entrega: formData.fecha_tope_entrega || null,
-        fecha_tope_multa: formData.fecha_tope_multa || null
+        fecha_tope_entrega: isAG ? null : (formData.fecha_tope_entrega || null),
+        fecha_tope_multa: isAG ? null : (formData.fecha_tope_multa || null),
+        fecha_insistencia: isAG ? (formData.fecha_insistencia || null) : null
       };
-      const errorFechas = validarOrdenFechas(fechasTope);
-      if (errorFechas) {
-        alert(errorFechas);
-        return;
+      if (!isAG) {
+        const errorFechas = validarOrdenFechas(fechasTope);
+        if (errorFechas) {
+          alert(errorFechas);
+          return;
+        }
       }
 
       const baseOcInsert = {
@@ -1277,8 +1291,6 @@ const SeguimientoOCModule = () => {
         await evaluarYActualizarEstadoSolicitud(formattedSol);
       }
 
-      if (insertItemsErr) throw insertItemsErr;
-
       alert('Orden de Compra creada exitosamente y catálogo base actualizado.');
       
       // Reset form
@@ -1291,6 +1303,7 @@ const SeguimientoOCModule = () => {
         fecha_tope_aceptacion: '',
         fecha_tope_entrega: '',
         fecha_tope_multa: '',
+        fecha_insistencia: '',
         estado: 'Enviada',
         fecha_envio_display: getTodayDisplayString(),
         fecha_aceptacion_display: ''
@@ -1313,22 +1326,38 @@ const SeguimientoOCModule = () => {
   // Helper to calculate state dates, business days and visual alerts
   const checkPlazos = (oc) => {
     if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada') {
-      return { statusType: 'cancelado', badgeBg: 'rgba(239, 68, 68, 0.2)', badgeColor: '#ef4444', isExpired: true, isYellow: false, alertMessage: 'Orden Cancelada (Artículos liberados)' };
+      return { statusType: 'cancelado', badgeBg: 'rgba(239, 68, 68, 0.2)', badgeColor: '#ef4444', isExpired: true, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Orden Cancelada (Artículos liberados)' };
     }
     if (oc.estado === 'Recepción Conforme') {
-      return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, alertMessage: 'Recepción Conforme en Bodega' };
+      return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción Conforme en Bodega' };
     }
     if (oc.estado === 'Recepción Con Multa') {
-      return { statusType: 'multa', badgeBg: 'rgba(249, 115, 22, 0.2)', badgeColor: '#f97316', isExpired: false, isYellow: false, alertMessage: 'Recepción Con Multa (entregado después de la fecha tope de entrega)' };
+      return { statusType: 'multa', badgeBg: 'rgba(249, 115, 22, 0.2)', badgeColor: '#f97316', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción Con Multa (entregado después de la fecha tope de entrega)' };
+    }
+    if (oc.estado === 'Excepciones') {
+      return {
+        statusType: 'excepciones',
+        nivel: 'purpura',
+        badgeBg: 'rgba(192, 128, 192, 0.15)',
+        badgeColor: '#c080c0',
+        isExpired: false,
+        isYellow: false,
+        isOrange: false,
+        isRosa: false,
+        isPurpura: true,
+        alertMessage: '🟣 Régimen de Excepción: Aceptada para recepción fuera de plazo'
+      };
     }
 
-    // Semáforo por fechas tope (igual para todos los tipos de OC)
+    // Semáforo por fechas tope (incluye rosa para AG, naranja para multas, etc.)
     const ev = evaluarPlazos(oc);
     return {
       nivel: ev.nivel,
       isExpired: ev.isExpired,
       isYellow: ev.isYellow,
       isOrange: ev.isOrange,
+      isRosa: ev.isRosa,
+      isPurpura: ev.isPurpura,
       alertMessage: ev.glosa,
       badgeBg: ev.bg,
       badgeColor: ev.color
@@ -1444,10 +1473,26 @@ const SeguimientoOCModule = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Filtered OCs for Alertas Tab (Yellow Alerts only)
+  // Filtered OCs for Alertas Tab
   const filteredAlertasOcs = ocs.filter(oc => {
     const plazos = checkPlazos(oc);
-    if (!plazos.isYellow) return false;
+
+    let matchesSubTab = false;
+    if (alertasSubFilter === 'TODAS') {
+      matchesSubTab = plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura || (plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme');
+    } else if (alertasSubFilter === 'AMARILLAS') {
+      matchesSubTab = plazos.isYellow;
+    } else if (alertasSubFilter === 'ROSA') {
+      matchesSubTab = plazos.isRosa;
+    } else if (alertasSubFilter === 'NARANJAS') {
+      matchesSubTab = plazos.isOrange;
+    } else if (alertasSubFilter === 'EXCEPCIONES' || alertasSubFilter === 'PURPURAS') {
+      matchesSubTab = plazos.isPurpura || oc.estado === 'Excepciones';
+    } else if (alertasSubFilter === 'ROJAS') {
+      matchesSubTab = plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme';
+    }
+
+    if (!matchesSubTab) return false;
 
     const q = searchQueryAlertas.toLowerCase().trim();
     const matchesSearch = !q || (
@@ -1458,7 +1503,11 @@ const SeguimientoOCModule = () => {
 
     let matchesStatus = true;
     if (filtroEstadoAlertas !== 'TODOS') {
-      matchesStatus = oc.estado === filtroEstadoAlertas;
+      if (filtroEstadoAlertas === 'Cancelado') {
+        matchesStatus = oc.estado === 'Cancelado' || oc.estado === 'Cancelada';
+      } else {
+        matchesStatus = oc.estado === filtroEstadoAlertas;
+      }
     }
 
     return matchesSearch && matchesStatus;
@@ -1466,6 +1515,13 @@ const SeguimientoOCModule = () => {
 
   const yellowOcsCount = ocs.filter(oc => checkPlazos(oc).isYellow).length;
   const orangeOcsCount = ocs.filter(oc => checkPlazos(oc).isOrange).length;
+  const rosaOcsCount = ocs.filter(oc => checkPlazos(oc).isRosa).length;
+  const purpuraOcsCount = ocs.filter(oc => checkPlazos(oc).isPurpura || oc.estado === 'Excepciones').length;
+  const redOcsCount = ocs.filter(oc => {
+    const p = checkPlazos(oc);
+    return p.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme';
+  }).length;
+  const totalAlertasCount = yellowOcsCount + orangeOcsCount + rosaOcsCount + purpuraOcsCount + redOcsCount;
 
   // Helper function to render table for OCs
   const renderOcTable = (ocList, emptyText = "No se encontraron Órdenes de Compra registradas.") => {
@@ -1502,7 +1558,15 @@ const SeguimientoOCModule = () => {
           <tbody>
             {ocList.map(oc => {
               const plazos = checkPlazos(oc);
-              const rowStyle = plazos.isExpired ? {
+              const rowStyle = (plazos.isPurpura || oc.estado === 'Excepciones') ? {
+                background: 'rgba(192, 128, 192, 0.08)',
+                borderLeft: '4px solid #c080c0',
+                transition: 'all 0.3s ease'
+              } : plazos.isRosa ? {
+                background: 'rgba(244, 194, 194, 0.08)',
+                borderLeft: '4px solid #f4c2c2',
+                transition: 'all 0.3s ease'
+              } : plazos.isExpired ? {
                 background: 'rgba(239, 68, 68, 0.04)',
                 borderLeft: '4px solid #ef4444',
                 transition: 'all 0.3s ease'
@@ -1561,12 +1625,21 @@ const SeguimientoOCModule = () => {
                         Acept.: {formatDate(oc.fecha_aceptacion)}
                       </div>
                     )}
-                    {(oc.fecha_tope_aceptacion || oc.fecha_tope_entrega || oc.fecha_tope_multa) && (
+                    {oc.tipo_oc === 'AG' ? (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', lineHeight: 1.5 }}>
+                        Tope acept.: {formatISOToDisplay(oc.fecha_tope_aceptacion)}
+                        {oc.fecha_insistencia && (
+                          <span style={{ color: '#f4c2c2', marginLeft: '6px', fontWeight: '600' }}>
+                            · Insistencia: {formatISOToDisplay(oc.fecha_insistencia)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (oc.fecha_tope_aceptacion || oc.fecha_tope_entrega || oc.fecha_tope_multa) && (
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', lineHeight: 1.5 }}>
                         Tope acept.: {formatISOToDisplay(oc.fecha_tope_aceptacion)} · Entrega: {formatISOToDisplay(oc.fecha_tope_entrega)} · Multa: {formatISOToDisplay(oc.fecha_tope_multa)}
                       </div>
                     )}
-                    {(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.nivel === 'sin_fecha') && (
+                    {(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || plazos.nivel === 'sin_fecha') && (
                       <div style={{ 
                         color: plazos.badgeColor, 
                         display: 'flex', 
@@ -1593,13 +1666,14 @@ const SeguimientoOCModule = () => {
                         cursor: 'pointer',
                         background: plazos.badgeBg,
                         color: plazos.badgeColor,
-                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange) ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
+                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
                       }}
                     >
                       <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
                       <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
                       <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
                       <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
+                      <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                       <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                     </select>
                   </td>
@@ -1926,7 +2000,7 @@ const SeguimientoOCModule = () => {
                     }}
                   >
                     <AlertTriangle size={14} color={activeSubTab === 'alertas' ? '#eab308' : '#94a3b8'} /> Alertas
-                    {yellowOcsCount > 0 && (
+                    {totalAlertasCount > 0 && (
                       <span style={{
                         background: '#eab308',
                         color: '#0f172a',
@@ -1935,7 +2009,7 @@ const SeguimientoOCModule = () => {
                         fontSize: '0.75rem',
                         fontWeight: '800'
                       }}>
-                        {yellowOcsCount}
+                        {totalAlertasCount}
                       </span>
                     )}
                   </button>
@@ -1972,8 +2046,8 @@ const SeguimientoOCModule = () => {
                     {/* Quick Stats Panel */}
                     <div style={{ 
                       display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                      gap: '15px', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                      gap: '12px', 
                       marginBottom: '30px' 
                     }}>
                       <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '15px 20px' }}>
@@ -1998,16 +2072,28 @@ const SeguimientoOCModule = () => {
                           {yellowOcsCount}
                         </h3>
                       </div>
+                      <div style={{ background: 'rgba(244, 194, 194, 0.06)', border: '1px solid rgba(244, 194, 194, 0.3)', borderRadius: '12px', padding: '15px 20px' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#f4c2c2', fontWeight: '500' }}>INSISTENCIA AG (ROSA)</span>
+                        <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#f4c2c2' }}>
+                          {rosaOcsCount}
+                        </h3>
+                      </div>
                       <div style={{ background: 'rgba(251, 146, 60, 0.05)', border: '1px solid rgba(251, 146, 60, 0.25)', borderRadius: '12px', padding: '15px 20px' }}>
                         <span style={{ fontSize: '0.85rem', color: '#fb923c', fontWeight: '500' }}>ATRASADAS CON MULTA</span>
                         <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#fb923c' }}>
                           {orangeOcsCount}
                         </h3>
                       </div>
+                      <div style={{ background: 'rgba(192, 128, 192, 0.06)', border: '1px solid rgba(192, 128, 192, 0.3)', borderRadius: '12px', padding: '15px 20px' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#c080c0', fontWeight: '500' }}>EXCEPCIONES (PÚRPURA)</span>
+                        <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#c080c0' }}>
+                          {purpuraOcsCount}
+                        </h3>
+                      </div>
                       <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
-                        <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: '500' }}>PLAZO VENCIDO (ALERTA ROJA)</span>
+                        <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: '500' }}>PLAZO VENCIDO (ROJA)</span>
                         <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: '#ef4444' }}>
-                          {ocs.filter(o => checkPlazos(o).isExpired).length}
+                          {redOcsCount}
                         </h3>
                       </div>
                     </div>
@@ -2049,6 +2135,7 @@ const SeguimientoOCModule = () => {
                           <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
                           <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
                           <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
+                          <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                           <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                         </select>
                       </div>
@@ -2068,36 +2155,146 @@ const SeguimientoOCModule = () => {
                 )}
 
                 {activeSubTab === 'alertas' && (
-                  /* SUB-TAB 2: ALERTAS AMARILLAS */
+                  /* SUB-TAB 2: ALERTAS */
                   <motion.div
                     key="subtab-alertas"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                   >
-                    {/* Alertas Header Banner */}
+                    {/* Alertas Sub-Tabs Selector */}
                     <div style={{
-                      background: 'rgba(234, 179, 8, 0.08)',
-                      border: '1px solid rgba(234, 179, 8, 0.25)',
-                      borderRadius: '12px',
-                      padding: '16px 20px',
-                      marginBottom: '25px',
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '14px'
+                      gap: '8px',
+                      marginBottom: '20px',
+                      flexWrap: 'wrap',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      padding: '8px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-color)'
                     }}>
-                      <AlertTriangle size={24} color="#eab308" style={{ flexShrink: 0 }} />
-                      <div>
-                        <h4 style={{ margin: 0, color: '#fef08a', fontSize: '1rem', fontWeight: '700' }}>
-                          Órdenes de Compra en Alerta Amarilla ({yellowOcsCount})
-                        </h4>
-                        <p style={{ margin: '4px 0 0 0', color: '#cbd5e1', fontSize: '0.85rem' }}>
-                          Módulo exclusivo para gestionar y dar seguimiento prioritario a las órdenes con alerta amarilla activa.
-                        </p>
-                      </div>
+                      {[
+                        { id: 'TODAS', label: 'Todas las Alertas', count: totalAlertasCount, color: '#f8fafc', bg: 'rgba(255,255,255,0.08)' },
+                        { id: 'AMARILLAS', label: '🟡 Amarillas', count: yellowOcsCount, color: '#eab308', bg: 'rgba(234, 179, 8, 0.12)' },
+                        { id: 'ROSA', label: '🌸 Rosa (Insistencia AG)', count: rosaOcsCount, color: '#f4c2c2', bg: 'rgba(244, 194, 194, 0.12)' },
+                        { id: 'NARANJAS', label: '🟠 Naranjas (Multas)', count: orangeOcsCount, color: '#fb923c', bg: 'rgba(251, 146, 60, 0.12)' },
+                        { id: 'EXCEPCIONES', label: '🟣 Excepciones', count: purpuraOcsCount, color: '#c080c0', bg: 'rgba(192, 128, 192, 0.12)' },
+                        { id: 'ROJAS', label: '🔴 Rojas (Vencidas)', count: redOcsCount, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' }
+                      ].map(sub => {
+                        const isSelected = alertasSubFilter === sub.id;
+                        return (
+                          <button
+                            key={sub.id}
+                            onClick={() => setAlertasSubFilter(sub.id)}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: '8px',
+                              background: isSelected ? sub.bg : 'transparent',
+                              border: isSelected ? `1px solid ${sub.color}` : '1px solid transparent',
+                              color: isSelected ? sub.color : '#94a3b8',
+                              fontWeight: isSelected ? '700' : '500',
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <span>{sub.label}</span>
+                            <span style={{
+                              background: isSelected ? sub.color : 'rgba(255,255,255,0.08)',
+                              color: isSelected ? '#0f172a' : '#cbd5e1',
+                              borderRadius: '10px',
+                              padding: '1px 7px',
+                              fontSize: '0.72rem',
+                              fontWeight: '800'
+                            }}>
+                              {sub.count}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    {/* Controls: Search + Status Filter (Enviada/Aceptada only) */}
+                    {/* Alertas Header Banner Dinámico */}
+                    {(() => {
+                      const bannerConfig = {
+                        TODAS: {
+                          bg: 'rgba(59, 130, 246, 0.08)',
+                          border: 'rgba(59, 130, 246, 0.25)',
+                          color: '#60a5fa',
+                          title: `Panel Consolidado de Alertas (${totalAlertasCount})`,
+                          desc: 'Visualización global de todas las órdenes con alerta amarilla, insistencia AG, multa, excepciones y vencimiento.',
+                          icon: <Bell size={24} color="#60a5fa" style={{ flexShrink: 0 }} />
+                        },
+                        AMARILLAS: {
+                          bg: 'rgba(234, 179, 8, 0.08)',
+                          border: 'rgba(234, 179, 8, 0.25)',
+                          color: '#fef08a',
+                          title: `Órdenes en Alerta Amarilla (${yellowOcsCount})`,
+                          desc: 'A 1 día hábil o menos de vencer el plazo de aceptación o el plazo de entrega sin multa.',
+                          icon: <AlertTriangle size={24} color="#eab308" style={{ flexShrink: 0 }} />
+                        },
+                        ROSA: {
+                          bg: 'rgba(244, 194, 194, 0.08)',
+                          border: 'rgba(244, 194, 194, 0.3)',
+                          color: '#f4c2c2',
+                          title: `Órdenes AG para Insistencia de Despacho (${rosaOcsCount})`,
+                          desc: 'Órdenes de tipo AG en o tras la fecha de insistencia. Debe requerirse por correo el despacho parcializado.',
+                          icon: <Mail size={24} color="#f4c2c2" style={{ flexShrink: 0 }} />
+                        },
+                        NARANJAS: {
+                          bg: 'rgba(251, 146, 60, 0.08)',
+                          border: 'rgba(251, 146, 60, 0.3)',
+                          color: '#fdba74',
+                          title: `Órdenes en Período de Multa (${orangeOcsCount})`,
+                          desc: 'Órdenes atrasadas que superaron la fecha de entrega pero aún están dentro del plazo máximo con multa.',
+                          icon: <AlertTriangle size={24} color="#fb923c" style={{ flexShrink: 0 }} />
+                        },
+                        EXCEPCIONES: {
+                          bg: 'rgba(192, 128, 192, 0.08)',
+                          border: 'rgba(192, 128, 192, 0.3)',
+                          color: '#e9d5ff',
+                          title: `Órdenes en Régimen de Excepción (${purpuraOcsCount})`,
+                          desc: 'Órdenes que superaron el plazo máximo de multa y fueron autorizadas formalmente para recepción fuera de plazo.',
+                          icon: <CheckCircle size={24} color="#c080c0" style={{ flexShrink: 0 }} />
+                        },
+                        ROJAS: {
+                          bg: 'rgba(239, 68, 68, 0.08)',
+                          border: 'rgba(239, 68, 68, 0.3)',
+                          color: '#fca5a5',
+                          title: `Órdenes con Plazo Vencido (${redOcsCount})`,
+                          desc: 'Órdenes que han sobrepasado la fecha tope máxima de multa sin recepción conforme ni autorización de excepción.',
+                          icon: <XCircle size={24} color="#ef4444" style={{ flexShrink: 0 }} />
+                        }
+                      };
+                      const curr = bannerConfig[alertasSubFilter] || bannerConfig.TODAS;
+                      return (
+                        <div style={{
+                          background: curr.bg,
+                          border: `1px solid ${curr.border}`,
+                          borderRadius: '12px',
+                          padding: '16px 20px',
+                          marginBottom: '25px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '14px'
+                        }}>
+                          {curr.icon}
+                          <div>
+                            <h4 style={{ margin: 0, color: curr.color, fontSize: '1rem', fontWeight: '700' }}>
+                              {curr.title}
+                            </h4>
+                            <p style={{ margin: '4px 0 0 0', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                              {curr.desc}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Controls: Search + Status Filter */}
                     <div style={{ 
                       display: 'flex', 
                       gap: '15px', 
@@ -2117,7 +2314,7 @@ const SeguimientoOCModule = () => {
                         />
                       </div>
 
-                      {/* Dropdown status filter for Alertas (Enviada / Aceptada only) */}
+                      {/* Dropdown status filter for Alertas */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Filter size={16} color="#94a3b8" />
                         <select
@@ -2135,15 +2332,29 @@ const SeguimientoOCModule = () => {
                             cursor: 'pointer'
                           }}
                         >
-                          <option value="TODOS" style={{ background: '#0f172a', color: '#f8fafc' }}>Todas las Alertas</option>
+                          <option value="TODOS" style={{ background: '#0f172a', color: '#f8fafc' }}>Todos los Estados</option>
                           <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
                           <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
+                          <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                         </select>
                       </div>
                     </div>
 
                     {/* Table */}
-                    {renderOcTable(filteredAlertasOcs, "No hay Órdenes de Compra en alerta amarilla actualmente.")}
+                    {renderOcTable(
+                      filteredAlertasOcs, 
+                      alertasSubFilter === 'TODAS'
+                        ? "No hay alertas activas en ninguna categoría actualmente."
+                        : alertasSubFilter === 'AMARILLAS'
+                        ? "No hay Órdenes de Compra en alerta amarilla actualmente."
+                        : alertasSubFilter === 'ROSA'
+                        ? "No hay Órdenes AG pendientes de insistencia de despacho."
+                        : alertasSubFilter === 'NARANJAS'
+                        ? "No hay Órdenes de Compra en período de multa actualmente."
+                        : alertasSubFilter === 'EXCEPCIONES'
+                        ? "No hay Órdenes de Compra bajo régimen de excepciones."
+                        : "No hay Órdenes de Compra con plazo vencido actualmente."
+                    )}
                   </motion.div>
                 )}
 
@@ -2695,7 +2906,7 @@ const SeguimientoOCModule = () => {
                   </select>
                 </div>
 
-                {/* Fechas Tope (para todos los tipos de OC) */}
+                {/* Fechas Tope */}
                 <div style={{
                   background: 'rgba(59, 130, 246, 0.08)',
                   border: '1px solid rgba(59, 130, 246, 0.25)',
@@ -2706,47 +2917,78 @@ const SeguimientoOCModule = () => {
                   gap: '12px'
                 }}>
                   <strong style={{ color: '#3b82f6', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={15} /> Fechas Tope de la OC
+                    <Clock size={15} /> Fechas Clave y Plazos
                   </strong>
-                  {formData.solicitud_compra && (formData.fecha_tope_aceptacion || formData.fecha_tope_entrega || formData.fecha_tope_multa) && (
+                  {formData.solicitud_compra && (formData.fecha_tope_aceptacion || formData.fecha_tope_entrega || formData.fecha_tope_multa || formData.fecha_insistencia) && (
                     <small style={{ color: '#10b981', fontSize: '0.75rem' }}>
                       Heredado de la solicitud {formData.solicitud_compra} (puede editarse).
                     </small>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope aceptación</label>
-                      <input
-                        type="date"
-                        className="input-field"
-                        style={{ fontSize: '0.85rem' }}
-                        value={formData.fecha_tope_aceptacion}
-                        onChange={e => setFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
-                      />
+
+                  {formData.tipo_oc === 'AG' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación (Envío Proveedor)</label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={formData.fecha_tope_aceptacion}
+                          onChange={e => setFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>
+                          Fecha de Insistencia (Despacho Parcial)
+                        </label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem', borderColor: '#f4c2c2' }}
+                          value={formData.fecha_insistencia}
+                          onChange={e => setFormData(prev => ({ ...prev, fecha_insistencia: e.target.value }))}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope entrega (sin multa)</label>
-                      <input
-                        type="date"
-                        className="input-field"
-                        style={{ fontSize: '0.85rem' }}
-                        value={formData.fecha_tope_entrega}
-                        onChange={e => setFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
-                      />
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope aceptación</label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={formData.fecha_tope_aceptacion}
+                          onChange={e => setFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope entrega (sin multa)</label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem' }}
+                          value={formData.fecha_tope_entrega}
+                          onChange={e => setFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope máximo con multa</label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
+                          value={formData.fecha_tope_multa}
+                          onChange={e => setFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope máximo con multa</label>
-                      <input
-                        type="date"
-                        className="input-field"
-                        style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
-                        value={formData.fecha_tope_multa}
-                        onChange={e => setFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
-                      />
-                    </div>
-                  </div>
+                  )}
+
                   <small style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1.5 }}>
-                    Semáforo: <span style={{ color: '#eab308' }}>amarillo</span> 1 día antes de cada tope · <span style={{ color: '#fb923c' }}>naranja</span> atrasado con multa · <span style={{ color: '#ea580c' }}>naranjo intenso</span> 1 día antes del tope de multa · <span style={{ color: '#ef4444' }}>rojo</span> vencido. El estado siempre se cambia manualmente.
+                    {formData.tipo_oc === 'AG'
+                      ? 'Para órdenes AG: alerta rosa bebé 1 día antes de la fecha de insistencia para solicitar despacho parcial por correo.'
+                      : 'Semáforo: amarillo 1 día antes de cada tope · naranja atrasado con multa · rojo vencido.'}
                   </small>
                 </div>
 
@@ -2759,6 +3001,7 @@ const SeguimientoOCModule = () => {
                   >
                     <option value="Enviada">Enviada</option>
                     <option value="Aceptada">Aceptada</option>
+                    <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
                     <option value="Cancelado">Cancelado (Liberar artículos)</option>
                   </select>
                 </div>
@@ -2898,9 +3141,11 @@ const SeguimientoOCModule = () => {
                     fontWeight: '700',
                     background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
                                 selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
+                                selectedOcForModal.estado === 'Excepciones' ? 'rgba(192, 128, 192, 0.2)' :
                                 selectedOcForModal.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
                     color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
                            selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
+                           selectedOcForModal.estado === 'Excepciones' ? '#c080c0' :
                            selectedOcForModal.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
                     display: 'inline-block',
                     marginTop: '4px'
@@ -2916,13 +3161,18 @@ const SeguimientoOCModule = () => {
                       Aceptada: {formatDate(selectedOcForModal.fecha_aceptacion)}
                     </span>
                   )}
+                  {selectedOcForModal.tipo_oc === 'AG' && selectedOcForModal.fecha_insistencia && (
+                    <span style={{ display: 'block', color: '#f4c2c2', fontSize: '0.8rem', marginTop: '2px', fontWeight: '600' }}>
+                      Insistencia: {formatISOToDisplay(selectedOcForModal.fecha_insistencia)}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Alert Message inside Modal */}
               {(() => {
                 const plazos = checkPlazos(selectedOcForModal);
-                if (!(plazos.isExpired || plazos.isYellow || plazos.isOrange)) return null;
+                if (!(plazos.isExpired || plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura)) return null;
                 return (
                   <div style={{ 
                     display: 'flex', 
@@ -3593,6 +3843,7 @@ const SeguimientoOCModule = () => {
                       <option value="Aceptada">Aceptada</option>
                       <option value="Recepción Conforme">Recepción Conforme</option>
                       <option value="Recepción Con Multa">Recepción Con Multa</option>
+                      <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
                       <option value="Cancelado">Cancelado (Liberar artículos)</option>
                     </select>
                   </div>
@@ -3711,38 +3962,66 @@ const SeguimientoOCModule = () => {
                 <div style={{ color: '#3b82f6', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                   <Clock size={16} /> Fechas Tope y Plazos de Entrega (Semáforo)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación</label>
-                    <input 
-                      type="date"
-                      className="input-field"
-                      style={{ fontSize: '0.85rem' }}
-                      value={editFormData.fecha_tope_aceptacion}
-                      onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
-                    />
+
+                {editFormData.tipo_oc === 'AG' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación (Envío Proveedor)</label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        style={{ fontSize: '0.85rem' }}
+                        value={editFormData.fecha_tope_aceptacion}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block', marginBottom: '4px', fontWeight: '600' }}>
+                        Fecha de Insistencia (Despacho Parcial)
+                      </label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        style={{ fontSize: '0.85rem', borderColor: '#f4c2c2' }}
+                        value={editFormData.fecha_insistencia}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_insistencia: e.target.value }))}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Entrega (sin multa)</label>
-                    <input 
-                      type="date"
-                      className="input-field"
-                      style={{ fontSize: '0.85rem' }}
-                      value={editFormData.fecha_tope_entrega}
-                      onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
-                    />
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Aceptación</label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        style={{ fontSize: '0.85rem' }}
+                        value={editFormData.fecha_tope_aceptacion}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_aceptacion: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tope Entrega (sin multa)</label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        style={{ fontSize: '0.85rem' }}
+                        value={editFormData.fecha_tope_entrega}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_entrega: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope Máximo con multa</label>
+                      <input 
+                        type="date"
+                        className="input-field"
+                        style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
+                        value={editFormData.fecha_tope_multa}
+                        onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', color: '#fb923c', display: 'block', marginBottom: '4px' }}>Tope Máximo con multa</label>
-                    <input 
-                      type="date"
-                      className="input-field"
-                      style={{ fontSize: '0.85rem', borderColor: 'rgba(251, 146, 60, 0.5)' }}
-                      value={editFormData.fecha_tope_multa}
-                      onChange={e => setEditFormData(prev => ({ ...prev, fecha_tope_multa: e.target.value }))}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Articulos de la OC Section */}
