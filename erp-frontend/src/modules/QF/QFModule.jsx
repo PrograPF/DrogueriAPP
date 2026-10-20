@@ -59,7 +59,7 @@ const QFModule = () => {
   const [formFechaInsistencia, setFormFechaInsistencia] = useState('');
 
   // Sub-Centros de Costo options (for RESOLUTIVIDAD)
-  const [subCentrosOptions, setSubCentrosOptions] = useState(['UAPO', 'ORL', 'TD']);
+  const [subCentrosOptions, setSubCentrosOptions] = useState(['C.M', 'ORL', 'TD', 'UAPO']);
 
   // Assigned OCs mapping: { [numero_solicitud]: [{ id, numero_oc, estado }] }
   const [assignedOcsMap, setAssignedOcsMap] = useState({});
