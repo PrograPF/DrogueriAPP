@@ -62,16 +62,20 @@ const hexToRgba = (hex, alpha) => {
 const build = (nivel, colorHex, glosa) => ({
   nivel,
   color: colorHex,
+  badgeColor: colorHex,
   bg: hexToRgba(colorHex, 0.18),
+  badgeBg: hexToRgba(colorHex, 0.18),
   glosa,
+  alertMessage: glosa,
   isYellow: nivel === 'amarillo',
   isOrange: nivel === 'multa' || nivel === 'naranjo',
   isExpired: nivel === 'rojo',
   isRosa: nivel === 'rosa',
-  isPurpura: nivel === 'purpura'
+  isPurpura: nivel === 'purpura',
+  isFinal: nivel === 'final'
 });
 
-const ESTADOS_FINALES = ['Cancelado', 'Cancelada', 'Recepción Conforme', 'Recepción Con Multa'];
+export const ESTADOS_FINALES = ['Cancelado', 'Cancelada', 'Recepción Conforme', 'Recepción Con Multa', 'Recepción de excepción'];
 
 export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
   const hoy = normalizeISO(hoyISO) || toLocalISO();
@@ -82,7 +86,10 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
     return build('purpura', COLORS.purpura, '🟣 Régimen de Excepción: Aceptada para recepción fuera de plazo');
   }
 
-  // 2. Estados finales cerrados
+  // 2. Estados finales cerrados (incluye Recepción de excepción ya entregada)
+  if (estado === 'Recepción de excepción') {
+    return build('final', COLORS.purpura, 'Recepción de excepción en bodega');
+  }
   if (ESTADOS_FINALES.includes(estado)) {
     return build('final', COLORS.gris, estado);
   }

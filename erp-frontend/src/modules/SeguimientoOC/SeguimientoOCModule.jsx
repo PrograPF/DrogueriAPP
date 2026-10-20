@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
   Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check,
-  Edit, Edit2, Edit3, Bell, AlertCircle
+  Edit, Edit2, Edit3, Bell, AlertCircle, BarChart3, DollarSign, PackageOpen, Layers, ArrowUpDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -181,6 +181,12 @@ const SeguimientoOCModule = () => {
   const [selectedOcIdForRecepcion, setSelectedOcIdForRecepcion] = useState('');
   const [recepcionQuantities, setRecepcionQuantities] = useState({}); // { [articleId]: incomingQty }
   const [savingRecepcion, setSavingRecepcion] = useState(false);
+
+  // Valorizados sub-tab state (Órdenes con recepciones parciales incompletas)
+  const [searchValorizados, setSearchValorizados] = useState('');
+  const [filtroTipoValorizados, setFiltroTipoValorizados] = useState('TODOS');
+  const [expandedValorizadoOcId, setExpandedValorizadoOcId] = useState(null);
+  const [sortByValorizados, setSortByValorizados] = useState('saldo_desc');
   
   // Form state
   const [formData, setFormData] = useState({
@@ -250,6 +256,7 @@ const SeguimientoOCModule = () => {
   const [savingEdit, setSavingEdit] = useState(false);
   const [nuevoArticuloCodigo, setNuevoArticuloCodigo] = useState('');
   const [nuevoArticuloCantidad, setNuevoArticuloCantidad] = useState(1);
+  const [nuevoArticuloPrecio, setNuevoArticuloPrecio] = useState('');
 
   const handleDateDisplayChange = (e) => {
     const val = e.target.value;
@@ -377,6 +384,8 @@ const SeguimientoOCModule = () => {
           codigo: item.codigo_articulo || '',
           nombre: ((item.descripcion_articulo || articulosCatalog[item.codigo_articulo] || '') + subTag).trim(),
           cantidad: item.cantidad || 1,
+          precio_unitario: item.precio_unitario || '',
+          subtotal_neto: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
           isNew: false,
           tempName: '',
           yaAsignadoEnOc: ocPrevia
@@ -386,7 +395,7 @@ const SeguimientoOCModule = () => {
       if (formRows.length > 0) {
         setArticulosForm(formRows);
       } else {
-        setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '', yaAsignadoEnOc: null }]);
+        setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, precio_unitario: '', subtotal_neto: 0, isNew: false, tempName: '', yaAsignadoEnOc: null }]);
       }
 
     } catch (err) {
@@ -406,14 +415,7 @@ const SeguimientoOCModule = () => {
         .from('ordenes_compra')
         .select(`
           *,
-          ordenes_compra_articulos (
-            id,
-            codigo_articulo,
-            cantidad,
-            cantidad_recepcionada,
-            estado_recepcion,
-            historial_cambios
-          )
+          ordenes_compra_articulos (*)
         `)
         .order('fecha_envio', { ascending: false });
 
@@ -552,7 +554,7 @@ const SeguimientoOCModule = () => {
     setShowProveedorSuggestions(false);
     setShowSolicitudSuggestions(false);
     setArticulosYaAsignados([]);
-    setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
+    setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, precio_unitario: '', subtotal_neto: 0, isNew: false, tempName: '' }]);
     setView('create');
   };
 
@@ -917,6 +919,8 @@ const SeguimientoOCModule = () => {
       codigo_articulo: a.codigo_articulo,
       descripcion: articulosCatalog[a.codigo_articulo] || a.codigo_articulo,
       cantidad: a.cantidad || 1,
+      precio_unitario: a.precio_unitario !== undefined && a.precio_unitario !== null ? a.precio_unitario : '',
+      subtotal_neto: a.subtotal_neto || ((a.cantidad || 1) * (a.precio_unitario || 0)),
       cantidad_recepcionada: a.cantidad_recepcionada || 0,
       estado_recepcion: a.estado_recepcion || 'Pendiente'
     }));
@@ -924,6 +928,7 @@ const SeguimientoOCModule = () => {
     setDeletedArticleIds([]);
     setNuevoArticuloCodigo('');
     setNuevoArticuloCantidad(1);
+    setNuevoArticuloPrecio('');
   };
 
   const handleEditArticuloCantidad = (index, newQty) => {
@@ -931,7 +936,25 @@ const SeguimientoOCModule = () => {
     setEditArticulos(prev => prev.map((art, idx) => {
       if (idx !== index) return art;
       const minQty = art.cantidad_recepcionada || 1;
-      return { ...art, cantidad: isNaN(val) ? '' : Math.max(minQty, val) };
+      const c = isNaN(val) ? '' : Math.max(minQty, val);
+      return { 
+        ...art, 
+        cantidad: c,
+        subtotal_neto: (Number(c) || 0) * (Number(art.precio_unitario) || 0)
+      };
+    }));
+  };
+
+  const handleEditArticuloPrecio = (index, newPrice) => {
+    const val = parseFloat(newPrice);
+    setEditArticulos(prev => prev.map((art, idx) => {
+      if (idx !== index) return art;
+      const precio = isNaN(val) ? 0 : Math.max(0, val);
+      return { 
+        ...art, 
+        precio_unitario: newPrice === '' ? '' : precio,
+        subtotal_neto: (Number(art.cantidad) || 0) * precio
+      };
     }));
   };
 
@@ -960,19 +983,24 @@ const SeguimientoOCModule = () => {
     }
 
     const desc = articulosCatalog[codigoLimpio] || `Artículo ${codigoLimpio}`;
+    const pUnit = parseFloat(nuevoArticuloPrecio) || 0;
+    const cCant = parseInt(nuevoArticuloCantidad, 10) || 1;
     setEditArticulos(prev => [
       ...prev,
       {
         id: null,
         codigo_articulo: codigoLimpio,
         descripcion: desc,
-        cantidad: parseInt(nuevoArticuloCantidad, 10) || 1,
+        cantidad: cCant,
+        precio_unitario: pUnit,
+        subtotal_neto: cCant * pUnit,
         cantidad_recepcionada: 0,
         estado_recepcion: 'Pendiente'
       }
     ]);
     setNuevoArticuloCodigo('');
     setNuevoArticuloCantidad(1);
+    setNuevoArticuloPrecio('');
   };
 
   const handleGuardarEdicion = async () => {
@@ -1055,6 +1083,19 @@ const SeguimientoOCModule = () => {
           : `S-${editFormData.solicitud_compra.trim().toUpperCase()}`
       ) : null;
 
+      // Calculate financial totals
+      let totalNeto = 0;
+      let totalRecepcionadoValor = 0;
+      for (const art of editArticulos) {
+        const qty = parseInt(art.cantidad, 10) || 1;
+        const pUnit = parseFloat(art.precio_unitario) || 0;
+        const sub = qty * pUnit;
+        totalNeto += sub;
+        totalRecepcionadoValor += (parseInt(art.cantidad_recepcionada, 10) || 0) * pUnit;
+      }
+      const totalConIva = Math.round(totalNeto * 1.19);
+      const saldoOc = Math.max(0, totalNeto - totalRecepcionadoValor);
+
       // 2. Update ordenes_compra
       const updates = {
         numero_oc: nuevoNumeroOc,
@@ -1065,15 +1106,32 @@ const SeguimientoOCModule = () => {
         estado: nuevoEstado,
         fecha_envio: fechaEnvioISO,
         fecha_aceptacion: fechaAceptacionISO,
+        total_neto: totalNeto,
+        total_con_iva: totalConIva,
+        saldo_oc: saldoOc,
         ...fechasTope
       };
 
-      const { error: updateErr } = await supabase
-        .from('ordenes_compra')
-        .update(updates)
-        .eq('id', editingOc.id);
+      try {
+        const { error: updateErr } = await supabase
+          .from('ordenes_compra')
+          .update(updates)
+          .eq('id', editingOc.id);
 
-      if (updateErr) throw updateErr;
+        if (updateErr) throw updateErr;
+      } catch (err) {
+        if (err.code === '42703' || err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+          const { total_neto, total_con_iva, saldo_oc, ...legacyUpdates } = updates;
+          const { error: legacyErr } = await supabase
+            .from('ordenes_compra')
+            .update(legacyUpdates)
+            .eq('id', editingOc.id);
+          if (legacyErr) throw legacyErr;
+          alert('⚠️ Atención: La OC fue actualizada pero las columnas financieras aún no existen en Supabase. Recuerde ejecutar el script SQL provisto en el SQL Editor.');
+        } else {
+          throw err;
+        }
+      }
 
       // 3. Update revisiones_bodega if numero_oc changed
       const oldNum = editingOc.numero_oc ? editingOc.numero_oc.trim() : '';
@@ -1095,25 +1153,43 @@ const SeguimientoOCModule = () => {
 
       // 5. Update and insert articles
       for (const art of editArticulos) {
+        const qty = parseInt(art.cantidad, 10) || 1;
+        const pUnit = parseFloat(art.precio_unitario) || 0;
+        const sub = qty * pUnit;
         if (art.id) {
-          const qty = parseInt(art.cantidad, 10) || 1;
-          const { error: updArtErr } = await supabase
+          const { error: artUpdErr } = await supabase
             .from('ordenes_compra_articulos')
-            .update({ cantidad: qty })
+            .update({ cantidad: qty, precio_unitario: pUnit, subtotal_neto: sub })
             .eq('id', art.id);
-          if (updArtErr) throw updArtErr;
+          if (artUpdErr && (artUpdErr.code === '42703' || artUpdErr.code === 'PGRST204' || (artUpdErr.message && artUpdErr.message.includes('schema cache')))) {
+            await supabase
+              .from('ordenes_compra_articulos')
+              .update({ cantidad: qty })
+              .eq('id', art.id);
+          }
         } else if (art.codigo_articulo && art.codigo_articulo.trim()) {
-          const qty = parseInt(art.cantidad, 10) || 1;
-          const { error: insArtErr } = await supabase
+          const { error: artInsErr } = await supabase
             .from('ordenes_compra_articulos')
             .insert([{
               oc_id: editingOc.id,
               codigo_articulo: art.codigo_articulo.trim(),
               cantidad: qty,
               cantidad_recepcionada: 0,
+              precio_unitario: pUnit,
+              subtotal_neto: sub,
               estado_recepcion: 'Pendiente'
             }]);
-          if (insArtErr) throw insArtErr;
+          if (artInsErr && (artInsErr.code === '42703' || artInsErr.code === 'PGRST204' || (artInsErr.message && artInsErr.message.includes('schema cache')))) {
+            await supabase
+              .from('ordenes_compra_articulos')
+              .insert([{
+                oc_id: editingOc.id,
+                codigo_articulo: art.codigo_articulo.trim(),
+                cantidad: qty,
+                cantidad_recepcionada: 0,
+                estado_recepcion: 'Pendiente'
+              }]);
+          }
         }
       }
 
@@ -1138,14 +1214,7 @@ const SeguimientoOCModule = () => {
           .from('ordenes_compra')
           .select(`
             *,
-            ordenes_compra_articulos (
-              id,
-              codigo_articulo,
-              cantidad,
-              cantidad_recepcionada,
-              estado_recepcion,
-              historial_cambios
-            )
+            ordenes_compra_articulos (*)
           `)
           .eq('id', editingOc.id)
           .maybeSingle();
@@ -1164,7 +1233,7 @@ const SeguimientoOCModule = () => {
   const handleAddRow = () => {
     setArticulosForm(prev => [
       ...prev,
-      { key: Date.now() + Math.random(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }
+      { key: Date.now() + Math.random(), codigo: '', nombre: '', cantidad: 1, precio_unitario: '', subtotal_neto: 0, isNew: false, tempName: '' }
     ]);
   };
 
@@ -1178,7 +1247,13 @@ const SeguimientoOCModule = () => {
   const handleRowChange = (key, field, value) => {
     setArticulosForm(prev => prev.map(row => {
       if (row.key === key) {
-        return { ...row, [field]: value };
+        const updated = { ...row, [field]: value };
+        if (field === 'cantidad' || field === 'precio_unitario') {
+          const qty = Number(field === 'cantidad' ? value : row.cantidad) || 0;
+          const price = Number(field === 'precio_unitario' ? value : row.precio_unitario) || 0;
+          updated.subtotal_neto = qty * price;
+        }
+        return updated;
       }
       return row;
     }));
@@ -1247,6 +1322,25 @@ const SeguimientoOCModule = () => {
         return;
       }
 
+      // Calculate financial totals
+      let totalNeto = 0;
+      const childItems = validArticles.map(art => {
+        const cant = parseInt(art.cantidad, 10) || 1;
+        const precioUnit = parseFloat(art.precio_unitario) || 0;
+        const subtotal = cant * precioUnit;
+        totalNeto += subtotal;
+        return {
+          codigo_articulo: art.codigo.trim(),
+          cantidad: cant,
+          cantidad_recepcionada: 0,
+          precio_unitario: precioUnit,
+          subtotal_neto: subtotal
+        };
+      });
+
+      const totalConIva = Math.round(totalNeto * 1.19);
+      const saldoOc = totalNeto;
+
       const baseOcInsert = {
         numero_oc: formData.numero_oc.trim(),
         solicitud_compra: formattedSol,
@@ -1256,31 +1350,49 @@ const SeguimientoOCModule = () => {
         estado: formData.estado,
         fecha_envio: parseDisplayDate(formData.fecha_envio_display),
         fecha_aceptacion: formData.fecha_aceptacion_display ? parseDisplayDate(formData.fecha_aceptacion_display) : (formData.estado === 'Aceptada' ? new Date().toISOString() : null),
+        total_neto: totalNeto,
+        total_con_iva: totalConIva,
+        saldo_oc: saldoOc,
         ...fechasTope
       };
 
+      let newOCId;
       const { data: insertedOC, error: insertOcErr } = await supabase
         .from('ordenes_compra')
         .insert([baseOcInsert])
         .select();
 
-      if (insertOcErr) throw insertOcErr;
+      if (insertOcErr) {
+        if (insertOcErr.code === '42703' || insertOcErr.code === 'PGRST204' || (insertOcErr.message && insertOcErr.message.includes('schema cache'))) {
+          const { total_neto, total_con_iva, saldo_oc, ...legacyInsert } = baseOcInsert;
+          const { data: legacyData, error: legacyErr } = await supabase
+            .from('ordenes_compra')
+            .insert([legacyInsert])
+            .select();
+          if (legacyErr) throw legacyErr;
+          newOCId = legacyData[0].id;
+          const legacyItems = childItems.map(({ precio_unitario, subtotal_neto, ...rest }) => ({ ...rest, oc_id: newOCId }));
+          const { error: legItemsErr } = await supabase.from('ordenes_compra_articulos').insert(legacyItems);
+          if (legItemsErr) throw legItemsErr;
+          alert('⚠️ Atención: La OC fue creada pero las columnas financieras aún no existen en Supabase. Recuerde ejecutar el script SQL provisto en el SQL Editor.');
+        } else {
+          throw insertOcErr;
+        }
+      } else {
+        newOCId = insertedOC[0].id;
+        const itemsToInsert = childItems.map(c => ({ ...c, oc_id: newOCId }));
+        let { error: insertItemsErr } = await supabase
+          .from('ordenes_compra_articulos')
+          .insert(itemsToInsert);
 
-      const newOCId = insertedOC[0].id;
-
-      // 3. Insert child articles
-      const childItems = validArticles.map(art => ({
-        oc_id: newOCId,
-        codigo_articulo: art.codigo.trim(),
-        cantidad: parseInt(art.cantidad) || 1,
-        cantidad_recepcionada: 0 // Initialize at 0
-      }));
-
-      const { error: insertItemsErr } = await supabase
-        .from('ordenes_compra_articulos')
-        .insert(childItems);
-
-      if (insertItemsErr) throw insertItemsErr;
+        if (insertItemsErr && (insertItemsErr.code === '42703' || insertItemsErr.code === 'PGRST204' || (insertItemsErr.message && insertItemsErr.message.includes('schema cache')))) {
+          const legacyItems = itemsToInsert.map(({ precio_unitario, subtotal_neto, ...rest }) => rest);
+          const { error: legErr } = await supabase.from('ordenes_compra_articulos').insert(legacyItems);
+          if (legErr) throw legErr;
+        } else if (insertItemsErr) {
+          throw insertItemsErr;
+        }
+      }
 
       // Update matched solicitud_compra status automatically
       if (formattedSol) {
@@ -1306,7 +1418,7 @@ const SeguimientoOCModule = () => {
       });
       setProveedorSearch('');
       setShowProveedorSuggestions(false);
-      setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, isNew: false, tempName: '' }]);
+      setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, precio_unitario: '', subtotal_neto: 0, isNew: false, tempName: '' }]);
       setView('list');
       cargarOcs();
       cargarArticulosCatalog();
@@ -1329,6 +1441,9 @@ const SeguimientoOCModule = () => {
     }
     if (oc.estado === 'Recepción Con Multa') {
       return { statusType: 'multa', badgeBg: 'rgba(249, 115, 22, 0.2)', badgeColor: '#f97316', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción Con Multa (entregado después de la fecha tope de entrega)' };
+    }
+    if (oc.estado === 'Recepción de excepción') {
+      return { statusType: 'recepcion_excepcion', badgeBg: 'rgba(192, 128, 192, 0.2)', badgeColor: '#c080c0', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción de Excepción en Bodega (entregado bajo régimen de excepción)' };
     }
     if (oc.estado === 'Excepciones') {
       return {
@@ -1407,14 +1522,7 @@ const SeguimientoOCModule = () => {
         .from('ordenes_compra')
         .select(`
           *,
-          ordenes_compra_articulos (
-            id,
-            codigo_articulo,
-            cantidad,
-            cantidad_recepcionada,
-            estado_recepcion,
-            historial_cambios
-          )
+          ordenes_compra_articulos (*)
         `)
         .eq('id', selectedOcIdForRecepcion);
 
@@ -1422,17 +1530,35 @@ const SeguimientoOCModule = () => {
       
       const updatedOc = refreshedOcs?.[0];
       if (updatedOc) {
-        // 4. Update parent OC status based on business days and completion
-        const totalRequested = (updatedOc.ordenes_compra_articulos || []).reduce((acc, a) => acc + (a.cantidad || 0), 0);
-        const totalReceivedNow = (updatedOc.ordenes_compra_articulos || []).reduce((acc, a) => acc + (a.cantidad_recepcionada || 0), 0);
+        // Calculate and update new saldo_oc
+        const arts = updatedOc.ordenes_compra_articulos || [];
+        const totalNeto = arts.reduce((acc, a) => acc + (Number(a.subtotal_neto) || ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0))), 0);
+        const totalRecepcionadoValor = arts.reduce((acc, a) => acc + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
+        const nuevoSaldo = Math.max(0, totalNeto - totalRecepcionadoValor);
+
+        try {
+          await supabase
+            .from('ordenes_compra')
+            .update({ saldo_oc: nuevoSaldo })
+            .eq('id', selectedOcIdForRecepcion);
+        } catch (saldoErr) {
+          console.warn('No se pudo actualizar saldo_oc en Supabase:', saldoErr);
+        }
+
+        const totalRequested = arts.reduce((acc, a) => acc + (a.cantidad || 0), 0);
+        const totalReceivedNow = arts.reduce((acc, a) => acc + (a.cantidad_recepcionada || 0), 0);
 
         const isFullyReceived = totalReceivedNow >= totalRequested;
 
         // El estado de la OC SIEMPRE se cambia manualmente por el usuario.
         if (isFullyReceived) {
-          alert('Todas las cantidades fueron recepcionadas. Recuerde cambiar manualmente el estado de la OC a "Recepción Conforme" o "Recepción Con Multa".');
+          if (updatedOc.estado === 'Excepciones') {
+            alert('Todas las cantidades fueron recepcionadas. Como esta orden estaba autorizada bajo régimen de excepción, recuerde cambiar su estado a "Recepción de excepción".');
+          } else {
+            alert('Todas las cantidades fueron recepcionadas. Recuerde cambiar manualmente el estado de la OC a "Recepción Conforme", "Recepción Con Multa" o "Recepción de excepción".');
+          }
         } else {
-          alert('Recepción parcial registrada correctamente.');
+          alert('Recepción parcial registrada correctamente. Saldo de la OC actualizado.');
         }
       }
 
@@ -1475,7 +1601,7 @@ const SeguimientoOCModule = () => {
 
     let matchesSubTab = false;
     if (alertasSubFilter === 'TODAS') {
-      matchesSubTab = plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura || (plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme');
+      matchesSubTab = plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura || (plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme' && oc.estado !== 'Recepción Con Multa' && oc.estado !== 'Recepción de excepción');
     } else if (alertasSubFilter === 'AMARILLAS') {
       matchesSubTab = plazos.isYellow;
     } else if (alertasSubFilter === 'ROSA') {
@@ -1485,7 +1611,7 @@ const SeguimientoOCModule = () => {
     } else if (alertasSubFilter === 'EXCEPCIONES' || alertasSubFilter === 'PURPURAS') {
       matchesSubTab = plazos.isPurpura || oc.estado === 'Excepciones';
     } else if (alertasSubFilter === 'ROJAS') {
-      matchesSubTab = plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme';
+      matchesSubTab = plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme' && oc.estado !== 'Recepción Con Multa' && oc.estado !== 'Recepción de excepción';
     }
 
     if (!matchesSubTab) return false;
@@ -1515,7 +1641,7 @@ const SeguimientoOCModule = () => {
   const purpuraOcsCount = ocs.filter(oc => checkPlazos(oc).isPurpura || oc.estado === 'Excepciones').length;
   const redOcsCount = ocs.filter(oc => {
     const p = checkPlazos(oc);
-    return p.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme';
+    return p.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme' && oc.estado !== 'Recepción Con Multa' && oc.estado !== 'Recepción de excepción';
   }).length;
   const totalAlertasCount = yellowOcsCount + orangeOcsCount + rosaOcsCount + purpuraOcsCount + redOcsCount;
 
@@ -1658,7 +1784,7 @@ const SeguimientoOCModule = () => {
                         cursor: 'pointer',
                         background: plazos.badgeBg,
                         color: plazos.badgeColor,
-                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
+                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || oc.estado === 'Recepción de excepción') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
                       }}
                     >
                       <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
@@ -1666,6 +1792,7 @@ const SeguimientoOCModule = () => {
                       <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
                       <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
                       <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
+                      <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
                       <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                     </select>
                   </td>
@@ -1764,6 +1891,117 @@ const SeguimientoOCModule = () => {
 
     return matchesOc || matchesProv || matchesArt;
   });
+
+  // =========================================================================
+  // SUB-TAB 4: CÁLCULOS Y FILTROS DE ÓRDENES VALORIZADAS (RECEPCIÓN PARCIAL)
+  // Regla usuario: "la información de momento de cuántas unidades se recibieron sea 
+  // la ingresada en el módulo gestión de OC pestaña recepción de productos"
+  // (es decir, campo ordenes_compra_articulos.cantidad_recepcionada)
+  // =========================================================================
+  const ocsValorizados = useMemo(() => {
+    return ocs
+      .filter(oc => {
+        if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada') return false;
+        const arts = oc.ordenes_compra_articulos || [];
+        if (arts.length === 0) return false;
+        const totalSol = arts.reduce((sum, a) => sum + (Number(a.cantidad) || 0), 0);
+        const totalRec = arts.reduce((sum, a) => sum + (Number(a.cantidad_recepcionada) || 0), 0);
+        // Tienen recepciones registradas pero no están completas
+        return totalRec > 0 && totalRec < totalSol;
+      })
+      .map(oc => {
+        const arts = oc.ordenes_compra_articulos || [];
+        const totalSol = arts.reduce((sum, a) => sum + (Number(a.cantidad) || 0), 0);
+        const totalRec = arts.reduce((sum, a) => sum + (Number(a.cantidad_recepcionada) || 0), 0);
+        const totalNeto = arts.reduce((sum, a) => sum + ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0)), 0);
+        const recepcionadoNeto = arts.reduce((sum, a) => sum + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
+        const saldoFaltanteNeto = Math.max(0, totalNeto - recepcionadoNeto);
+        const saldoFaltanteIva = Math.round(saldoFaltanteNeto * 1.19);
+        const totalConIva = Math.round(totalNeto * 1.19);
+        const porcentajeAvance = totalSol > 0 ? Math.round((totalRec / totalSol) * 100) : 0;
+        const porcentajeFinanciero = totalNeto > 0 ? Math.round((recepcionadoNeto / totalNeto) * 100) : porcentajeAvance;
+
+        const articulosIncompletos = arts.filter(a => (Number(a.cantidad_recepcionada) || 0) < (Number(a.cantidad) || 0));
+
+        return {
+          ...oc,
+          totalSol,
+          totalRec,
+          totalNeto,
+          totalConIva,
+          recepcionadoNeto,
+          saldoFaltanteNeto,
+          saldoFaltanteIva,
+          porcentajeAvance,
+          porcentajeFinanciero,
+          articulosIncompletos,
+          totalArtsIncompletos: articulosIncompletos.length
+        };
+      });
+  }, [ocs]);
+
+  const valorizadosStats = useMemo(() => {
+    const totalOcs = ocsValorizados.length;
+    const totalComprometidoNeto = ocsValorizados.reduce((acc, o) => acc + o.totalNeto, 0);
+    const totalComprometidoIva = Math.round(totalComprometidoNeto * 1.19);
+    const totalRecepcionadoNeto = ocsValorizados.reduce((acc, o) => acc + o.recepcionadoNeto, 0);
+    const totalSaldoFaltanteNeto = ocsValorizados.reduce((acc, o) => acc + o.saldoFaltanteNeto, 0);
+    const totalSaldoFaltanteIva = ocsValorizados.reduce((acc, o) => acc + o.saldoFaltanteIva, 0);
+
+    const codigosIncompletosSet = new Set();
+    let totalUnidadesFaltantes = 0;
+    ocsValorizados.forEach(oc => {
+      oc.articulosIncompletos.forEach(a => {
+        if (a.codigo_articulo) codigosIncompletosSet.add(a.codigo_articulo.trim());
+        totalUnidadesFaltantes += Math.max(0, (Number(a.cantidad) || 0) - (Number(a.cantidad_recepcionada) || 0));
+      });
+    });
+
+    const porcentajeGlobalFinanciero = totalComprometidoNeto > 0
+      ? Math.round((totalRecepcionadoNeto / totalComprometidoNeto) * 100)
+      : 0;
+
+    return {
+      totalOcs,
+      totalComprometidoNeto,
+      totalComprometidoIva,
+      totalRecepcionadoNeto,
+      totalSaldoFaltanteNeto,
+      totalSaldoFaltanteIva,
+      totalArticulosUnicosIncompletos: codigosIncompletosSet.size,
+      totalUnidadesFaltantes,
+      porcentajeGlobalFinanciero
+    };
+  }, [ocsValorizados]);
+
+  const filteredValorizadosOcs = useMemo(() => {
+    const q = (searchValorizados || '').toLowerCase().trim();
+    let result = ocsValorizados.filter(oc => {
+      if (filtroTipoValorizados !== 'TODOS' && oc.tipo_oc !== filtroTipoValorizados) return false;
+      if (!q) return true;
+      const numMatch = (oc.numero_oc || '').toLowerCase().includes(q);
+      const provMatch = (oc.proveedor || '').toLowerCase().includes(q);
+      const rutMatch = (oc.rut_proveedor || '').toLowerCase().includes(q);
+      const solMatch = (oc.solicitud_compra || '').toLowerCase().includes(q);
+      const artMatch = (oc.ordenes_compra_articulos || []).some(a => 
+        (a.codigo_articulo || '').toLowerCase().includes(q) ||
+        (articulosCatalog[a.codigo_articulo] || '').toLowerCase().includes(q)
+      );
+      return numMatch || provMatch || rutMatch || solMatch || artMatch;
+    });
+
+    if (sortByValorizados === 'saldo_desc') {
+      result.sort((a, b) => b.saldoFaltanteNeto - a.saldoFaltanteNeto);
+    } else if (sortByValorizados === 'saldo_asc') {
+      result.sort((a, b) => a.saldoFaltanteNeto - b.saldoFaltanteNeto);
+    } else if (sortByValorizados === 'avance_asc') {
+      result.sort((a, b) => a.porcentajeAvance - b.porcentajeAvance);
+    } else if (sortByValorizados === 'numero_oc') {
+      result.sort((a, b) => (a.numero_oc || '').localeCompare(b.numero_oc || ''));
+    }
+
+    return result;
+  }, [ocsValorizados, searchValorizados, filtroTipoValorizados, sortByValorizados, articulosCatalog]);
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px' }}>
@@ -2025,6 +2263,38 @@ const SeguimientoOCModule = () => {
                   >
                     <ClipboardList size={14} /> Recepción de Productos
                   </button>
+
+                  <button
+                    onClick={() => setActiveSubTab('valorizados')}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      background: activeSubTab === 'valorizados' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                      color: activeSubTab === 'valorizados' ? '#38bdf8' : '#94a3b8',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '0.85rem',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <BarChart3 size={14} /> Valorizados
+                    {ocsValorizados.length > 0 && (
+                      <span style={{
+                        background: '#38bdf8',
+                        color: '#0f172a',
+                        borderRadius: '10px',
+                        padding: '1px 7px',
+                        fontSize: '0.75rem',
+                        fontWeight: '800'
+                      }}>
+                        {ocsValorizados.length}
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 {activeSubTab === 'list' && (
@@ -2128,6 +2398,7 @@ const SeguimientoOCModule = () => {
                           <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
                           <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
                           <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
+                          <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
                           <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                         </select>
                       </div>
@@ -2590,6 +2861,597 @@ const SeguimientoOCModule = () => {
                     </div>
                   </motion.div>
                 )}
+
+                {activeSubTab === 'valorizados' && (
+                  /* SUB-TAB 4: VALORIZADOS (ÓRDENES CON RECEPCIONES PARCIALES) */
+                  <motion.div
+                    key="subtab-valorizados"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    {/* Header Banner */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                      border: '1px solid rgba(56, 189, 248, 0.2)',
+                      borderRadius: '14px',
+                      padding: '24px 28px',
+                      marginBottom: '26px',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                            <div style={{
+                              padding: '8px',
+                              background: 'rgba(56, 189, 248, 0.15)',
+                              borderRadius: '10px',
+                              color: '#38bdf8'
+                            }}>
+                              <BarChart3 size={22} />
+                            </div>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: '800', margin: 0, color: '#f8fafc' }}>
+                              Órdenes de Compra Valorizadas
+                            </h3>
+                            <span style={{
+                              background: 'rgba(56, 189, 248, 0.18)',
+                              color: '#38bdf8',
+                              padding: '2px 10px',
+                              borderRadius: '20px',
+                              fontSize: '0.78rem',
+                              fontWeight: '700',
+                              border: '1px solid rgba(56, 189, 248, 0.3)'
+                            }}>
+                              {valorizadosStats.totalOcs} con entregas parciales
+                            </span>
+                          </div>
+                          <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: 0, maxWidth: '750px', lineHeight: 1.5 }}>
+                            Control financiero consolidado de órdenes que registran entregas físicas en bodega pero aún no completan el 100% de sus artículos solicitados.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* TOP 4 KPI CARDS */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '16px',
+                      marginBottom: '24px'
+                    }}>
+                      {/* Card 1: Órdenes y Artículos Incompletos */}
+                      <div style={{
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        borderRadius: '12px',
+                        padding: '18px 20px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Órdenes Incompletas
+                          </span>
+                          <div style={{ padding: '6px', background: 'rgba(56, 189, 248, 0.12)', borderRadius: '8px', color: '#38bdf8' }}>
+                            <Layers size={18} />
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#38bdf8', marginBottom: '6px' }}>
+                          {valorizadosStats.totalOcs} <span style={{ fontSize: '0.95rem', fontWeight: '600', color: '#94a3b8' }}>OC</span>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                          <strong style={{ color: '#f8fafc' }}>{valorizadosStats.totalArticulosUnicosIncompletos}</strong> tipos de artículos pendientes ({valorizadosStats.totalUnidadesFaltantes.toLocaleString('es-CL')} un.)
+                        </div>
+                      </div>
+
+                      {/* Card 2: Monto Recepcionado (Neto) */}
+                      <div style={{
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                        borderRadius: '12px',
+                        padding: '18px 20px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Recepcionado Neto
+                          </span>
+                          <div style={{ padding: '6px', background: 'rgba(16, 185, 129, 0.12)', borderRadius: '8px', color: '#10b981' }}>
+                            <CheckCircle size={18} />
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#10b981', marginBottom: '6px' }}>
+                          ${valorizadosStats.totalRecepcionadoNeto.toLocaleString('es-CL')}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                          <strong style={{ color: '#10b981' }}>{valorizadosStats.porcentajeGlobalFinanciero}%</strong> del total comprometido ya ingresado
+                        </div>
+                      </div>
+
+                      {/* Card 3: Saldo Faltante por Recibir (Neto) */}
+                      <div style={{
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(245, 158, 11, 0.25)',
+                        borderRadius: '12px',
+                        padding: '18px 20px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Saldo Faltante Neto
+                          </span>
+                          <div style={{ padding: '6px', background: 'rgba(245, 158, 11, 0.12)', borderRadius: '8px', color: '#f59e0b' }}>
+                            <Clock size={18} />
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#f59e0b', marginBottom: '6px' }}>
+                          ${valorizadosStats.totalSaldoFaltanteNeto.toLocaleString('es-CL')}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                          Comprometido total: <strong style={{ color: '#f8fafc' }}>${valorizadosStats.totalComprometidoNeto.toLocaleString('es-CL')}</strong>
+                        </div>
+                      </div>
+
+                      {/* Card 4: Saldo Faltante con IVA (19%) */}
+                      <div style={{
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(192, 128, 192, 0.3)',
+                        borderRadius: '12px',
+                        padding: '18px 20px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Saldo Faltante c/IVA
+                          </span>
+                          <div style={{ padding: '6px', background: 'rgba(192, 128, 192, 0.15)', borderRadius: '8px', color: '#c080c0' }}>
+                            <DollarSign size={18} />
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#c080c0', marginBottom: '6px' }}>
+                          ${valorizadosStats.totalSaldoFaltanteIva.toLocaleString('es-CL')}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                          IVA (19%) pendiente: <strong style={{ color: '#c080c0' }}>${(valorizadosStats.totalSaldoFaltanteIva - valorizadosStats.totalSaldoFaltanteNeto).toLocaleString('es-CL')}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* VISUAL CHART / BARRA DE PROGRESO GLOBAL */}
+                    <div style={{
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '12px',
+                      padding: '20px 24px',
+                      marginBottom: '26px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <BarChart3 size={18} color="#38bdf8" />
+                          <strong style={{ fontSize: '0.95rem', color: '#f8fafc' }}>
+                            Distribución de Cumplimiento Financiero Global
+                          </strong>
+                        </div>
+                        <span style={{
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981',
+                          padding: '3px 12px',
+                          borderRadius: '14px',
+                          fontWeight: '700',
+                          fontSize: '0.82rem',
+                          border: '1px solid rgba(16, 185, 129, 0.3)'
+                        }}>
+                          {valorizadosStats.porcentajeGlobalFinanciero}% Recepcionado
+                        </span>
+                      </div>
+
+                      {/* Multi-segment Progress Bar */}
+                      <div style={{
+                        height: '24px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        position: 'relative',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        <div 
+                          style={{
+                            width: `${Math.min(100, valorizadosStats.porcentajeGlobalFinanciero)}%`,
+                            background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                            transition: 'width 0.5s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#ffffff'
+                          }}
+                          title={`Recepcionado: $${valorizadosStats.totalRecepcionadoNeto.toLocaleString('es-CL')}`}
+                        >
+                          {valorizadosStats.porcentajeGlobalFinanciero >= 12 && `${valorizadosStats.porcentajeGlobalFinanciero}%`}
+                        </div>
+                        <div 
+                          style={{
+                            width: `${Math.max(0, 100 - valorizadosStats.porcentajeGlobalFinanciero)}%`,
+                            background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                            transition: 'width 0.5s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#ffffff'
+                          }}
+                          title={`Saldo pendiente: $${valorizadosStats.totalSaldoFaltanteNeto.toLocaleString('es-CL')}`}
+                        >
+                          {(100 - valorizadosStats.porcentajeGlobalFinanciero) >= 12 && `${100 - valorizadosStats.porcentajeGlobalFinanciero}%`}
+                        </div>
+                      </div>
+
+                      {/* Legend Grid */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '12px',
+                        marginTop: '16px',
+                        fontSize: '0.82rem'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></span>
+                          <span style={{ color: '#94a3b8' }}>Recepcionado:</span>
+                          <strong style={{ color: '#10b981' }}>${valorizadosStats.totalRecepcionadoNeto.toLocaleString('es-CL')}</strong>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                          <span style={{ color: '#94a3b8' }}>Saldo Pendiente Neto:</span>
+                          <strong style={{ color: '#f59e0b' }}>${valorizadosStats.totalSaldoFaltanteNeto.toLocaleString('es-CL')}</strong>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#c080c0' }}></span>
+                          <span style={{ color: '#94a3b8' }}>Saldo Pendiente c/IVA:</span>
+                          <strong style={{ color: '#c080c0' }}>${valorizadosStats.totalSaldoFaltanteIva.toLocaleString('es-CL')}</strong>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <PackageOpen size={14} color="#38bdf8" />
+                          <span style={{ color: '#94a3b8' }}>Unidades por recibir:</span>
+                          <strong style={{ color: '#38bdf8' }}>{valorizadosStats.totalUnidadesFaltantes.toLocaleString('es-CL')} un.</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SEARCH & FILTER CONTROLS */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                      marginBottom: '20px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '280px' }}>
+                        <div style={{ position: 'relative', width: '100%', maxWidth: '450px' }}>
+                          <Search style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={16} />
+                          <input
+                            type="text"
+                            value={searchValorizados}
+                            onChange={e => setSearchValorizados(e.target.value)}
+                            placeholder="Buscar por N° OC, proveedor, RUT, código o artículo..."
+                            className="input-field"
+                            style={{ paddingLeft: '42px', height: '42px', fontSize: '0.85rem' }}
+                          />
+                        </div>
+
+                        <select
+                          value={filtroTipoValorizados}
+                          onChange={e => setFiltroTipoValorizados(e.target.value)}
+                          className="input-field"
+                          style={{ width: '150px', height: '42px', fontSize: '0.85rem' }}
+                        >
+                          <option value="TODOS">Todos los tipos</option>
+                          {TIPOS_OC.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <ArrowUpDown size={15} color="#94a3b8" />
+                        <select
+                          value={sortByValorizados}
+                          onChange={e => setSortByValorizados(e.target.value)}
+                          className="input-field"
+                          style={{ width: '220px', height: '42px', fontSize: '0.85rem' }}
+                        >
+                          <option value="saldo_desc">Mayor saldo faltante primero</option>
+                          <option value="saldo_asc">Menor saldo faltante primero</option>
+                          <option value="avance_asc">Menor avance primero</option>
+                          <option value="numero_oc">Por N° de OC</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* DATA TABLE */}
+                    {filteredValorizadosOcs.length === 0 ? (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '60px 20px',
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        borderRadius: '12px',
+                        border: '1px dashed var(--border-color)',
+                        color: '#94a3b8'
+                      }}>
+                        <Layers size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                        <h4 style={{ margin: '0 0 6px 0', color: '#f8fafc', fontSize: '1.05rem' }}>
+                          {ocsValorizados.length === 0
+                            ? 'No hay Órdenes de Compra con entregas parciales actualmente'
+                            : 'No se encontraron Órdenes que coincidan con la búsqueda'}
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                          {ocsValorizados.length === 0
+                            ? 'Cuando se registren recepciones parciales en la pestaña "Recepción de Productos", aparecerán valorizadas aquí automáticamente.'
+                            : 'Pruebe ajustando los términos de búsqueda o los filtros seleccionados.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="table-container" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8', textAlign: 'left' }}>
+                              <th style={{ padding: '12px 14px' }}>N° OC / TIPO</th>
+                              <th style={{ padding: '12px 14px' }}>PROVEEDOR</th>
+                              <th style={{ padding: '12px 14px', width: '170px' }}>AVANCE FÍSICO</th>
+                              <th style={{ padding: '12px 14px', textAlign: 'right' }}>TOTAL NETO</th>
+                              <th style={{ padding: '12px 14px', textAlign: 'right' }}>RECEPCIONADO NETO</th>
+                              <th style={{ padding: '12px 14px', textAlign: 'right' }}>SALDO FALTANTE NETO</th>
+                              <th style={{ padding: '12px 14px', textAlign: 'right' }}>SALDO C/IVA (19%)</th>
+                              <th style={{ padding: '12px 14px', textAlign: 'center', width: '110px' }}>FALTANTES</th>
+                              <th style={{ padding: '12px 14px', textAlign: 'center', width: '90px' }}>DETALLE</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredValorizadosOcs.map(oc => {
+                              const isExpanded = expandedValorizadoOcId === oc.id;
+                              return (
+                                <React.Fragment key={oc.id}>
+                                  <tr 
+                                    onClick={() => setExpandedValorizadoOcId(isExpanded ? null : oc.id)}
+                                    style={{
+                                      borderBottom: isExpanded ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
+                                      cursor: 'pointer',
+                                      background: isExpanded ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+                                      transition: 'background 0.2s ease'
+                                    }}
+                                    onMouseEnter={e => {
+                                      if (!isExpanded) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                                    }}
+                                    onMouseLeave={e => {
+                                      if (!isExpanded) e.currentTarget.style.background = 'transparent';
+                                    }}
+                                  >
+                                    {/* N° OC & Tipo */}
+                                    <td style={{ padding: '14px' }}>
+                                      <div style={{ fontWeight: '700', color: '#38bdf8', fontSize: '0.92rem' }}>
+                                        {oc.numero_oc}
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px', alignItems: 'center' }}>
+                                        <span style={{
+                                          padding: '1px 6px',
+                                          borderRadius: '4px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: '700',
+                                          background: 'rgba(56, 189, 248, 0.15)',
+                                          color: '#38bdf8'
+                                        }}>
+                                          {oc.tipo_oc || 'AG'}
+                                        </span>
+                                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                          {oc.estado}
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    {/* Proveedor & RUT */}
+                                    <td style={{ padding: '14px' }}>
+                                      <div style={{ fontWeight: '600', color: '#f8fafc', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {oc.proveedor}
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                        RUT: {oc.rut_proveedor || 'S/R'}
+                                      </div>
+                                    </td>
+
+                                    {/* Avance Físico */}
+                                    <td style={{ padding: '14px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                                        <strong style={{ color: '#10b981' }}>{oc.porcentajeAvance}%</strong>
+                                        <span style={{ color: '#94a3b8' }}>{oc.totalRec} de {oc.totalSol} un.</span>
+                                      </div>
+                                      <div style={{ height: '7px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                          width: `${Math.min(100, oc.porcentajeAvance)}%`,
+                                          height: '100%',
+                                          background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                                          borderRadius: '4px'
+                                        }}></div>
+                                      </div>
+                                    </td>
+
+                                    {/* Total Neto */}
+                                    <td style={{ padding: '14px', textAlign: 'right', fontWeight: '600', color: '#cbd5e1' }}>
+                                      ${oc.totalNeto.toLocaleString('es-CL')}
+                                    </td>
+
+                                    {/* Recepcionado Neto */}
+                                    <td style={{ padding: '14px', textAlign: 'right', fontWeight: '700', color: '#10b981' }}>
+                                      ${oc.recepcionadoNeto.toLocaleString('es-CL')}
+                                    </td>
+
+                                    {/* Saldo Faltante Neto */}
+                                    <td style={{ padding: '14px', textAlign: 'right', fontWeight: '800', color: '#f59e0b' }}>
+                                      ${oc.saldoFaltanteNeto.toLocaleString('es-CL')}
+                                    </td>
+
+                                    {/* Saldo Faltante con IVA */}
+                                    <td style={{ padding: '14px', textAlign: 'right', fontWeight: '800', color: '#c080c0' }}>
+                                      ${oc.saldoFaltanteIva.toLocaleString('es-CL')}
+                                    </td>
+
+                                    {/* Faltantes Badge */}
+                                    <td style={{ padding: '14px', textAlign: 'center' }}>
+                                      <span style={{
+                                        padding: '3px 8px',
+                                        borderRadius: '12px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: '700',
+                                        background: 'rgba(245, 158, 11, 0.15)',
+                                        color: '#f59e0b',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        display: 'inline-block'
+                                      }}>
+                                        {oc.totalArtsIncompletos} ítem(s)
+                                      </span>
+                                    </td>
+
+                                    {/* Botón Detalle */}
+                                    <td style={{ padding: '14px', textAlign: 'center' }}>
+                                      <button
+                                        type="button"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          setExpandedValorizadoOcId(isExpanded ? null : oc.id);
+                                        }}
+                                        style={{
+                                          background: isExpanded ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                          border: isExpanded ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                          color: isExpanded ? '#38bdf8' : '#94a3b8',
+                                          borderRadius: '6px',
+                                          padding: '6px 10px',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: '600',
+                                          transition: 'all 0.2s ease'
+                                        }}
+                                      >
+                                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        {isExpanded ? 'Ocultar' : 'Ver'}
+                                      </button>
+                                    </td>
+                                  </tr>
+
+                                  {/* Sub-tabla Desplegable con detalle por artículo */}
+                                  {isExpanded && (
+                                    <tr style={{ background: 'rgba(15, 23, 42, 0.95)', borderBottom: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                                      <td colSpan={9} style={{ padding: '16px 20px' }}>
+                                        <div style={{
+                                          background: 'rgba(0, 0, 0, 0.3)',
+                                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                                          borderRadius: '10px',
+                                          padding: '16px'
+                                        }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                              <PackageOpen size={16} color="#38bdf8" />
+                                              <strong style={{ fontSize: '0.88rem', color: '#f8fafc' }}>
+                                                Desglose de Artículos de la Orden {oc.numero_oc}
+                                              </strong>
+                                            </div>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                              {oc.articulosIncompletos.length} artículo(s) con saldo pendiente
+                                            </span>
+                                          </div>
+
+                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                            <thead>
+                                              <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#94a3b8', textAlign: 'left' }}>
+                                                <th style={{ padding: '8px' }}>CÓDIGO</th>
+                                                <th style={{ padding: '8px' }}>DESCRIPCIÓN</th>
+                                                <th style={{ padding: '8px', textAlign: 'center', width: '90px' }}>SOLICITADO</th>
+                                                <th style={{ padding: '8px', textAlign: 'center', width: '90px' }}>RECIBIDO</th>
+                                                <th style={{ padding: '8px', textAlign: 'center', width: '90px' }}>FALTANTE</th>
+                                                <th style={{ padding: '8px', textAlign: 'right', width: '120px' }}>PRECIO UNIT.</th>
+                                                <th style={{ padding: '8px', textAlign: 'right', width: '140px' }}>SALDO FALTANTE NETO</th>
+                                                <th style={{ padding: '8px', textAlign: 'right', width: '140px' }}>SALDO C/IVA</th>
+                                                <th style={{ padding: '8px', textAlign: 'center', width: '120px' }}>ESTADO</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {(oc.ordenes_compra_articulos || []).map((art, aIdx) => {
+                                                const cantSol = Number(art.cantidad) || 0;
+                                                const cantRec = Number(art.cantidad_recepcionada) || 0;
+                                                const cantFalt = Math.max(0, cantSol - cantRec);
+                                                const pUnit = Number(art.precio_unitario) || 0;
+                                                const saldoNetoArt = cantFalt * pUnit;
+                                                const saldoIvaArt = Math.round(saldoNetoArt * 1.19);
+                                                const isArtComplete = cantRec >= cantSol;
+                                                const nombreArt = articulosCatalog[art.codigo_articulo] || art.descripcion || `Artículo ${art.codigo_articulo}`;
+
+                                                return (
+                                                  <tr 
+                                                    key={art.id || aIdx}
+                                                    style={{
+                                                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                                                      background: !isArtComplete ? 'rgba(245, 158, 11, 0.03)' : 'transparent'
+                                                    }}
+                                                  >
+                                                    <td style={{ padding: '10px 8px' }}>
+                                                      <span style={{ fontWeight: '700', color: '#38bdf8' }}>
+                                                        {art.codigo_articulo}
+                                                      </span>
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', color: '#e2e8f0' }}>
+                                                      {nombreArt}
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#cbd5e1', fontWeight: '600' }}>
+                                                      {cantSol} un.
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#10b981', fontWeight: '700' }}>
+                                                      {cantRec} un.
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center', color: cantFalt > 0 ? '#f59e0b' : '#64748b', fontWeight: '700' }}>
+                                                      {cantFalt} un.
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'right', color: '#cbd5e1' }}>
+                                                      ${pUnit.toLocaleString('es-CL')}
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: cantFalt > 0 ? '#f59e0b' : '#64748b' }}>
+                                                      ${saldoNetoArt.toLocaleString('es-CL')}
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', color: cantFalt > 0 ? '#c080c0' : '#64748b' }}>
+                                                      ${saldoIvaArt.toLocaleString('es-CL')}
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                      <span style={{
+                                                        padding: '2px 8px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: '700',
+                                                        background: isArtComplete ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                                        color: isArtComplete ? '#10b981' : '#f59e0b',
+                                                        border: `1px solid ${isArtComplete ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                                                      }}>
+                                                        {isArtComplete ? 'Completo' : 'Parcial'}
+                                                      </span>
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
               </>
             ) : (
               /* DENTAL DEPARTMENT */
@@ -3016,6 +3878,7 @@ const SeguimientoOCModule = () => {
                     <option value="Enviada">Enviada</option>
                     <option value="Aceptada">Aceptada</option>
                     <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
+                    <option value="Recepción de excepción">Recepción de excepción (Recibida bajo excepción)</option>
                     <option value="Cancelado">Cancelado (Liberar artículos)</option>
                   </select>
                 </div>
@@ -3044,6 +3907,43 @@ const SeguimientoOCModule = () => {
                   />
                 ))}
               </div>
+
+              {/* Resumen Financiero Crear OC */}
+              {(() => {
+                const formTotalNeto = articulosForm.reduce((sum, r) => sum + ((Number(r.cantidad) || 0) * (Number(r.precio_unitario) || 0)), 0);
+                const formTotalIva = Math.round(formTotalNeto * 1.19);
+                const formSaldoOc = formTotalNeto;
+                return (
+                  <div style={{
+                    marginTop: '20px',
+                    padding: '16px 20px',
+                    background: 'rgba(15, 23, 42, 0.7)',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: '14px',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total Neto</span>
+                      <strong style={{ fontSize: '1.15rem', color: '#f8fafc' }}>${formTotalNeto.toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>IVA (19%)</span>
+                      <strong style={{ fontSize: '1.15rem', color: '#cbd5e1' }}>${(formTotalIva - formTotalNeto).toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total con IVA</span>
+                      <strong style={{ fontSize: '1.15rem', color: '#38bdf8' }}>${formTotalIva.toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '14px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#10b981', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Saldo Inicial OC</span>
+                      <strong style={{ fontSize: '1.15rem', color: '#10b981' }}>${formSaldoOc.toLocaleString('es-CL')}</strong>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Action Buttons */}
@@ -3155,12 +4055,14 @@ const SeguimientoOCModule = () => {
                     fontWeight: '700',
                     background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
                                 selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
-                                selectedOcForModal.estado === 'Excepciones' ? 'rgba(192, 128, 192, 0.2)' :
-                                selectedOcForModal.estado === 'Recepcionado' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.15)',
+                                (selectedOcForModal.estado === 'Excepciones' || selectedOcForModal.estado === 'Recepción de excepción') ? 'rgba(192, 128, 192, 0.25)' :
+                                (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado') ? 'rgba(16, 185, 129, 0.25)' :
+                                selectedOcForModal.estado === 'Recepción Con Multa' ? 'rgba(251, 146, 60, 0.2)' : 'rgba(245, 158, 11, 0.15)',
                     color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
                            selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
-                           selectedOcForModal.estado === 'Excepciones' ? '#c080c0' :
-                           selectedOcForModal.estado === 'Recepcionado' ? '#10b981' : '#f59e0b',
+                           (selectedOcForModal.estado === 'Excepciones' || selectedOcForModal.estado === 'Recepción de excepción') ? '#c080c0' :
+                           (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado') ? '#10b981' :
+                           selectedOcForModal.estado === 'Recepción Con Multa' ? '#fb923c' : '#f59e0b',
                     display: 'inline-block',
                     marginTop: '4px'
                   }}>
@@ -3307,6 +4209,14 @@ const SeguimientoOCModule = () => {
                                   </div>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                                     <span>Solicitado: <strong style={{ color: 'var(--text-primary)' }}>{cantSol} uds.</strong></span>
+                                    {art.precio_unitario != null && Number(art.precio_unitario) > 0 && (
+                                      <>
+                                        <span style={{ color: 'var(--border-color)' }}>•</span>
+                                        <span>P. Unit.: <strong style={{ color: '#38bdf8' }}>${Number(art.precio_unitario).toLocaleString('es-CL')}</strong></span>
+                                        <span style={{ color: 'var(--border-color)' }}>•</span>
+                                        <span>Subtotal: <strong style={{ color: '#10b981' }}>${((Number(art.subtotal_neto) || (cantSol * Number(art.precio_unitario)))).toLocaleString('es-CL')}</strong></span>
+                                      </>
+                                    )}
                                     <span style={{ color: 'var(--border-color)' }}>•</span>
                                     <span style={{ 
                                       display: 'inline-flex', 
@@ -3404,6 +4314,52 @@ const SeguimientoOCModule = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Resumen Financiero OC en Detalle */}
+                  {(() => {
+                    const detNeto = selectedOcForModal.total_neto != null 
+                      ? Number(selectedOcForModal.total_neto) 
+                      : modalArticulos.reduce((s, a) => s + (Number(a.subtotal_neto) || ((Number(a.cantidad_solicitada) || Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0))), 0);
+                    const detIva = selectedOcForModal.total_con_iva != null
+                      ? Number(selectedOcForModal.total_con_iva)
+                      : Math.round(detNeto * 1.19);
+                    const detSaldo = selectedOcForModal.saldo_oc != null
+                      ? Number(selectedOcForModal.saldo_oc)
+                      : (detNeto - modalArticulos.reduce((s, a) => s + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0));
+
+                    if (detNeto <= 0) return null;
+
+                    return (
+                      <div style={{
+                        marginTop: '16px',
+                        padding: '14px 18px',
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                        gap: '12px',
+                        alignItems: 'center'
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total Neto</span>
+                          <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>${detNeto.toLocaleString('es-CL')}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>IVA (19%)</span>
+                          <strong style={{ fontSize: '1.05rem', color: '#cbd5e1' }}>${(detIva - detNeto).toLocaleString('es-CL')}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total con IVA</span>
+                          <strong style={{ fontSize: '1.05rem', color: '#38bdf8' }}>${detIva.toLocaleString('es-CL')}</strong>
+                        </div>
+                        <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '14px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#10b981', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Saldo Pendiente OC</span>
+                          <strong style={{ fontSize: '1.1rem', color: '#10b981' }}>${detSaldo.toLocaleString('es-CL')}</strong>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3858,6 +4814,7 @@ const SeguimientoOCModule = () => {
                       <option value="Recepción Conforme">Recepción Conforme</option>
                       <option value="Recepción Con Multa">Recepción Con Multa</option>
                       <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
+                      <option value="Recepción de excepción">Recepción de excepción (Recibida bajo excepción)</option>
                       <option value="Cancelado">Cancelado (Liberar artículos)</option>
                     </select>
                   </div>
@@ -4075,8 +5032,10 @@ const SeguimientoOCModule = () => {
                       <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', textAlign: 'left' }}>
                         <th style={{ padding: '8px 10px' }}>Código</th>
                         <th style={{ padding: '8px 10px' }}>Descripción</th>
-                        <th style={{ padding: '8px 10px', width: '130px' }}>Cant. Solicitada</th>
-                        <th style={{ padding: '8px 10px', width: '110px' }}>Recepcionado</th>
+                        <th style={{ padding: '8px 10px', width: '100px' }}>Cant. Sol.</th>
+                        <th style={{ padding: '8px 10px', width: '120px' }}>Precio Unit. ($)</th>
+                        <th style={{ padding: '8px 10px', width: '120px' }}>Subtotal Neto</th>
+                        <th style={{ padding: '8px 10px', width: '100px' }}>Recepcionado</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center', width: '60px' }}>Acción</th>
                       </tr>
                     </thead>
@@ -4098,8 +5057,23 @@ const SeguimientoOCModule = () => {
                               value={art.cantidad}
                               onChange={e => handleEditArticuloCantidad(idx, e.target.value)}
                               className="input-field"
-                              style={{ width: '90px', padding: '4px 8px', fontSize: '0.85rem' }}
+                              style={{ width: '80px', padding: '4px 8px', fontSize: '0.85rem' }}
                             />
+                          </td>
+                          <td style={{ padding: '8px 10px' }}>
+                            <input 
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={art.precio_unitario !== undefined && art.precio_unitario !== null ? art.precio_unitario : ''}
+                              onChange={e => handleEditArticuloPrecio(idx, e.target.value)}
+                              placeholder="0"
+                              className="input-field"
+                              style={{ width: '105px', padding: '4px 8px', fontSize: '0.85rem' }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 10px', fontWeight: '600', color: '#10b981' }}>
+                            ${((Number(art.subtotal_neto) || ((Number(art.cantidad) || 0) * (Number(art.precio_unitario) || 0)))).toLocaleString('es-CL')}
                           </td>
                           <td style={{ padding: '8px 10px' }}>
                             <span style={{ 
@@ -4145,9 +5119,10 @@ const SeguimientoOCModule = () => {
                   background: 'rgba(255,255,255,0.02)',
                   border: '1px dashed var(--border-color)',
                   padding: '10px 14px',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  flexWrap: 'wrap'
                 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 2, minWidth: '150px' }}>
                     <input 
                       type="text"
                       className="input-field"
@@ -4157,7 +5132,7 @@ const SeguimientoOCModule = () => {
                       style={{ fontSize: '0.85rem', padding: '6px 10px' }}
                     />
                   </div>
-                  <div style={{ width: '100px' }}>
+                  <div style={{ width: '85px' }}>
                     <input 
                       type="number"
                       min="1"
@@ -4165,6 +5140,18 @@ const SeguimientoOCModule = () => {
                       placeholder="Cant."
                       value={nuevoArticuloCantidad}
                       onChange={e => setNuevoArticuloCantidad(e.target.value)}
+                      style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                    />
+                  </div>
+                  <div style={{ width: '115px' }}>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="any"
+                      className="input-field"
+                      placeholder="Precio Unit. ($)"
+                      value={nuevoArticuloPrecio}
+                      onChange={e => setNuevoArticuloPrecio(e.target.value)}
                       style={{ fontSize: '0.85rem', padding: '6px 10px' }}
                     />
                   </div>
@@ -4177,6 +5164,43 @@ const SeguimientoOCModule = () => {
                     <Plus size={14} /> Añadir
                   </button>
                 </div>
+
+                {/* Resumen Financiero Edit Modal */}
+                {(() => {
+                  const editTotalNeto = editArticulos.reduce((sum, a) => sum + ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0)), 0);
+                  const editTotalIva = Math.round(editTotalNeto * 1.19);
+                  const editSaldoOc = editTotalNeto - editArticulos.reduce((sum, a) => sum + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
+                  return (
+                    <div style={{
+                      marginTop: '16px',
+                      padding: '14px 18px',
+                      background: 'rgba(15, 23, 42, 0.7)',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: '12px',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total Neto</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>${editTotalNeto.toLocaleString('es-CL')}</strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>IVA (19%)</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#cbd5e1' }}>${(editTotalIva - editTotalNeto).toLocaleString('es-CL')}</strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total con IVA</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#38bdf8' }}>${editTotalIva.toLocaleString('es-CL')}</strong>
+                      </div>
+                      <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '14px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#10b981', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Saldo OC Pendiente</span>
+                        <strong style={{ fontSize: '1.1rem', color: '#10b981' }}>${editSaldoOc.toLocaleString('es-CL')}</strong>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Action Buttons Footer */}
@@ -4246,20 +5270,24 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
     }
   }, [nombre, exists, loading]);
 
+  const cant = Number(row.cantidad) || 0;
+  const precioUnit = Number(row.precio_unitario) || 0;
+  const subtotal = cant * precioUnit;
+
   return (
     <div style={{ 
       display: 'grid', 
-      gridTemplateColumns: '150px 1fr 120px auto', 
-      gap: '15px', 
+      gridTemplateColumns: '130px 1fr 90px 125px 125px auto', 
+      gap: '12px', 
       alignItems: 'start',
       background: isAssignedRed ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.01)',
       border: isAssignedRed ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid var(--border-color)',
-      padding: '15px',
+      padding: '14px',
       borderRadius: '8px',
       transition: 'all 0.2s ease'
     }}>
       <div>
-        <label style={{ fontSize: '0.8rem', color: isAssignedRed ? '#f87171' : '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+        <label style={{ fontSize: '0.78rem', color: isAssignedRed ? '#f87171' : '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>
           CÓDIGO {isAssignedRed && '⚠️'}
         </label>
         <input
@@ -4273,21 +5301,21 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
       </div>
 
       <div>
-        <label style={{ fontSize: '0.8rem', color: isAssignedRed ? '#f87171' : '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>NOMBRE / DESCRIPCIÓN</label>
+        <label style={{ fontSize: '0.78rem', color: isAssignedRed ? '#f87171' : '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>NOMBRE / DESCRIPCIÓN</label>
         {row.codigo.trim() === '' ? (
-          <div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed var(--border-color)', color: '#64748b', fontSize: '0.85rem' }}>
+          <div style={{ padding: '9px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed var(--border-color)', color: '#64748b', fontSize: '0.85rem' }}>
             Ingrese código para buscar o registrar...
           </div>
         ) : loading ? (
-          <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '10px 0' }}>Buscando en catálogo base...</div>
+          <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '9px 0' }}>Buscando en catálogo base...</div>
         ) : exists && nombre ? (
-          <div style={{ padding: '10px 16px', background: isAssignedRed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: isAssignedRed ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.2)', color: isAssignedRed ? '#ef4444' : '#10b981', fontWeight: '600', fontSize: '0.9rem' }}>
+          <div style={{ padding: '9px 14px', background: isAssignedRed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: isAssignedRed ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.2)', color: isAssignedRed ? '#ef4444' : '#10b981', fontWeight: '600', fontSize: '0.88rem' }}>
             {nombre} {isAssignedRed ? '(Ya asignado previamente)' : '(Registrado)'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <AlertTriangle size={14} /> El artículo no existe. Escriba el nombre para crearlo:
+            <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertTriangle size={13} /> El artículo no existe. Escriba el nombre para crearlo:
             </span>
             <input
               type="text"
@@ -4304,24 +5332,24 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
         {isAssignedRed && (
           <div style={{
             marginTop: '8px',
-            padding: '6px 12px',
+            padding: '5px 10px',
             background: 'rgba(239, 68, 68, 0.18)',
             borderRadius: '6px',
             border: '1px solid rgba(239, 68, 68, 0.4)',
             color: '#f87171',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             fontWeight: '700',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
           }}>
-            <AlertTriangle size={14} color="#ef4444" /> Ya fue asignado previamente en la {row.yaAsignadoEnOc} (Puedes eliminarlo manualmente con el botón papelera de la derecha)
+            <AlertTriangle size={13} color="#ef4444" /> Ya fue asignado previamente en la {row.yaAsignadoEnOc}
           </div>
         )}
       </div>
 
       <div>
-        <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>CANTIDAD</label>
+        <label style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', marginBottom: '6px', fontWeight: '600' }}>CANTIDAD</label>
         <input
           type="number"
           value={row.cantidad}
@@ -4332,17 +5360,50 @@ const ArticleRow = ({ rowKey, row, onChange, onRemove, showRemove }) => {
         />
       </div>
 
+      <div>
+        <label style={{ fontSize: '0.78rem', color: '#cbd5e1', display: 'block', marginBottom: '6px', fontWeight: '600' }}>PRECIO UNIT. ($)</label>
+        <input
+          type="number"
+          value={row.precio_unitario !== undefined ? row.precio_unitario : ''}
+          onChange={e => onChange(rowKey, 'precio_unitario', e.target.value)}
+          placeholder="Ej: 1500"
+          className="input-field"
+          min="0"
+          step="any"
+        />
+      </div>
+
+      <div>
+        <label style={{ fontSize: '0.78rem', color: '#60a5fa', display: 'block', marginBottom: '6px', fontWeight: '600' }}>SUBTOTAL NETO</label>
+        <div style={{
+          padding: '9px 12px',
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          borderRadius: '8px',
+          color: '#93c5fd',
+          fontWeight: '700',
+          fontSize: '0.85rem',
+          textAlign: 'right',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          ${subtotal.toLocaleString('es-CL')}
+        </div>
+      </div>
+
       {showRemove && (
         <button 
           onClick={() => onRemove(rowKey)} 
           className="btn-secondary" 
           style={{ 
-            marginTop: '25px', 
-            padding: '10px', 
+            marginTop: '24px', 
+            padding: '9px', 
             borderColor: 'rgba(239,68,68,0.2)', 
             color: '#ef4444',
             background: 'rgba(239,68,68,0.05)'
           }}
+          title="Eliminar fila"
         >
           <Trash2 size={16} />
         </button>
