@@ -75,7 +75,15 @@ const build = (nivel, colorHex, glosa) => ({
   isFinal: nivel === 'final'
 });
 
-export const ESTADOS_FINALES = ['Cancelado', 'Cancelada', 'Recepción Conforme', 'Recepción Con Multa', 'Recepción de excepción'];
+export const ESTADOS_FINALES = [
+  'Cancelado',
+  'Cancelada',
+  'Recepción Conforme',
+  'Recepción Con Multa',
+  'Recepción de excepción',
+  'Cerrada con saldo pendiente',
+  'Saldo liberado'
+];
 
 export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
   const hoy = normalizeISO(hoyISO) || toLocalISO();
@@ -86,9 +94,15 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
     return build('purpura', COLORS.purpura, '🟣 Régimen de Excepción: Aceptada para recepción fuera de plazo');
   }
 
-  // 2. Estados finales cerrados (incluye Recepción de excepción ya entregada)
+  // 2. Estados finales cerrados (incluye Recepción de excepción, Cerrada con saldo pendiente y Saldo liberado)
   if (estado === 'Recepción de excepción') {
     return build('final', COLORS.purpura, 'Recepción de excepción en bodega');
+  }
+  if (estado === 'Cerrada con saldo pendiente') {
+    return build('final', COLORS.rojo, 'Cerrada con saldo pendiente (Solo falta liberar saldo)');
+  }
+  if (estado === 'Saldo liberado') {
+    return build('final', COLORS.verde, 'Saldo liberado');
   }
   if (ESTADOS_FINALES.includes(estado)) {
     return build('final', COLORS.gris, estado);

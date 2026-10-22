@@ -1458,6 +1458,12 @@ const SeguimientoOCModule = () => {
     if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada') {
       return { statusType: 'cancelado', badgeBg: 'rgba(239, 68, 68, 0.2)', badgeColor: '#ef4444', isExpired: true, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Orden Cancelada (Artículos liberados)' };
     }
+    if (oc.estado === 'Cerrada con saldo pendiente') {
+      return { statusType: 'cerrada_saldo', badgeBg: 'rgba(239, 68, 68, 0.2)', badgeColor: '#ef4444', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Cerrada con saldo pendiente (Solo falta liberar saldo)' };
+    }
+    if (oc.estado === 'Saldo liberado') {
+      return { statusType: 'saldo_liberado', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Saldo Liberado en OC' };
+    }
     if (oc.estado === 'Recepción Conforme') {
       return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción Conforme en Bodega' };
     }
@@ -1629,18 +1635,20 @@ const SeguimientoOCModule = () => {
     const plazos = checkPlazos(oc);
 
     let matchesSubTab = false;
+    const isExcludedFromAlerts = oc.estado === 'Cancelado' || oc.estado === 'Cancelada' || oc.estado === 'Recepción Conforme' || oc.estado === 'Recepción Con Multa' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado';
+
     if (alertasSubFilter === 'TODAS') {
-      matchesSubTab = plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura || (plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme' && oc.estado !== 'Recepción Con Multa' && oc.estado !== 'Recepción de excepción');
+      matchesSubTab = !isExcludedFromAlerts && (plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura || plazos.isExpired);
     } else if (alertasSubFilter === 'AMARILLAS') {
-      matchesSubTab = plazos.isYellow;
+      matchesSubTab = !isExcludedFromAlerts && plazos.isYellow;
     } else if (alertasSubFilter === 'ROSA') {
-      matchesSubTab = plazos.isRosa;
+      matchesSubTab = !isExcludedFromAlerts && plazos.isRosa;
     } else if (alertasSubFilter === 'NARANJAS') {
-      matchesSubTab = plazos.isOrange;
+      matchesSubTab = !isExcludedFromAlerts && plazos.isOrange;
     } else if (alertasSubFilter === 'EXCEPCIONES' || alertasSubFilter === 'PURPURAS') {
-      matchesSubTab = plazos.isPurpura || oc.estado === 'Excepciones';
+      matchesSubTab = !isExcludedFromAlerts && (plazos.isPurpura || oc.estado === 'Excepciones');
     } else if (alertasSubFilter === 'ROJAS') {
-      matchesSubTab = plazos.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme' && oc.estado !== 'Recepción Con Multa' && oc.estado !== 'Recepción de excepción';
+      matchesSubTab = !isExcludedFromAlerts && plazos.isExpired;
     }
 
     if (!matchesSubTab) return false;
@@ -1664,13 +1672,15 @@ const SeguimientoOCModule = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const yellowOcsCount = ocs.filter(oc => checkPlazos(oc).isYellow).length;
-  const orangeOcsCount = ocs.filter(oc => checkPlazos(oc).isOrange).length;
-  const rosaOcsCount = ocs.filter(oc => checkPlazos(oc).isRosa).length;
-  const purpuraOcsCount = ocs.filter(oc => checkPlazos(oc).isPurpura || oc.estado === 'Excepciones').length;
+  const isFinalOrClosed = (estado) => estado === 'Cancelado' || estado === 'Cancelada' || estado === 'Recepción Conforme' || estado === 'Recepción Con Multa' || estado === 'Recepción de excepción' || estado === 'Cerrada con saldo pendiente' || estado === 'Saldo liberado';
+
+  const yellowOcsCount = ocs.filter(oc => !isFinalOrClosed(oc.estado) && checkPlazos(oc).isYellow).length;
+  const orangeOcsCount = ocs.filter(oc => !isFinalOrClosed(oc.estado) && checkPlazos(oc).isOrange).length;
+  const rosaOcsCount = ocs.filter(oc => !isFinalOrClosed(oc.estado) && checkPlazos(oc).isRosa).length;
+  const purpuraOcsCount = ocs.filter(oc => !isFinalOrClosed(oc.estado) && (checkPlazos(oc).isPurpura || oc.estado === 'Excepciones')).length;
   const redOcsCount = ocs.filter(oc => {
     const p = checkPlazos(oc);
-    return p.isExpired && oc.estado !== 'Cancelado' && oc.estado !== 'Cancelada' && oc.estado !== 'Recepción Conforme' && oc.estado !== 'Recepción Con Multa' && oc.estado !== 'Recepción de excepción';
+    return !isFinalOrClosed(oc.estado) && p.isExpired;
   }).length;
   const totalAlertasCount = yellowOcsCount + orangeOcsCount + rosaOcsCount + purpuraOcsCount + redOcsCount;
 
@@ -1813,7 +1823,7 @@ const SeguimientoOCModule = () => {
                         cursor: 'pointer',
                         background: plazos.badgeBg,
                         color: plazos.badgeColor,
-                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || oc.estado === 'Recepción de excepción') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
+                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
                       }}
                     >
                       <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
@@ -1822,6 +1832,8 @@ const SeguimientoOCModule = () => {
                       <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
                       <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                       <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
+                      <option value="Cerrada con saldo pendiente" style={{ background: '#0f172a', color: '#ef4444' }}>Cerrada con saldo pendiente</option>
+                      <option value="Saldo liberado" style={{ background: '#0f172a', color: '#10b981' }}>Saldo liberado</option>
                       <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                     </select>
                   </td>
@@ -1930,12 +1942,18 @@ const SeguimientoOCModule = () => {
   const ocsValorizados = useMemo(() => {
     return ocs
       .filter(oc => {
-        if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada') return false;
+        if (oc.estado === 'Cancelado' || oc.estado === 'Cancelada' || oc.estado === 'Saldo liberado') return false;
         const arts = oc.ordenes_compra_articulos || [];
         if (arts.length === 0) return false;
         const totalSol = arts.reduce((sum, a) => sum + (Number(a.cantidad) || 0), 0);
         const totalRec = arts.reduce((sum, a) => sum + (Number(a.cantidad_recepcionada) || 0), 0);
-        // Tienen recepciones registradas pero no están completas
+        
+        // Regla usuario: "Cerrada con saldo pendiente" se visualiza en Valorizados si tiene saldo faltante
+        if (oc.estado === 'Cerrada con saldo pendiente') {
+          return totalRec < totalSol;
+        }
+
+        // Órdenes estándar: tienen recepciones registradas pero no están completas
         return totalRec > 0 && totalRec < totalSol;
       })
       .map(oc => {
@@ -2435,6 +2453,8 @@ const SeguimientoOCModule = () => {
                           <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
                           <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                           <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
+                          <option value="Cerrada con saldo pendiente" style={{ background: '#0f172a', color: '#ef4444' }}>Cerrada con saldo pendiente</option>
+                          <option value="Saldo liberado" style={{ background: '#0f172a', color: '#10b981' }}>Saldo liberado</option>
                           <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
                         </select>
                       </div>
@@ -3915,6 +3935,8 @@ const SeguimientoOCModule = () => {
                     <option value="Aceptada">Aceptada</option>
                     <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
                     <option value="Recepción de excepción">Recepción de excepción (Recibida bajo excepción)</option>
+                    <option value="Cerrada con saldo pendiente" style={{ color: '#ef4444' }}>Cerrada con saldo pendiente</option>
+                    <option value="Saldo liberado" style={{ color: '#10b981' }}>Saldo liberado</option>
                     <option value="Cancelado">Cancelado (Liberar artículos)</option>
                   </select>
                 </div>
@@ -4162,12 +4184,14 @@ const SeguimientoOCModule = () => {
                     background: selectedOcForModal.estado === 'Enviada' ? 'rgba(59, 130, 246, 0.15)' : 
                                 selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
                                 (selectedOcForModal.estado === 'Excepciones' || selectedOcForModal.estado === 'Recepción de excepción') ? 'rgba(192, 128, 192, 0.25)' :
-                                (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado') ? 'rgba(16, 185, 129, 0.25)' :
+                                (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado' || selectedOcForModal.estado === 'Saldo liberado') ? 'rgba(16, 185, 129, 0.25)' :
+                                selectedOcForModal.estado === 'Cerrada con saldo pendiente' ? 'rgba(239, 68, 68, 0.2)' :
                                 selectedOcForModal.estado === 'Recepción Con Multa' ? 'rgba(251, 146, 60, 0.2)' : 'rgba(245, 158, 11, 0.15)',
                     color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
                            selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
                            (selectedOcForModal.estado === 'Excepciones' || selectedOcForModal.estado === 'Recepción de excepción') ? '#c080c0' :
-                           (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado') ? '#10b981' :
+                           (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado' || selectedOcForModal.estado === 'Saldo liberado') ? '#10b981' :
+                           selectedOcForModal.estado === 'Cerrada con saldo pendiente' ? '#ef4444' :
                            selectedOcForModal.estado === 'Recepción Con Multa' ? '#fb923c' : '#f59e0b',
                     display: 'inline-block',
                     marginTop: '4px'
@@ -4943,6 +4967,8 @@ const SeguimientoOCModule = () => {
                       <option value="Recepción Con Multa">Recepción Con Multa</option>
                       <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
                       <option value="Recepción de excepción">Recepción de excepción (Recibida bajo excepción)</option>
+                      <option value="Cerrada con saldo pendiente" style={{ color: '#ef4444' }}>Cerrada con saldo pendiente</option>
+                      <option value="Saldo liberado" style={{ color: '#10b981' }}>Saldo liberado</option>
                       <option value="Cancelado">Cancelado (Liberar artículos)</option>
                     </select>
                   </div>
