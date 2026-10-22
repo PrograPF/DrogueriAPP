@@ -201,7 +201,9 @@ const SeguimientoOCModule = () => {
     fecha_insistencia: '',
     estado: 'Enviada', // 'Enviada', 'Aceptada', 'Recepción Conforme', 'Recepción Con Multa', 'Cancelado', 'Excepciones'
     fecha_envio_display: getTodayDisplayString(),
-    fecha_aceptacion_display: ''
+    fecha_aceptacion_display: '',
+    descuento: '',
+    cargo: ''
   });
 
   // States for supplier searchable dropdown
@@ -245,7 +247,9 @@ const SeguimientoOCModule = () => {
     fecha_tope_aceptacion: '',
     fecha_tope_entrega: '',
     fecha_tope_multa: '',
-    fecha_insistencia: ''
+    fecha_insistencia: '',
+    descuento: '',
+    cargo: ''
   });
   const [editArticulos, setEditArticulos] = useState([]);
   const [deletedArticleIds, setDeletedArticleIds] = useState([]);
@@ -548,7 +552,9 @@ const SeguimientoOCModule = () => {
       fecha_insistencia: '',
       estado: 'Enviada',
       fecha_envio_display: getTodayDisplayString(),
-      fecha_aceptacion_display: ''
+      fecha_aceptacion_display: '',
+      descuento: '',
+      cargo: ''
     });
     setProveedorSearch('');
     setShowProveedorSuggestions(false);
@@ -905,7 +911,9 @@ const SeguimientoOCModule = () => {
       fecha_tope_aceptacion: toDateInputString(oc.fecha_tope_aceptacion),
       fecha_tope_entrega: toDateInputString(oc.fecha_tope_entrega),
       fecha_tope_multa: toDateInputString(oc.fecha_tope_multa),
-      fecha_insistencia: toDateInputString(oc.fecha_insistencia)
+      fecha_insistencia: toDateInputString(oc.fecha_insistencia),
+      descuento: oc.descuento !== undefined && oc.descuento !== null ? oc.descuento : '',
+      cargo: oc.cargo !== undefined && oc.cargo !== null ? oc.cargo : ''
     });
 
     setEditProveedorSearch(oc.proveedor || '');
@@ -1084,15 +1092,18 @@ const SeguimientoOCModule = () => {
       ) : null;
 
       // Calculate financial totals
-      let totalNeto = 0;
+      let subtotalArticulos = 0;
       let totalRecepcionadoValor = 0;
       for (const art of editArticulos) {
         const qty = parseInt(art.cantidad, 10) || 1;
         const pUnit = parseFloat(art.precio_unitario) || 0;
         const sub = qty * pUnit;
-        totalNeto += sub;
+        subtotalArticulos += sub;
         totalRecepcionadoValor += (parseInt(art.cantidad_recepcionada, 10) || 0) * pUnit;
       }
+      const descuentoVal = Math.max(0, parseFloat(editFormData.descuento) || 0);
+      const cargoVal = Math.max(0, parseFloat(editFormData.cargo) || 0);
+      const totalNeto = Math.max(0, subtotalArticulos - descuentoVal + cargoVal);
       const totalConIva = Math.round(totalNeto * 1.19);
       const saldoOc = Math.max(0, totalNeto - totalRecepcionadoValor);
 
@@ -1106,6 +1117,9 @@ const SeguimientoOCModule = () => {
         estado: nuevoEstado,
         fecha_envio: fechaEnvioISO,
         fecha_aceptacion: fechaAceptacionISO,
+        subtotal_articulos: subtotalArticulos,
+        descuento: descuentoVal,
+        cargo: cargoVal,
         total_neto: totalNeto,
         total_con_iva: totalConIva,
         saldo_oc: saldoOc,
@@ -1121,7 +1135,7 @@ const SeguimientoOCModule = () => {
         if (updateErr) throw updateErr;
       } catch (err) {
         if (err.code === '42703' || err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
-          const { total_neto, total_con_iva, saldo_oc, ...legacyUpdates } = updates;
+          const { subtotal_articulos, descuento, cargo, total_neto, total_con_iva, saldo_oc, ...legacyUpdates } = updates;
           const { error: legacyErr } = await supabase
             .from('ordenes_compra')
             .update(legacyUpdates)
@@ -1323,12 +1337,12 @@ const SeguimientoOCModule = () => {
       }
 
       // Calculate financial totals
-      let totalNeto = 0;
+      let subtotalArticulos = 0;
       const childItems = validArticles.map(art => {
         const cant = parseInt(art.cantidad, 10) || 1;
         const precioUnit = parseFloat(art.precio_unitario) || 0;
         const subtotal = cant * precioUnit;
-        totalNeto += subtotal;
+        subtotalArticulos += subtotal;
         return {
           codigo_articulo: art.codigo.trim(),
           cantidad: cant,
@@ -1338,6 +1352,9 @@ const SeguimientoOCModule = () => {
         };
       });
 
+      const descuentoVal = Math.max(0, parseFloat(formData.descuento) || 0);
+      const cargoVal = Math.max(0, parseFloat(formData.cargo) || 0);
+      const totalNeto = Math.max(0, subtotalArticulos - descuentoVal + cargoVal);
       const totalConIva = Math.round(totalNeto * 1.19);
       const saldoOc = totalNeto;
 
@@ -1350,6 +1367,9 @@ const SeguimientoOCModule = () => {
         estado: formData.estado,
         fecha_envio: parseDisplayDate(formData.fecha_envio_display),
         fecha_aceptacion: formData.fecha_aceptacion_display ? parseDisplayDate(formData.fecha_aceptacion_display) : (formData.estado === 'Aceptada' ? new Date().toISOString() : null),
+        subtotal_articulos: subtotalArticulos,
+        descuento: descuentoVal,
+        cargo: cargoVal,
         total_neto: totalNeto,
         total_con_iva: totalConIva,
         saldo_oc: saldoOc,
@@ -1364,7 +1384,7 @@ const SeguimientoOCModule = () => {
 
       if (insertOcErr) {
         if (insertOcErr.code === '42703' || insertOcErr.code === 'PGRST204' || (insertOcErr.message && insertOcErr.message.includes('schema cache'))) {
-          const { total_neto, total_con_iva, saldo_oc, ...legacyInsert } = baseOcInsert;
+          const { subtotal_articulos, descuento, cargo, total_neto, total_con_iva, saldo_oc, ...legacyInsert } = baseOcInsert;
           const { data: legacyData, error: legacyErr } = await supabase
             .from('ordenes_compra')
             .insert([legacyInsert])
@@ -1414,7 +1434,9 @@ const SeguimientoOCModule = () => {
         fecha_insistencia: '',
         estado: 'Enviada',
         fecha_envio_display: getTodayDisplayString(),
-        fecha_aceptacion_display: ''
+        fecha_aceptacion_display: '',
+        descuento: '',
+        cargo: ''
       });
       setProveedorSearch('');
       setShowProveedorSuggestions(false);
@@ -1532,7 +1554,14 @@ const SeguimientoOCModule = () => {
       if (updatedOc) {
         // Calculate and update new saldo_oc
         const arts = updatedOc.ordenes_compra_articulos || [];
-        const totalNeto = arts.reduce((acc, a) => acc + (Number(a.subtotal_neto) || ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0))), 0);
+        const subtotalArts = updatedOc.subtotal_articulos != null
+          ? Number(updatedOc.subtotal_articulos)
+          : arts.reduce((acc, a) => acc + (Number(a.subtotal_neto) || ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0))), 0);
+        const desc = Number(updatedOc.descuento) || 0;
+        const crg = Number(updatedOc.cargo) || 0;
+        const totalNeto = updatedOc.total_neto != null
+          ? Number(updatedOc.total_neto)
+          : Math.max(0, subtotalArts - desc + crg);
         const totalRecepcionadoValor = arts.reduce((acc, a) => acc + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
         const nuevoSaldo = Math.max(0, totalNeto - totalRecepcionadoValor);
 
@@ -1913,11 +1942,18 @@ const SeguimientoOCModule = () => {
         const arts = oc.ordenes_compra_articulos || [];
         const totalSol = arts.reduce((sum, a) => sum + (Number(a.cantidad) || 0), 0);
         const totalRec = arts.reduce((sum, a) => sum + (Number(a.cantidad_recepcionada) || 0), 0);
-        const totalNeto = arts.reduce((sum, a) => sum + ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0)), 0);
+        const subtotalArts = oc.subtotal_articulos != null
+          ? Number(oc.subtotal_articulos)
+          : arts.reduce((sum, a) => sum + ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0)), 0);
+        const desc = Number(oc.descuento) || 0;
+        const crg = Number(oc.cargo) || 0;
+        const totalNeto = oc.total_neto != null
+          ? Number(oc.total_neto)
+          : Math.max(0, subtotalArts - desc + crg);
         const recepcionadoNeto = arts.reduce((sum, a) => sum + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
         const saldoFaltanteNeto = Math.max(0, totalNeto - recepcionadoNeto);
         const saldoFaltanteIva = Math.round(saldoFaltanteNeto * 1.19);
-        const totalConIva = Math.round(totalNeto * 1.19);
+        const totalConIva = oc.total_con_iva != null ? Number(oc.total_con_iva) : Math.round(totalNeto * 1.19);
         const porcentajeAvance = totalSol > 0 ? Math.round((totalRec / totalSol) * 100) : 0;
         const porcentajeFinanciero = totalNeto > 0 ? Math.round((recepcionadoNeto / totalNeto) * 100) : porcentajeAvance;
 
@@ -3908,25 +3944,95 @@ const SeguimientoOCModule = () => {
                 ))}
               </div>
 
+              {/* Ajustes Financieros: Descuento y Cargos */}
+              <div style={{
+                marginTop: '20px',
+                padding: '16px 20px',
+                background: 'rgba(30, 41, 59, 0.45)',
+                borderRadius: '10px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: '16px',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <label style={{ ...labelStyle, color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <DollarSign size={15} /> Descuento Global ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={formData.descuento !== undefined ? formData.descuento : ''}
+                    onChange={e => setFormData(prev => ({ ...prev, descuento: e.target.value }))}
+                    placeholder="Monto a restar (ej: 5000)"
+                    className="input-field"
+                    style={{ borderColor: formData.descuento ? 'rgba(239, 68, 68, 0.5)' : undefined }}
+                  />
+                  <small style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                    Se resta directamente al valor neto de los artículos.
+                  </small>
+                </div>
+
+                <div>
+                  <label style={{ ...labelStyle, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <DollarSign size={15} /> Cargos / Flete / Recargo ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={formData.cargo !== undefined ? formData.cargo : ''}
+                    onChange={e => setFormData(prev => ({ ...prev, cargo: e.target.value }))}
+                    placeholder="Monto a sumar (ej: 2500)"
+                    className="input-field"
+                    style={{ borderColor: formData.cargo ? 'rgba(59, 130, 246, 0.5)' : undefined }}
+                  />
+                  <small style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                    Se suma directamente al valor neto de la OC.
+                  </small>
+                </div>
+              </div>
+
               {/* Resumen Financiero Crear OC */}
               {(() => {
-                const formTotalNeto = articulosForm.reduce((sum, r) => sum + ((Number(r.cantidad) || 0) * (Number(r.precio_unitario) || 0)), 0);
+                const subtotalArticulos = articulosForm.reduce((sum, r) => sum + ((Number(r.cantidad) || 0) * (Number(r.precio_unitario) || 0)), 0);
+                const desc = Math.max(0, parseFloat(formData.descuento) || 0);
+                const crg = Math.max(0, parseFloat(formData.cargo) || 0);
+                const formTotalNeto = Math.max(0, subtotalArticulos - desc + crg);
                 const formTotalIva = Math.round(formTotalNeto * 1.19);
                 const formSaldoOc = formTotalNeto;
                 return (
                   <div style={{
-                    marginTop: '20px',
+                    marginTop: '16px',
                     padding: '16px 20px',
                     background: 'rgba(15, 23, 42, 0.7)',
                     borderRadius: '10px',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                     gap: '14px',
                     alignItems: 'center'
                   }}>
                     <div>
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total Neto</span>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Subtotal Artículos</span>
+                      <strong style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>${subtotalArticulos.toLocaleString('es-CL')}</strong>
+                    </div>
+                    {desc > 0 && (
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#f87171', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>(-) Descuento</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#f87171' }}>-${desc.toLocaleString('es-CL')}</strong>
+                      </div>
+                    )}
+                    {crg > 0 && (
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#60a5fa', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>(+) Cargos</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#60a5fa' }}>+${crg.toLocaleString('es-CL')}</strong>
+                      </div>
+                    )}
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Total Neto</span>
                       <strong style={{ fontSize: '1.15rem', color: '#f8fafc' }}>${formTotalNeto.toLocaleString('es-CL')}</strong>
                     </div>
                     <div>
@@ -4318,9 +4424,14 @@ const SeguimientoOCModule = () => {
 
                   {/* Resumen Financiero OC en Detalle */}
                   {(() => {
+                    const subtotalArts = selectedOcForModal.subtotal_articulos != null
+                      ? Number(selectedOcForModal.subtotal_articulos)
+                      : modalArticulos.reduce((s, a) => s + (Number(a.subtotal_neto) || ((Number(a.cantidad_solicitada) || Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0))), 0);
+                    const desc = Number(selectedOcForModal.descuento) || 0;
+                    const crg = Number(selectedOcForModal.cargo) || 0;
                     const detNeto = selectedOcForModal.total_neto != null 
                       ? Number(selectedOcForModal.total_neto) 
-                      : modalArticulos.reduce((s, a) => s + (Number(a.subtotal_neto) || ((Number(a.cantidad_solicitada) || Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0))), 0);
+                      : Math.max(0, subtotalArts - desc + crg);
                     const detIva = selectedOcForModal.total_con_iva != null
                       ? Number(selectedOcForModal.total_con_iva)
                       : Math.round(detNeto * 1.19);
@@ -4328,7 +4439,7 @@ const SeguimientoOCModule = () => {
                       ? Number(selectedOcForModal.saldo_oc)
                       : (detNeto - modalArticulos.reduce((s, a) => s + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0));
 
-                    if (detNeto <= 0) return null;
+                    if (detNeto <= 0 && subtotalArts <= 0) return null;
 
                     return (
                       <div style={{
@@ -4338,12 +4449,28 @@ const SeguimientoOCModule = () => {
                         borderRadius: '10px',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                         gap: '12px',
                         alignItems: 'center'
                       }}>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total Neto</span>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Subtotal Artículos</span>
+                          <strong style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>${subtotalArts.toLocaleString('es-CL')}</strong>
+                        </div>
+                        {desc > 0 && (
+                          <div>
+                            <span style={{ fontSize: '0.72rem', color: '#f87171', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>(-) Descuento</span>
+                            <strong style={{ fontSize: '1.05rem', color: '#f87171' }}>-${desc.toLocaleString('es-CL')}</strong>
+                          </div>
+                        )}
+                        {crg > 0 && (
+                          <div>
+                            <span style={{ fontSize: '0.72rem', color: '#60a5fa', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>(+) Cargos</span>
+                            <strong style={{ fontSize: '1.05rem', color: '#60a5fa' }}>+${crg.toLocaleString('es-CL')}</strong>
+                          </div>
+                        )}
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Total Neto</span>
                           <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>${detNeto.toLocaleString('es-CL')}</strong>
                         </div>
                         <div>
@@ -5166,11 +5293,66 @@ const SeguimientoOCModule = () => {
                   </button>
                 </div>
 
+                {/* Ajustes Financieros Edit Modal: Descuento y Cargos */}
+                <div style={{
+                  marginTop: '16px',
+                  padding: '14px 18px',
+                  background: 'rgba(30, 41, 59, 0.45)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '14px',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <label style={{ ...labelStyle, color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <DollarSign size={14} /> Descuento Global ($)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={editFormData.descuento !== undefined && editFormData.descuento !== null ? editFormData.descuento : ''}
+                      onChange={e => setEditFormData(prev => ({ ...prev, descuento: e.target.value }))}
+                      placeholder="Monto a restar (ej: 5000)"
+                      className="input-field"
+                      style={{ borderColor: editFormData.descuento ? 'rgba(239, 68, 68, 0.5)' : undefined }}
+                    />
+                    <small style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: '3px', display: 'block' }}>
+                      Resta al subtotal de artículos.
+                    </small>
+                  </div>
+
+                  <div>
+                    <label style={{ ...labelStyle, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <DollarSign size={14} /> Cargos / Flete / Recargo ($)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={editFormData.cargo !== undefined && editFormData.cargo !== null ? editFormData.cargo : ''}
+                      onChange={e => setEditFormData(prev => ({ ...prev, cargo: e.target.value }))}
+                      placeholder="Monto a sumar (ej: 2500)"
+                      className="input-field"
+                      style={{ borderColor: editFormData.cargo ? 'rgba(59, 130, 246, 0.5)' : undefined }}
+                    />
+                    <small style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: '3px', display: 'block' }}>
+                      Suma al subtotal de artículos.
+                    </small>
+                  </div>
+                </div>
+
                 {/* Resumen Financiero Edit Modal */}
                 {(() => {
-                  const editTotalNeto = editArticulos.reduce((sum, a) => sum + ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0)), 0);
+                  const subtotalArticulos = editArticulos.reduce((sum, a) => sum + ((Number(a.cantidad) || 0) * (Number(a.precio_unitario) || 0)), 0);
+                  const desc = Math.max(0, parseFloat(editFormData.descuento) || 0);
+                  const crg = Math.max(0, parseFloat(editFormData.cargo) || 0);
+                  const editTotalNeto = Math.max(0, subtotalArticulos - desc + crg);
                   const editTotalIva = Math.round(editTotalNeto * 1.19);
-                  const editSaldoOc = editTotalNeto - editArticulos.reduce((sum, a) => sum + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
+                  const recepcionadoNeto = editArticulos.reduce((sum, a) => sum + ((Number(a.cantidad_recepcionada) || 0) * (Number(a.precio_unitario) || 0)), 0);
+                  const editSaldoOc = Math.max(0, editTotalNeto - recepcionadoNeto);
                   return (
                     <div style={{
                       marginTop: '16px',
@@ -5179,12 +5361,28 @@ const SeguimientoOCModule = () => {
                       borderRadius: '10px',
                       border: '1px solid rgba(255, 255, 255, 0.08)',
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                       gap: '12px',
                       alignItems: 'center'
                     }}>
                       <div>
-                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total Neto</span>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Subtotal Artículos</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>${subtotalArticulos.toLocaleString('es-CL')}</strong>
+                      </div>
+                      {desc > 0 && (
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#f87171', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>(-) Descuento</span>
+                          <strong style={{ fontSize: '1.05rem', color: '#f87171' }}>-${desc.toLocaleString('es-CL')}</strong>
+                        </div>
+                      )}
+                      {crg > 0 && (
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#60a5fa', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>(+) Cargos</span>
+                          <strong style={{ fontSize: '1.05rem', color: '#60a5fa' }}>+${crg.toLocaleString('es-CL')}</strong>
+                        </div>
+                      )}
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Total Neto</span>
                         <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>${editTotalNeto.toLocaleString('es-CL')}</strong>
                       </div>
                       <div>
