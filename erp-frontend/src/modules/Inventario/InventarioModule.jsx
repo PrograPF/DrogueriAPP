@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Package, History, Calendar, ClipboardList, RefreshCw, 
-  AlertTriangle, TrendingUp, User, Truck, ShieldAlert, ArrowRight, Info
+  AlertTriangle, TrendingUp, User, Truck, ShieldAlert, ArrowRight, Info,
+  Edit2, Trash2, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -24,6 +25,11 @@ const InventarioModule = () => {
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [usuarioFirma, setUsuarioFirma] = useState(localStorage.getItem('firma_operador') || '');
   const [guardandoComentario, setGuardandoComentario] = useState(false);
+  const [editingComentarioId, setEditingComentarioId] = useState(null);
+  const [editingComentarioText, setEditingComentarioText] = useState('');
+  const [editingUsuarioFirma, setEditingUsuarioFirma] = useState('');
+  const [guardandoEditComentario, setGuardandoEditComentario] = useState(false);
+  const [eliminandoComentarioId, setEliminandoComentarioId] = useState(null);
   
   // Buscadores
   const [stockSearchQuery, setStockSearchQuery] = useState('');
@@ -117,6 +123,76 @@ const InventarioModule = () => {
   const handleAbrirBitacoraLote = (lote) => {
     setSelectedLoteForModal(lote);
     setNuevoComentario('');
+    setEditingComentarioId(null);
+    setEditingComentarioText('');
+    setEditingUsuarioFirma('');
+    setEliminandoComentarioId(null);
+  };
+
+  const handleStartEditComentario = (com) => {
+    setEditingComentarioId(com.id);
+    setEditingComentarioText(com.comentario || '');
+    setEditingUsuarioFirma(com.usuario || '');
+  };
+
+  const handleCancelEditComentario = () => {
+    setEditingComentarioId(null);
+    setEditingComentarioText('');
+    setEditingUsuarioFirma('');
+  };
+
+  const handleSaveEditComentario = async (comId) => {
+    if (!editingComentarioText.trim()) return;
+    setGuardandoEditComentario(true);
+    try {
+      const updatePayload = {
+        comentario: editingComentarioText.trim(),
+        usuario: editingUsuarioFirma.trim() || 'Operador'
+      };
+      const { error } = await supabase
+        .from('articulos_variantes_comentarios')
+        .update(updatePayload)
+        .eq('id', comId);
+
+      if (error) throw error;
+
+      setComentariosVariantes(prev => prev.map(c => c.id === comId ? { ...c, ...updatePayload } : c));
+      setEditingComentarioId(null);
+      setEditingComentarioText('');
+      setEditingUsuarioFirma('');
+    } catch (err) {
+      console.error('Error al actualizar anotación del lote:', err);
+      alert('Error al actualizar anotación: ' + err.message);
+    } finally {
+      setGuardandoEditComentario(false);
+    }
+  };
+
+  const handleDeleteComentario = async (comId) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta anotación del lote?')) {
+      return;
+    }
+    setEliminandoComentarioId(comId);
+    try {
+      const { error } = await supabase
+        .from('articulos_variantes_comentarios')
+        .delete()
+        .eq('id', comId);
+
+      if (error) throw error;
+
+      setComentariosVariantes(prev => prev.filter(c => c.id !== comId));
+      if (editingComentarioId === comId) {
+        setEditingComentarioId(null);
+        setEditingComentarioText('');
+        setEditingUsuarioFirma('');
+      }
+    } catch (err) {
+      console.error('Error al eliminar anotación del lote:', err);
+      alert('Error al eliminar anotación: ' + err.message);
+    } finally {
+      setEliminandoComentarioId(null);
+    }
   };
 
   const handleAddComentarioLote = async (e) => {
@@ -975,22 +1051,160 @@ const InventarioModule = () => {
                     No hay anotaciones registradas para este lote.
                   </div>
                 ) : (
-                  (comentariosPorVariante[selectedLoteForModal.id] || []).map((com, index) => (
-                    <div key={com.id || index} style={{
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.05)',
-                      borderRadius: '8px',
-                      padding: '12px',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.75rem', color: '#64748b' }}>
-                        <span style={{ fontWeight: '700', color: '#a855f7' }}>Anotación #{index + 1} por {com.usuario}</span>
-                        <span>{formatDateTime(com.created_at)}</span>
+                  (comentariosPorVariante[selectedLoteForModal.id] || []).map((com, index) => {
+                    const isEditing = editingComentarioId === com.id;
+                    const isDeleting = eliminandoComentarioId === com.id;
+                    return (
+                      <div key={com.id || index} style={{
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        opacity: isDeleting ? 0.5 : 1,
+                        transition: 'all 0.2s'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.75rem', color: '#64748b' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: '700', color: '#a855f7' }}>Anotación #{index + 1} por {com.usuario}</span>
+                            <span>{formatDateTime(com.created_at)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {!isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditComentario(com)}
+                                  title="Editar anotación"
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#94a3b8',
+                                    cursor: 'pointer',
+                                    padding: '3px 5px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseOver={(e) => { e.currentTarget.style.color = '#a855f7'; e.currentTarget.style.background = 'rgba(168, 85, 247, 0.12)'; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteComentario(com.id)}
+                                  title="Eliminar anotación"
+                                  disabled={isDeleting}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#94a3b8',
+                                    cursor: isDeleting ? 'not-allowed' : 'pointer',
+                                    padding: '3px 5px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseOver={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)'; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            ) : (
+                              <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: '600' }}>Editando...</span>
+                            )}
+                          </div>
+                        </div>
+                        {isEditing ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Nombre / Firma:</label>
+                              <input
+                                type="text"
+                                value={editingUsuarioFirma}
+                                onChange={(e) => setEditingUsuarioFirma(e.target.value)}
+                                style={{
+                                  background: '#0f172a',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  borderRadius: '6px',
+                                  padding: '6px 10px',
+                                  color: '#f8fafc',
+                                  fontSize: '0.8rem',
+                                  outline: 'none'
+                                }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Comentario:</label>
+                              <textarea
+                                value={editingComentarioText}
+                                onChange={(e) => setEditingComentarioText(e.target.value)}
+                                rows={2}
+                                style={{
+                                  width: '100%',
+                                  background: '#0f172a',
+                                  border: '1px solid #a855f7',
+                                  borderRadius: '6px',
+                                  padding: '8px 10px',
+                                  color: '#f8fafc',
+                                  fontSize: '0.85rem',
+                                  resize: 'vertical',
+                                  outline: 'none'
+                                }}
+                                autoFocus
+                              />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={handleCancelEditComentario}
+                                disabled={guardandoEditComentario}
+                                style={{
+                                  padding: '4px 10px',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  background: 'transparent',
+                                  color: '#94a3b8',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditComentario(com.id)}
+                                disabled={guardandoEditComentario || !editingComentarioText.trim()}
+                                style={{
+                                  padding: '4px 12px',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  background: '#a855f7',
+                                  color: '#fff',
+                                  fontWeight: '600',
+                                  cursor: guardandoEditComentario || !editingComentarioText.trim() ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <Check size={12} />
+                                {guardandoEditComentario ? 'Guardando...' : 'Guardar'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ color: '#cbd5e1', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                            {com.comentario}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ color: '#cbd5e1', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                        {com.comentario}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
