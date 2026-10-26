@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, Plus, Search, Trash2, Calendar, Edit2, 
   ArrowLeft, ArrowRight, RefreshCw, CheckCircle, Clock, AlertTriangle, 
-  Building2, Tag, X, Save, DollarSign, Package, Eye
+  Building2, Tag, X, Save, DollarSign, Package, Eye, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -38,6 +38,7 @@ const QFModule = () => {
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterEstado, setFilterEstado] = useState('ALL'); // 'ALL' | 'SIN_OC' | 'PARCIAL' | 'COMPLETA' | 'CON_OC'
 
   // Centros de costo state
   const [centrosCosto, setCentrosCosto] = useState([]);
@@ -403,20 +404,61 @@ const QFModule = () => {
     }
   };
 
-  const filteredSolicitudes = solicitudes.filter(s => {
-    const term = searchQuery.toLowerCase();
-    const matchHeader = (
-      (s.numero_solicitud && s.numero_solicitud.toLowerCase().includes(term)) ||
-      (s.centro_costo_nombre && s.centro_costo_nombre.toLowerCase().includes(term)) ||
-      (s.codigo_articulo && s.codigo_articulo.toLowerCase().includes(term)) ||
-      (s.descripcion_articulo && s.descripcion_articulo.toLowerCase().includes(term))
-    );
-    const matchChildren = (s.solicitudes_compra_articulos || []).some(art => 
-      (art.codigo_articulo && art.codigo_articulo.toLowerCase().includes(term)) ||
-      (art.descripcion_articulo && art.descripcion_articulo.toLowerCase().includes(term))
-    );
-    return matchHeader || matchChildren;
-  });
+  // Determina el estado de asignación de OC consistente para cada solicitud
+  const getSolicitudStatus = (s) => {
+    const num = (s.numero_solicitud || '').trim().toUpperCase();
+    const matchingOcs = assignedOcsMap[num] || [];
+    return s.estado || (matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada');
+  };
+
+  // Contadores dinámicos para los filtros rápidos
+  const counts = useMemo(() => {
+    let sinOc = 0;
+    let parcial = 0;
+    let completa = 0;
+
+    solicitudes.forEach(s => {
+      const st = getSolicitudStatus(s);
+      if (st === 'OC asignada completa') completa++;
+      else if (st === 'OC asignada parcial') parcial++;
+      else sinOc++;
+    });
+
+    return {
+      all: solicitudes.length,
+      sinOc,
+      parcial,
+      completa,
+      conOc: parcial + completa
+    };
+  }, [solicitudes, assignedOcsMap]);
+
+  // Solicitudes filtradas por estado y por texto de búsqueda
+  const filteredSolicitudes = useMemo(() => {
+    return solicitudes.filter(s => {
+      // 1. Filtro por Estado de asignación OC
+      const st = getSolicitudStatus(s);
+      if (filterEstado === 'SIN_OC' && st !== 'Sin OC asignada') return false;
+      if (filterEstado === 'PARCIAL' && st !== 'OC asignada parcial') return false;
+      if (filterEstado === 'COMPLETA' && st !== 'OC asignada completa') return false;
+      if (filterEstado === 'CON_OC' && (st !== 'OC asignada parcial' && st !== 'OC asignada completa')) return false;
+
+      // 2. Filtro por Texto de Búsqueda
+      if (!searchQuery.trim()) return true;
+      const term = searchQuery.toLowerCase().trim();
+      const matchHeader = (
+        (s.numero_solicitud && s.numero_solicitud.toLowerCase().includes(term)) ||
+        (s.centro_costo_nombre && s.centro_costo_nombre.toLowerCase().includes(term)) ||
+        (s.codigo_articulo && s.codigo_articulo.toLowerCase().includes(term)) ||
+        (s.descripcion_articulo && s.descripcion_articulo.toLowerCase().includes(term))
+      );
+      const matchChildren = (s.solicitudes_compra_articulos || []).some(art => 
+        (art.codigo_articulo && art.codigo_articulo.toLowerCase().includes(term)) ||
+        (art.descripcion_articulo && art.descripcion_articulo.toLowerCase().includes(term))
+      );
+      return matchHeader || matchChildren;
+    });
+  }, [solicitudes, assignedOcsMap, filterEstado, searchQuery]);
 
   return (
     <motion.div 
@@ -497,18 +539,223 @@ const QFModule = () => {
               </button>
             </div>
 
-            {/* Buscador */}
+            {/* Buscador y Filtros */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '25px' }}>
-              <div style={{ position: 'relative', width: '100%' }}>
+              <div style={{ position: 'relative', width: '100%', marginBottom: '16px' }}>
                 <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input 
                   type="text" 
                   placeholder="Buscar por N° Solicitud (S-1234), artículo, código o centro de costo..." 
                   className="input-field"
-                  style={{ paddingLeft: '45px', width: '100%' }}
+                  style={{ paddingLeft: '45px', paddingRight: searchQuery ? '40px' : '15px', width: '100%' }}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Limpiar búsqueda"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Barra de Filtros por Estado de Asignación OC */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '600', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '5px', marginRight: '4px' }}>
+                    <Filter size={14} color="#3b82f6" /> Filtro OC:
+                  </span>
+
+                  {/* Todas */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterEstado('ALL')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.84rem',
+                      fontWeight: filterEstado === 'ALL' ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: filterEstado === 'ALL' ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: filterEstado === 'ALL' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      color: filterEstado === 'ALL' ? '#60a5fa' : '#94a3b8',
+                      boxShadow: filterEstado === 'ALL' ? '0 0 10px rgba(59, 130, 246, 0.2)' : 'none'
+                    }}
+                  >
+                    <span>Todas</span>
+                    <span style={{
+                      padding: '1px 7px',
+                      borderRadius: '12px',
+                      fontSize: '0.74rem',
+                      fontWeight: '700',
+                      background: filterEstado === 'ALL' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                      color: filterEstado === 'ALL' ? '#93c5fd' : '#cbd5e1'
+                    }}>
+                      {counts.all}
+                    </span>
+                  </button>
+
+                  {/* Sin OC Asignada */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterEstado('SIN_OC')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.84rem',
+                      fontWeight: filterEstado === 'SIN_OC' ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: filterEstado === 'SIN_OC' ? '1px solid rgba(234, 179, 8, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: filterEstado === 'SIN_OC' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      color: filterEstado === 'SIN_OC' ? '#facc15' : '#94a3b8',
+                      boxShadow: filterEstado === 'SIN_OC' ? '0 0 10px rgba(234, 179, 8, 0.2)' : 'none'
+                    }}
+                  >
+                    <Clock size={14} color={filterEstado === 'SIN_OC' ? '#facc15' : '#eab308'} />
+                    <span>Sin OC asignada</span>
+                    <span style={{
+                      padding: '1px 7px',
+                      borderRadius: '12px',
+                      fontSize: '0.74rem',
+                      fontWeight: '700',
+                      background: filterEstado === 'SIN_OC' ? 'rgba(234, 179, 8, 0.3)' : 'rgba(234, 179, 8, 0.12)',
+                      color: filterEstado === 'SIN_OC' ? '#fef08a' : '#eab308'
+                    }}>
+                      {counts.sinOc}
+                    </span>
+                  </button>
+
+                  {/* OC Asignada Parcial */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterEstado('PARCIAL')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.84rem',
+                      fontWeight: filterEstado === 'PARCIAL' ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: filterEstado === 'PARCIAL' ? '1px solid rgba(59, 130, 246, 0.6)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: filterEstado === 'PARCIAL' ? 'rgba(59, 130, 246, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                      color: filterEstado === 'PARCIAL' ? '#60a5fa' : '#94a3b8',
+                      boxShadow: filterEstado === 'PARCIAL' ? '0 0 10px rgba(59, 130, 246, 0.25)' : 'none'
+                    }}
+                  >
+                    <Tag size={14} color={filterEstado === 'PARCIAL' ? '#60a5fa' : '#3b82f6'} />
+                    <span>OC asignada parcial</span>
+                    <span style={{
+                      padding: '1px 7px',
+                      borderRadius: '12px',
+                      fontSize: '0.74rem',
+                      fontWeight: '700',
+                      background: filterEstado === 'PARCIAL' ? 'rgba(59, 130, 246, 0.35)' : 'rgba(59, 130, 246, 0.15)',
+                      color: filterEstado === 'PARCIAL' ? '#bfdbfe' : '#3b82f6'
+                    }}>
+                      {counts.parcial}
+                    </span>
+                  </button>
+
+                  {/* OC Asignada Completa */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterEstado('COMPLETA')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.84rem',
+                      fontWeight: filterEstado === 'COMPLETA' ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: filterEstado === 'COMPLETA' ? '1px solid rgba(16, 185, 129, 0.6)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: filterEstado === 'COMPLETA' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      color: filterEstado === 'COMPLETA' ? '#34d399' : '#94a3b8',
+                      boxShadow: filterEstado === 'COMPLETA' ? '0 0 10px rgba(16, 185, 129, 0.25)' : 'none'
+                    }}
+                  >
+                    <CheckCircle size={14} color={filterEstado === 'COMPLETA' ? '#34d399' : '#10b981'} />
+                    <span>OC asignada completa</span>
+                    <span style={{
+                      padding: '1px 7px',
+                      borderRadius: '12px',
+                      fontSize: '0.74rem',
+                      fontWeight: '700',
+                      background: filterEstado === 'COMPLETA' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.15)',
+                      color: filterEstado === 'COMPLETA' ? '#a7f3d0' : '#10b981'
+                    }}>
+                      {counts.completa}
+                    </span>
+                  </button>
+
+                  {/* Con OC (Parcial + Completa) */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterEstado('CON_OC')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.84rem',
+                      fontWeight: filterEstado === 'CON_OC' ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: filterEstado === 'CON_OC' ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: filterEstado === 'CON_OC' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      color: filterEstado === 'CON_OC' ? '#c084fc' : '#94a3b8',
+                      boxShadow: filterEstado === 'CON_OC' ? '0 0 10px rgba(168, 85, 247, 0.2)' : 'none'
+                    }}
+                    title="Ver todas las solicitudes que tienen alguna OC asignada (parciales o completas)"
+                  >
+                    <span>Con OC (Todas)</span>
+                    <span style={{
+                      padding: '1px 7px',
+                      borderRadius: '12px',
+                      fontSize: '0.74rem',
+                      fontWeight: '700',
+                      background: filterEstado === 'CON_OC' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(168, 85, 247, 0.12)',
+                      color: filterEstado === 'CON_OC' ? '#e9d5ff' : '#c084fc'
+                    }}>
+                      {counts.conOc}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Contador Informativo */}
+                <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '500' }}>
+                  Mostrando <strong style={{ color: '#cbd5e1' }}>{filteredSolicitudes.length}</strong> de <strong style={{ color: '#cbd5e1' }}>{counts.all}</strong> solicitudes
+                </div>
               </div>
             </div>
 
@@ -522,7 +769,24 @@ const QFModule = () => {
               ) : filteredSolicitudes.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '12px' }}>
                   <FileText size={36} style={{ marginBottom: '10px', opacity: 0.4 }} />
-                  <p style={{ margin: 0 }}>No hay solicitudes de compra registradas o coincidentes.</p>
+                  <p style={{ margin: '0 0 12px 0' }}>No hay solicitudes de compra que coincidan con los filtros seleccionados.</p>
+                  {(filterEstado !== 'ALL' || searchQuery) && (
+                    <button
+                      onClick={() => { setFilterEstado('ALL'); setSearchQuery(''); }}
+                      className="btn-secondary"
+                      style={{ 
+                        padding: '6px 16px', 
+                        fontSize: '0.84rem', 
+                        cursor: 'pointer',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        color: '#60a5fa',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      Restablecer filtros
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
@@ -541,8 +805,8 @@ const QFModule = () => {
                       {filteredSolicitudes.map((s) => {
                         const items = s.solicitudes_compra_articulos || [];
                         const totalItems = items.length > 0 ? items.length : 1;
-                        const matchingOcs = assignedOcsMap[s.numero_solicitud.toUpperCase()] || [];
-                        const currentStatus = s.estado || (matchingOcs.length > 0 ? 'OC asignada parcial' : 'Sin OC asignada');
+                        const matchingOcs = assignedOcsMap[(s.numero_solicitud || '').toUpperCase()] || [];
+                        const currentStatus = getSolicitudStatus(s);
 
                         let badgeBg = 'rgba(234, 179, 8, 0.15)';
                         let badgeColor = '#eab308';
