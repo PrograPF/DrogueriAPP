@@ -1681,9 +1681,15 @@ const SeguimientoOCModule = () => {
   const filteredOcs = ocs.filter(oc => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
-      oc.numero_oc.toLowerCase().includes(q) ||
-      oc.proveedor.toLowerCase().includes(q) ||
-      (oc.solicitud_compra || '').toLowerCase().includes(q)
+      (oc.numero_oc || '').toLowerCase().includes(q) ||
+      (oc.proveedor || '').toLowerCase().includes(q) ||
+      (oc.rut_proveedor || '').toLowerCase().includes(q) ||
+      (oc.solicitud_compra || '').toLowerCase().includes(q) ||
+      (oc.ordenes_compra_articulos || []).some(art => {
+        const artCode = (art.codigo_articulo || '').toLowerCase();
+        const artName = (articulosCatalog[art.codigo_articulo] || art.descripcion || '').toLowerCase();
+        return artCode.includes(q) || artName.includes(q);
+      })
     );
 
     let matchesStatus = true;
@@ -1723,9 +1729,15 @@ const SeguimientoOCModule = () => {
 
     const q = searchQueryAlertas.toLowerCase().trim();
     const matchesSearch = !q || (
-      oc.numero_oc.toLowerCase().includes(q) ||
-      oc.proveedor.toLowerCase().includes(q) ||
-      (oc.solicitud_compra || '').toLowerCase().includes(q)
+      (oc.numero_oc || '').toLowerCase().includes(q) ||
+      (oc.proveedor || '').toLowerCase().includes(q) ||
+      (oc.rut_proveedor || '').toLowerCase().includes(q) ||
+      (oc.solicitud_compra || '').toLowerCase().includes(q) ||
+      (oc.ordenes_compra_articulos || []).some(art => {
+        const artCode = (art.codigo_articulo || '').toLowerCase();
+        const artName = (articulosCatalog[art.codigo_articulo] || art.descripcion || '').toLowerCase();
+        return artCode.includes(q) || artName.includes(q);
+      })
     );
 
     let matchesStatus = true;
@@ -2490,7 +2502,7 @@ const SeguimientoOCModule = () => {
                           type="text"
                           value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)}
-                          placeholder="Buscar por número de OC, proveedor o solicitud..."
+                          placeholder="Buscar por N° OC, proveedor, RUT, solicitud, código o artículo..."
                           className="input-field"
                           style={{ paddingLeft: '48px', width: '100%' }}
                         />
@@ -2695,7 +2707,7 @@ const SeguimientoOCModule = () => {
                           type="text"
                           value={searchQueryAlertas}
                           onChange={e => setSearchQueryAlertas(e.target.value)}
-                          placeholder="Buscar por número de OC, proveedor o solicitud..."
+                          placeholder="Buscar por N° OC, proveedor, RUT, solicitud, código o artículo..."
                           className="input-field"
                           style={{ paddingLeft: '48px', width: '100%' }}
                         />
