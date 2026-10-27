@@ -590,21 +590,81 @@ const SeguimientoOCModule = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOcForModal?.id]);
 
-  const cargarProveedores = async () => {
+  const buscarProveedoresEnVivo = async (queryText = '') => {
     setLoadingProveedores(true);
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('proveedores')
         .select('id, rut, nombre_proveedor')
         .order('nombre_proveedor', { ascending: true });
+
+      const term = (queryText || '').trim();
+      if (term) {
+        q = q.or(`nombre_proveedor.ilike.%${term}%,rut.ilike.%${term}%`);
+      }
+      const { data, error } = await q.limit(30);
       if (error) throw error;
       setProveedores(data || []);
+      return data || [];
     } catch (err) {
-      console.error('Error al cargar proveedores:', err);
+      console.error('Error al buscar proveedores en vivo:', err);
+      return [];
     } finally {
       setLoadingProveedores(false);
     }
   };
+
+  const cargarProveedores = buscarProveedoresEnVivo;
+
+  // Búsqueda en vivo de proveedores en creación (con debounce de 200ms)
+  useEffect(() => {
+    if (!showProveedorSuggestions) return;
+    const timer = setTimeout(() => {
+      buscarProveedoresEnVivo(proveedorSearch);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [proveedorSearch, showProveedorSuggestions]);
+
+  // Búsqueda en vivo de proveedores en edición (con debounce de 200ms)
+  useEffect(() => {
+    if (!showEditProveedorSuggestions) return;
+    const timer = setTimeout(() => {
+      buscarProveedoresEnVivo(editProveedorSearch);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [editProveedorSearch, showEditProveedorSuggestions]);
+
+  // Refrescar automáticamente al regresar a la ventana si hay búsqueda activa
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (showProveedorSuggestions) {
+        buscarProveedoresEnVivo(proveedorSearch);
+      } else if (showEditProveedorSuggestions) {
+        buscarProveedoresEnVivo(editProveedorSearch);
+      }
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [showProveedorSuggestions, showEditProveedorSuggestions, proveedorSearch, editProveedorSearch]);
+
+  // Sincronizar RUT automáticamente si el nombre escrito coincide con un proveedor cargado
+  useEffect(() => {
+    if (formData.proveedor && proveedores.length > 0) {
+      const matched = proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === formData.proveedor.toLowerCase().trim());
+      if (matched && matched.rut && !formData.rut_proveedor) {
+        setFormData(prev => ({ ...prev, rut_proveedor: matched.rut }));
+      }
+    }
+  }, [proveedores, formData.proveedor, formData.rut_proveedor]);
+
+  useEffect(() => {
+    if (editFormData.proveedor && proveedores.length > 0) {
+      const matched = proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === editFormData.proveedor.toLowerCase().trim());
+      if (matched && matched.rut && !editFormData.rut_proveedor) {
+        setEditFormData(prev => ({ ...prev, rut_proveedor: matched.rut }));
+      }
+    }
+  }, [proveedores, editFormData.proveedor, editFormData.rut_proveedor]);
 
   // Open Create View
   const handleStartCreate = () => {
@@ -629,13 +689,13 @@ const SeguimientoOCModule = () => {
     setShowSolicitudSuggestions(false);
     setArticulosYaAsignados([]);
     setArticulosForm([{ key: Date.now(), codigo: '', nombre: '', cantidad: 1, precio_unitario: '', subtotal_neto: 0, isNew: false, tempName: '' }]);
+    setProveedores([]);
     setView('create');
   };
 
   useEffect(() => {
     cargarOcs();
     cargarArticulosCatalog();
-    cargarProveedores();
     cargarSolicitudesOptions();
   }, []);
 
@@ -3769,18 +3829,19 @@ const SeguimientoOCModule = () => {
                     onChange={e => {
                       const val = e.target.value;
                       setProveedorSearch(val);
-                      const filtered = proveedores.filter(p => 
-                        (p.nombre_proveedor || '').toLowerCase().includes(val.toLowerCase()) ||
-                        (p.rut || '').toLowerCase().includes(val.toLowerCase())
-                      );
-                      setFormData(prev => ({ 
-                        ...prev, 
-                        proveedor: val,
-                        rut_proveedor: proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === val.toLowerCase())?.rut || ''
-                      }));
+                      setFormData(prev => {
+                        const matched = proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === val.toLowerCase().trim());
+                        return { 
+                          ...prev, 
+                          proveedor: val,
+                          rut_proveedor: matched ? matched.rut : prev.rut_proveedor
+                        };
+                      });
                       setShowProveedorSuggestions(true);
                     }}
-                    onFocus={() => setShowProveedorSuggestions(true)}
+                    onFocus={() => {
+                      setShowProveedorSuggestions(true);
+                    }}
                     onBlur={() => {
                       setTimeout(() => setShowProveedorSuggestions(false), 200);
                     }}
@@ -3802,18 +3863,16 @@ const SeguimientoOCModule = () => {
                       boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
                       marginTop: '4px'
                     }}>
-                      {proveedores.filter(p => 
-                        (p.nombre_proveedor || '').toLowerCase().includes(proveedorSearch.toLowerCase()) ||
-                        (p.rut || '').toLowerCase().includes(proveedorSearch.toLowerCase())
-                      ).length === 0 ? (
+                      {loadingProveedores ? (
+                        <div style={{ padding: '10px 14px', color: '#94a3b8', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <RefreshCw className="animate-spin" size={14} /> Buscando proveedores en vivo...
+                        </div>
+                      ) : proveedores.length === 0 ? (
                         <div style={{ padding: '10px 14px', color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>
                           No se encontraron proveedores
                         </div>
                       ) : (
-                        proveedores.filter(p => 
-                          (p.nombre_proveedor || '').toLowerCase().includes(proveedorSearch.toLowerCase()) ||
-                          (p.rut || '').toLowerCase().includes(proveedorSearch.toLowerCase())
-                        ).map(p => (
+                        proveedores.map(p => (
                           <div
                             key={p.id}
                             onMouseDown={() => {
@@ -5183,14 +5242,19 @@ const SeguimientoOCModule = () => {
                       onChange={e => {
                         const val = e.target.value;
                         setEditProveedorSearch(val);
-                        setEditFormData(prev => ({
-                          ...prev,
-                          proveedor: val,
-                          rut_proveedor: proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === val.toLowerCase())?.rut || prev.rut_proveedor
-                        }));
+                        setEditFormData(prev => {
+                          const matched = proveedores.find(p => (p.nombre_proveedor || '').toLowerCase() === val.toLowerCase().trim());
+                          return {
+                            ...prev,
+                            proveedor: val,
+                            rut_proveedor: matched ? matched.rut : prev.rut_proveedor
+                          };
+                        });
                         setShowEditProveedorSuggestions(true);
                       }}
-                      onFocus={() => setShowEditProveedorSuggestions(true)}
+                      onFocus={() => {
+                        setShowEditProveedorSuggestions(true);
+                      }}
                       onBlur={() => setTimeout(() => setShowEditProveedorSuggestions(false), 200)}
                       placeholder="Nombre del proveedor..."
                     />
@@ -5209,10 +5273,16 @@ const SeguimientoOCModule = () => {
                         boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
                         marginTop: '4px'
                       }}>
-                        {proveedores
-                          .filter(p => (p.nombre_proveedor || '').toLowerCase().includes(editProveedorSearch.toLowerCase()) || (p.rut || '').toLowerCase().includes(editProveedorSearch.toLowerCase()))
-                          .slice(0, 8)
-                          .map(p => (
+                        {loadingProveedores ? (
+                          <div style={{ padding: '8px 12px', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <RefreshCw className="animate-spin" size={14} /> Buscando proveedores en vivo...
+                          </div>
+                        ) : proveedores.length === 0 ? (
+                          <div style={{ padding: '8px 12px', color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                            No se encontraron proveedores
+                          </div>
+                        ) : (
+                          proveedores.slice(0, 15).map(p => (
                             <div
                               key={p.id}
                               onMouseDown={() => {
@@ -5229,13 +5299,23 @@ const SeguimientoOCModule = () => {
                                 cursor: 'pointer',
                                 fontSize: '0.85rem',
                                 color: '#cbd5e1',
-                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={e => {
+                                e.target.style.background = 'rgba(59, 130, 246, 0.15)';
+                                e.target.style.color = '#3b82f6';
+                              }}
+                              onMouseLeave={e => {
+                                e.target.style.background = 'transparent';
+                                e.target.style.color = '#cbd5e1';
                               }}
                             >
                               <span style={{ fontWeight: '600' }}>{p.nombre_proveedor}</span>
                               <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '8px' }}>({p.rut})</span>
                             </div>
-                          ))}
+                          ))
+                        )}
                       </div>
                     )}
                   </div>
