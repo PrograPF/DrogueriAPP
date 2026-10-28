@@ -82,7 +82,10 @@ export const ESTADOS_FINALES = [
   'Recepción Con Multa',
   'Recepción de excepción',
   'Cerrada con saldo pendiente',
-  'Saldo liberado'
+  'Saldo liberado',
+  'Recepción Conforme Parcial',
+  'Recepción conforme parcial',
+  'Recepcion conforme parcial'
 ];
 
 export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
@@ -94,7 +97,7 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
     return build('purpura', COLORS.purpura, '🟣 Régimen de Excepción: Aceptada para recepción fuera de plazo');
   }
 
-  // 2. Estados finales cerrados (incluye Recepción de excepción, Cerrada con saldo pendiente y Saldo liberado)
+  // 2. Estados finales cerrados (incluye Recepción de excepción, Cerrada con saldo pendiente, Saldo liberado y Recepción Conforme Parcial)
   if (estado === 'Recepción de excepción') {
     return build('final', COLORS.purpura, 'Recepción de excepción en bodega');
   }
@@ -103,6 +106,9 @@ export const evaluarPlazos = (oc = {}, hoyISO = toLocalISO()) => {
   }
   if (estado === 'Saldo liberado') {
     return build('final', COLORS.verde, 'Saldo liberado');
+  }
+  if (estado === 'Recepción Conforme Parcial' || estado === 'Recepción conforme parcial' || estado === 'Recepcion conforme parcial') {
+    return build('final', '#38bdf8', 'Recepción Conforme Parcial en bodega (con saldo pendiente)');
   }
   if (ESTADOS_FINALES.includes(estado)) {
     return build('final', COLORS.gris, estado);

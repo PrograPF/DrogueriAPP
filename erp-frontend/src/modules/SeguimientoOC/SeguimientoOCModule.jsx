@@ -1592,6 +1592,9 @@ const SeguimientoOCModule = () => {
     if (oc.estado === 'Saldo liberado') {
       return { statusType: 'saldo_liberado', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Saldo Liberado en OC' };
     }
+    if (oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial') {
+      return { statusType: 'conforme_parcial', badgeBg: 'rgba(56, 189, 248, 0.18)', badgeColor: '#38bdf8', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción Conforme Parcial en Bodega (con saldo pendiente)' };
+    }
     if (oc.estado === 'Recepción Conforme') {
       return { statusType: 'conforme', badgeBg: 'rgba(16, 185, 129, 0.15)', badgeColor: '#10b981', isExpired: false, isYellow: false, isOrange: false, isRosa: false, isPurpura: false, alertMessage: 'Recepción Conforme en Bodega' };
     }
@@ -1746,7 +1749,7 @@ const SeguimientoOCModule = () => {
             alert('Todas las cantidades fueron recepcionadas. Recuerde cambiar manualmente el estado de la OC a "Recepción Conforme", "Recepción Con Multa" o "Recepción de excepción".');
           }
         } else {
-          alert('Recepción parcial registrada correctamente. Saldo de la OC actualizado.');
+          alert('Recepción parcial registrada correctamente. Saldo de la OC actualizado. Si corresponde, recuerde actualizar el estado de la OC a "Recepción Conforme Parcial".');
         }
       }
 
@@ -1781,6 +1784,8 @@ const SeguimientoOCModule = () => {
     if (filtroEstadoList !== 'TODOS') {
       if (filtroEstadoList === 'Cancelado') {
         matchesStatus = oc.estado === 'Cancelado' || oc.estado === 'Cancelada';
+      } else if (filtroEstadoList === 'Recepción Conforme Parcial') {
+        matchesStatus = oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial';
       } else {
         matchesStatus = oc.estado === filtroEstadoList;
       }
@@ -1794,7 +1799,7 @@ const SeguimientoOCModule = () => {
     const plazos = checkPlazos(oc);
 
     let matchesSubTab = false;
-    const isExcludedFromAlerts = oc.estado === 'Cancelado' || oc.estado === 'Cancelada' || oc.estado === 'Recepción Conforme' || oc.estado === 'Recepción Con Multa' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado';
+    const isExcludedFromAlerts = oc.estado === 'Cancelado' || oc.estado === 'Cancelada' || oc.estado === 'Recepción Conforme' || oc.estado === 'Recepción Con Multa' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado' || oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial';
 
     if (alertasSubFilter === 'TODAS') {
       matchesSubTab = !isExcludedFromAlerts && (plazos.isYellow || plazos.isOrange || plazos.isRosa || plazos.isPurpura || plazos.isExpired);
@@ -1837,7 +1842,7 @@ const SeguimientoOCModule = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const isFinalOrClosed = (estado) => estado === 'Cancelado' || estado === 'Cancelada' || estado === 'Recepción Conforme' || estado === 'Recepción Con Multa' || estado === 'Recepción de excepción' || estado === 'Cerrada con saldo pendiente' || estado === 'Saldo liberado';
+  const isFinalOrClosed = (estado) => estado === 'Cancelado' || estado === 'Cancelada' || estado === 'Recepción Conforme' || estado === 'Recepción Con Multa' || estado === 'Recepción de excepción' || estado === 'Cerrada con saldo pendiente' || estado === 'Saldo liberado' || estado === 'Recepción Conforme Parcial' || estado === 'Recepción conforme parcial' || estado === 'Recepcion conforme parcial';
 
   const yellowOcsCount = ocs.filter(oc => !isFinalOrClosed(oc.estado) && checkPlazos(oc).isYellow).length;
   const orangeOcsCount = ocs.filter(oc => !isFinalOrClosed(oc.estado) && checkPlazos(oc).isOrange).length;
@@ -1988,12 +1993,13 @@ const SeguimientoOCModule = () => {
                         cursor: 'pointer',
                         background: plazos.badgeBg,
                         color: plazos.badgeColor,
-                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
+                        border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado' || oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
                       }}
                     >
                       <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
                       <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
                       <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
+                      <option value="Recepción Conforme Parcial" style={{ background: '#0f172a', color: '#38bdf8' }}>Recepción Conforme Parcial</option>
                       <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
                       <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                       <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
@@ -2079,9 +2085,9 @@ const SeguimientoOCModule = () => {
     );
   };
 
-  // Filtered Active OCs for Recepcion Search Input (Only 'Enviada' or 'Aceptada')
+  // Filtered Active OCs for Recepcion Search Input ('Enviada', 'Aceptada' o 'Recepción Conforme Parcial')
   const filteredActiveOcsForRecepcion = ocs.filter(oc => {
-    const esValidaParaRecepcion = oc.estado === 'Enviada' || oc.estado === 'Aceptada';
+    const esValidaParaRecepcion = oc.estado === 'Enviada' || oc.estado === 'Aceptada' || oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial';
     if (!esValidaParaRecepcion) return false;
 
     const q = recepcionSearchQuery.toLowerCase().trim();
@@ -2113,8 +2119,8 @@ const SeguimientoOCModule = () => {
         const totalSol = arts.reduce((sum, a) => sum + (Number(a.cantidad) || 0), 0);
         const totalRec = arts.reduce((sum, a) => sum + (Number(a.cantidad_recepcionada) || 0), 0);
         
-        // Regla usuario: "Cerrada con saldo pendiente" se visualiza en Valorizados si tiene saldo faltante
-        if (oc.estado === 'Cerrada con saldo pendiente') {
+        // Regla usuario: "Cerrada con saldo pendiente" y "Recepción Conforme Parcial" se visualizan en Valorizados si tienen saldo faltante
+        if (oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial') {
           return totalRec < totalSol;
         }
 
@@ -2615,6 +2621,7 @@ const SeguimientoOCModule = () => {
                           <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
                           <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
                           <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
+                          <option value="Recepción Conforme Parcial" style={{ background: '#0f172a', color: '#38bdf8' }}>Recepción Conforme Parcial</option>
                           <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
                           <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                           <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
@@ -4128,6 +4135,7 @@ const SeguimientoOCModule = () => {
                   >
                     <option value="Enviada">Enviada</option>
                     <option value="Aceptada">Aceptada</option>
+                    <option value="Recepción Conforme Parcial" style={{ color: '#38bdf8' }}>Recepción Conforme Parcial</option>
                     <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
                     <option value="Recepción de excepción">Recepción de excepción (Recibida bajo excepción)</option>
                     <option value="Cerrada con saldo pendiente" style={{ color: '#ef4444' }}>Cerrada con saldo pendiente</option>
@@ -4380,12 +4388,14 @@ const SeguimientoOCModule = () => {
                                 selectedOcForModal.estado === 'Aceptada' ? 'rgba(16, 185, 129, 0.15)' : 
                                 (selectedOcForModal.estado === 'Excepciones' || selectedOcForModal.estado === 'Recepción de excepción') ? 'rgba(192, 128, 192, 0.25)' :
                                 (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado' || selectedOcForModal.estado === 'Saldo liberado') ? 'rgba(16, 185, 129, 0.25)' :
+                                (selectedOcForModal.estado === 'Recepción Conforme Parcial' || selectedOcForModal.estado === 'Recepción conforme parcial' || selectedOcForModal.estado === 'Recepcion conforme parcial') ? 'rgba(56, 189, 248, 0.2)' :
                                 selectedOcForModal.estado === 'Cerrada con saldo pendiente' ? 'rgba(239, 68, 68, 0.2)' :
                                 selectedOcForModal.estado === 'Recepción Con Multa' ? 'rgba(251, 146, 60, 0.2)' : 'rgba(245, 158, 11, 0.15)',
                     color: selectedOcForModal.estado === 'Enviada' ? '#3b82f6' : 
                            selectedOcForModal.estado === 'Aceptada' ? '#10b981' : 
                            (selectedOcForModal.estado === 'Excepciones' || selectedOcForModal.estado === 'Recepción de excepción') ? '#c080c0' :
                            (selectedOcForModal.estado === 'Recepción Conforme' || selectedOcForModal.estado === 'Recepcionado' || selectedOcForModal.estado === 'Saldo liberado') ? '#10b981' :
+                           (selectedOcForModal.estado === 'Recepción Conforme Parcial' || selectedOcForModal.estado === 'Recepción conforme parcial' || selectedOcForModal.estado === 'Recepcion conforme parcial') ? '#38bdf8' :
                            selectedOcForModal.estado === 'Cerrada con saldo pendiente' ? '#ef4444' :
                            selectedOcForModal.estado === 'Recepción Con Multa' ? '#fb923c' : '#f59e0b',
                     display: 'inline-block',
@@ -5277,6 +5287,7 @@ const SeguimientoOCModule = () => {
                       <option value="Enviada">Enviada</option>
                       <option value="Aceptada">Aceptada</option>
                       <option value="Recepción Conforme">Recepción Conforme</option>
+                      <option value="Recepción Conforme Parcial" style={{ color: '#38bdf8' }}>Recepción Conforme Parcial</option>
                       <option value="Recepción Con Multa">Recepción Con Multa</option>
                       <option value="Excepciones">Excepciones (Aceptada fuera de plazo)</option>
                       <option value="Recepción de excepción">Recepción de excepción (Recibida bajo excepción)</option>

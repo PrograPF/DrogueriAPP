@@ -106,7 +106,7 @@ const RecepcionArticulosModule = () => {
             historial_cambios
           )
         `)
-        .or('estado.eq.Enviada,estado.eq.Aceptada')
+        .in('estado', ['Enviada', 'Aceptada', 'Recepción Conforme Parcial', 'Recepción conforme parcial', 'Recepcion conforme parcial'])
         .order('fecha_envio', { ascending: false });
 
       if (error) throw error;
