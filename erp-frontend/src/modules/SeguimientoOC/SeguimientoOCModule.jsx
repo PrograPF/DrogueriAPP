@@ -1654,6 +1654,31 @@ const SeguimientoOCModule = () => {
       return;
     }
 
+    // 0. Validación de seguridad estricta: ninguna cantidad puede exceder el saldo pendiente
+    for (const [artId, qtyStr] of incomingEntries) {
+      const incomingQty = parseInt(qtyStr) || 0;
+      const currentArt = selectedOc.ordenes_compra_articulos.find(a => a.id === artId);
+      if (!currentArt) continue;
+
+      const cantSol = Number(currentArt.cantidad) || 0;
+      const currentAcum = Number(currentArt.cantidad_recepcionada) || 0;
+      const maxPermitido = Math.max(0, cantSol - currentAcum);
+
+      if (incomingQty > maxPermitido) {
+        const nombreArt = articulosCatalog[currentArt.codigo_articulo] || `Artículo ${currentArt.codigo_articulo}`;
+        alert(
+          `⚠️ No se puede registrar la recepción:\n\n` +
+          `Para el artículo "${nombreArt}" (Código: ${currentArt.codigo_articulo}):\n` +
+          `• Cantidad ingresada: ${incomingQty.toLocaleString('es-CL')} uds.\n` +
+          `• Máximo permitido restante: ${maxPermitido.toLocaleString('es-CL')} uds.\n` +
+          `• Total solicitado en OC: ${cantSol.toLocaleString('es-CL')} uds.\n` +
+          `• Ya recepcionado previamente: ${currentAcum.toLocaleString('es-CL')} uds.\n\n` +
+          `Por favor corrija la cantidad antes de registrar.`
+        );
+        return;
+      }
+    }
+
     setSavingRecepcion(true);
     try {
       // 1. Update each article with its new accumulated received quantity
@@ -2980,9 +3005,13 @@ const SeguimientoOCModule = () => {
                                 <tbody>
                                   {(selOc.ordenes_compra_articulos || []).map(art => {
                                     const nombreArt = articulosCatalog[art.codigo_articulo] || `Cód ${art.codigo_articulo}`;
-                                    const cantSolicitada = art.cantidad || 1;
-                                    const cantRecibida = art.cantidad_recepcionada || 0;
+                                    const cantSolicitada = Number(art.cantidad) || 1;
+                                    const cantRecibida = Number(art.cantidad_recepcionada) || 0;
+                                    const maxPendiente = Math.max(0, cantSolicitada - cantRecibida);
                                     const isComplete = cantRecibida >= cantSolicitada;
+                                    const rawVal = recepcionQuantities[art.id];
+                                    const enteredVal = rawVal !== undefined && rawVal !== '' ? parseInt(rawVal) : null;
+                                    const isOverLimit = enteredVal !== null && enteredVal > maxPendiente;
 
                                     return (
                                       <tr key={art.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.85rem' }}>
@@ -2991,7 +3020,7 @@ const SeguimientoOCModule = () => {
                                           <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Código: {art.codigo_articulo}</div>
                                         </td>
                                         <td style={{ padding: '12px', fontWeight: '600', color: '#cbd5e1' }}>
-                                          {cantSolicitada} uds.
+                                          {cantSolicitada.toLocaleString('es-CL')} uds.
                                         </td>
                                         <td style={{ padding: '12px' }}>
                                           <span style={{ 
@@ -3003,7 +3032,7 @@ const SeguimientoOCModule = () => {
                                             border: isComplete ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(245,158,11,0.15)',
                                             display: 'inline-block'
                                           }}>
-                                            {cantRecibida} / {cantSolicitada}
+                                            {cantRecibida.toLocaleString('es-CL')} / {cantSolicitada.toLocaleString('es-CL')}
                                           </span>
                                         </td>
                                         <td style={{ padding: '12px' }}>
@@ -3011,17 +3040,31 @@ const SeguimientoOCModule = () => {
                                             type="number"
                                             value={recepcionQuantities[art.id] || ''}
                                             onChange={(e) => handleRecepcionQtyChange(art.id, e.target.value)}
-                                            placeholder="+ 0"
+                                            placeholder={isComplete ? "Completado" : `+ 0 (máx ${maxPendiente})`}
                                             className="input-field"
                                             style={{ 
                                               padding: '6px 10px', 
-                                              fontSize: '0.85rem',
-                                              textAlign: 'right',
-                                              borderColor: (recepcionQuantities[art.id] && parseInt(recepcionQuantities[art.id]) > 0) ? '#10b981' : 'rgba(255,255,255,0.1)'
+                                              fontSize: '0.85rem', 
+                                              textAlign: 'right', 
+                                              width: '100%',
+                                              minWidth: '130px',
+                                              borderColor: isOverLimit 
+                                                ? '#ef4444' 
+                                                : (recepcionQuantities[art.id] && parseInt(recepcionQuantities[art.id]) > 0) 
+                                                ? '#10b981' 
+                                                : 'rgba(255,255,255,0.1)',
+                                              background: isOverLimit ? 'rgba(239, 68, 68, 0.12)' : undefined,
+                                              color: isOverLimit ? '#f87171' : undefined
                                             }}
                                             min="0"
+                                            max={maxPendiente}
                                             disabled={isComplete}
                                           />
+                                          {isOverLimit && (
+                                            <div style={{ color: '#ef4444', fontSize: '0.74rem', fontWeight: '700', marginTop: '4px', textAlign: 'right' }}>
+                                              ⚠️ Excede el máximo ({maxPendiente.toLocaleString('es-CL')} uds.)
+                                            </div>
+                                          )}
                                         </td>
                                       </tr>
                                     );
@@ -3031,26 +3074,39 @@ const SeguimientoOCModule = () => {
                             </div>
 
                             {/* Submit Button */}
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
-                              <button
-                                onClick={handleRegisterRecepcion}
-                                className="btn-primary"
-                                style={{ 
-                                  background: '#10b981', 
-                                  color: '#ffffff', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  padding: '12px 24px',
-                                  fontSize: '0.9rem',
-                                  fontWeight: '700',
-                                  borderColor: '#10b981'
-                                }}
-                                disabled={savingRecepcion}
-                              >
-                                {savingRecepcion ? 'Registrando...' : 'Registrar Entrega Parcial'}
-                              </button>
-                            </div>
+                            {(() => {
+                              const hasAnyOverLimit = (selOc.ordenes_compra_articulos || []).some(art => {
+                                const maxPend = Math.max(0, (Number(art.cantidad) || 0) - (Number(art.cantidad_recepcionada) || 0));
+                                const val = recepcionQuantities[art.id] ? parseInt(recepcionQuantities[art.id]) : 0;
+                                return val > maxPend;
+                              });
+
+                              return (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+                                  <button
+                                    onClick={handleRegisterRecepcion}
+                                    className="btn-primary"
+                                    style={{ 
+                                      background: hasAnyOverLimit ? '#475569' : '#10b981', 
+                                      color: hasAnyOverLimit ? '#94a3b8' : '#ffffff', 
+                                      cursor: (savingRecepcion || hasAnyOverLimit) ? 'not-allowed' : 'pointer',
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '8px', 
+                                      padding: '12px 24px', 
+                                      fontSize: '0.9rem', 
+                                      fontWeight: '700', 
+                                      borderColor: hasAnyOverLimit ? '#475569' : '#10b981',
+                                      opacity: hasAnyOverLimit ? 0.7 : 1
+                                    }}
+                                    disabled={savingRecepcion || hasAnyOverLimit}
+                                    title={hasAnyOverLimit ? "No se puede registrar porque hay cantidades que superan el saldo pendiente" : "Registrar entrega parcial"}
+                                  >
+                                    {savingRecepcion ? 'Registrando...' : 'Registrar Entrega Parcial'}
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </motion.div>
                         );
                       })()}
