@@ -13,6 +13,7 @@ import { fetchArticulosCatalogMap, resolveArticuloNombre } from '../../utils/cat
 import { evaluarYActualizarEstadoSolicitud } from '../../utils/solicitudHelper';
 import { TIPOS_OC, evaluarPlazos, validarOrdenFechas, formatISOToDisplay } from '../../utils/plazosHelper';
 import { exportarOcsExcel } from '../../utils/exportOcExcel';
+import SolicitudesCompraModule from '../SolicitudesCompra/SolicitudesCompraModule';
 
 // Helper to get today's date formatted as yyyy-MM-dd
 const getTodayString = () => {
@@ -2371,7 +2372,46 @@ const SeguimientoOCModule = () => {
               gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
               gap: '24px'
             }}>
-              {/* Botón 1: Asignación y seguimiento de oc */}
+              {/* Botón 1: Solicitudes de Compra */}
+              <motion.div 
+                whileHover={{ 
+                  scale: 1.02, 
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  borderColor: 'rgba(59, 130, 246, 0.4)',
+                  transition: { duration: 0.2 }
+                }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('solicitudes')}
+                className="glass-card"
+                style={{ 
+                  padding: '36px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: '20px',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  borderRadius: '16px'
+                }}
+              >
+                <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%' }}>
+                  <FileText size={48} color="#3b82f6" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
+                    Solicitudes de Compra
+                  </h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
+                    Registro, control y seguimiento de requerimientos de compra por centro de costo.
+                  </p>
+                </div>
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontWeight: '600', fontSize: '0.95rem' }}>
+                  Abrir Solicitudes <ArrowRight size={18} />
+                </div>
+              </motion.div>
+
+              {/* Botón 2: Asignación y seguimiento de oc */}
               <motion.div 
                 whileHover={{ 
                   scale: 1.02, 
@@ -4405,6 +4445,17 @@ const SeguimientoOCModule = () => {
                 {loading ? 'Guardando...' : 'Crear OC y Registrar'}
               </button>
             </div>
+          </motion.div>
+        )}
+
+        {view === 'solicitudes' && (
+          <motion.div
+            key="solicitudes-view"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+          >
+            <SolicitudesCompraModule onBack={() => setView('selection')} />
           </motion.div>
         )}
       </AnimatePresence>
