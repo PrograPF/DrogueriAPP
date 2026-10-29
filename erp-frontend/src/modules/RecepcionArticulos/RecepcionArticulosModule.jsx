@@ -522,20 +522,22 @@ const RecepcionArticulosModule = () => {
                 {filteredOcs.map(oc => {
                   const estadoRecepOc = oc.estado_recepcion;
                   const ocCfg = estadoRecepOc ? ESTADO_OC_CONFIG[estadoRecepOc] : null;
+                  const articulosOc = oc.ordenes_compra_articulos || [];
                   return (
                     <div
                       key={oc.id}
                       onClick={() => setSelectedOcForModal(oc)}
                       style={{
                         background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.04)',
-                        borderRadius: '12px', padding: '18px 20px',
+                        borderRadius: '12px', padding: '16px 20px',
                         display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between',
-                        alignItems: 'flex-start', gap: '14px', cursor: 'pointer', transition: 'all 0.2s ease'
+                        alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.2s ease'
                       }}
                       onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.25)'; }}
                       onMouseOut={e  => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)'; }}
                     >
-                      <div>
+                      {/* 1. Columna Izquierda: N° OC, Proveedor, RUT y Estados */}
+                      <div style={{ flex: '1 1 260px', minWidth: '220px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#3b82f6' }}>{oc.numero_oc}</span>
                           {/* Estado Recepción (Sistema 2) */}
@@ -553,11 +555,83 @@ const RecepcionArticulosModule = () => {
                         <div style={{ fontSize: '0.88rem', fontWeight: '600', color: '#cbd5e1', marginTop: '4px' }}>
                           {oc.proveedor} <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '400' }}>(RUT: {oc.rut_proveedor || 'S/R'})</span>
                         </div>
-                        <ResumenArts arts={oc.ordenes_compra_articulos} />
+                        <ResumenArts arts={articulosOc} />
                       </div>
-                      <div style={{ fontSize: '0.82rem', color: '#94a3b8', textAlign: 'right' }}>
+
+                      {/* 2. Sector Central: Artículos contenidos en la OC (Código + Nombre) */}
+                      <div style={{ 
+                        flex: '2 1 320px', 
+                        minWidth: '240px', 
+                        maxWidth: '620px',
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '8px',
+                        padding: '10px 14px'
+                      }}>
+                        <div style={{ 
+                          fontSize: '0.72rem', 
+                          fontWeight: '700', 
+                          color: '#94a3b8', 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <Package size={13} color="#38bdf8" />
+                          Artículos contenidos ({articulosOc.length})
+                        </div>
+                        {articulosOc.length === 0 ? (
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                            Sin artículos registrados
+                          </div>
+                        ) : (
+                          <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '5px',
+                            maxHeight: '80px',
+                            overflowY: articulosOc.length > 3 ? 'auto' : 'visible',
+                            paddingRight: articulosOc.length > 3 ? '4px' : '0'
+                          }}>
+                            {articulosOc.map((art, aIdx) => {
+                              const nombreArt = articulosCatalog[art.codigo_articulo] || `Artículo ${art.codigo_articulo}`;
+                              return (
+                                <div key={art.id || aIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', lineHeight: '1.3' }}>
+                                  <span style={{ 
+                                    fontSize: '0.72rem', 
+                                    fontWeight: '800', 
+                                    color: '#38bdf8', 
+                                    background: 'rgba(56, 189, 248, 0.1)', 
+                                    border: '1px solid rgba(56, 189, 248, 0.25)', 
+                                    padding: '1px 6px', 
+                                    borderRadius: '4px',
+                                    fontFamily: 'monospace',
+                                    flexShrink: 0
+                                  }}>
+                                    [{art.codigo_articulo}]
+                                  </span>
+                                  <span style={{ 
+                                    color: '#e2e8f0', 
+                                    fontWeight: '500', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    whiteSpace: 'nowrap' 
+                                  }} title={nombreArt}>
+                                    {nombreArt}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 3. Columna Derecha: Acceso a gestión */}
+                      <div style={{ flex: '0 0 auto', fontSize: '0.82rem', color: '#94a3b8', textAlign: 'right' }}>
                         <div style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: '700' }}>
-                          {(oc.ordenes_compra_articulos || []).length} artículo(s) → Gestionar
+                          {articulosOc.length} artículo(s) → Gestionar
                         </div>
                       </div>
                     </div>

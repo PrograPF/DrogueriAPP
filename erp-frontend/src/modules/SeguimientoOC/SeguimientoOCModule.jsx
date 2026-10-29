@@ -3,7 +3,7 @@ import {
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
   Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check,
-  Edit, Edit2, Edit3, Bell, AlertCircle, BarChart3, DollarSign, PackageOpen, Layers, ArrowUpDown
+  Edit, Edit2, Edit3, Bell, AlertCircle, BarChart3, DollarSign, PackageOpen, Layers, ArrowUpDown, FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -12,6 +12,7 @@ import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 import { fetchArticulosCatalogMap, resolveArticuloNombre } from '../../utils/catalogHelper';
 import { evaluarYActualizarEstadoSolicitud } from '../../utils/solicitudHelper';
 import { TIPOS_OC, evaluarPlazos, validarOrdenFechas, formatISOToDisplay } from '../../utils/plazosHelper';
+import { exportarOcsExcel } from '../../utils/exportOcExcel';
 
 // Helper to get today's date formatted as yyyy-MM-dd
 const getTodayString = () => {
@@ -191,6 +192,9 @@ const SeguimientoOCModule = () => {
   const [filtroTipoValorizados, setFiltroTipoValorizados] = useState('TODOS');
   const [expandedValorizadoOcId, setExpandedValorizadoOcId] = useState(null);
   const [sortByValorizados, setSortByValorizados] = useState('saldo_desc');
+
+  // Exportación a Excel: guarda el nombre de la pestaña que se está exportando (o null)
+  const [exportingExcel, setExportingExcel] = useState(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -2228,6 +2232,109 @@ const SeguimientoOCModule = () => {
     return result;
   }, [ocsValorizados, searchValorizados, filtroTipoValorizados, sortByValorizados, articulosCatalog]);
 
+  // =========================================================================
+  // EXPORTAR A EXCEL (todas las pestañas)
+  // Exporta exactamente la lista que la pestaña muestra en pantalla (búsqueda y filtros activos)
+  // =========================================================================
+  const handleExportExcel = async (tab, lista) => {
+    if (exportingExcel) return;
+    if (!lista || lista.length === 0) {
+      alert('No hay órdenes de compra para exportar con los filtros actuales.');
+      return;
+    }
+
+    const ALERTA_LABELS = {
+      TODAS: 'Todas las alertas',
+      AMARILLAS: 'Amarillas',
+      ROSA: 'Rosa (insistencia SE)',
+      NARANJAS: 'Naranjas (multa)',
+      EXCEPCIONES: 'Excepciones (púrpura)',
+      PURPURAS: 'Excepciones (púrpura)',
+      ROJAS: 'Rojas (plazo vencido)'
+    };
+    const ORDEN_LABELS = {
+      saldo_desc: 'Mayor saldo faltante primero',
+      saldo_asc: 'Menor saldo faltante primero',
+      avance_asc: 'Menor avance primero',
+      numero_oc: 'Por N° de OC'
+    };
+
+    let filtros = [];
+    if (tab === 'list') {
+      filtros = [
+        ['Búsqueda', searchQuery.trim()],
+        ['Estado', filtroEstadoList === 'TODOS' ? 'Todos los estados' : filtroEstadoList]
+      ];
+    } else if (tab === 'alertas') {
+      filtros = [
+        ['Tipo de alerta', ALERTA_LABELS[alertasSubFilter] || alertasSubFilter],
+        ['Búsqueda', searchQueryAlertas.trim()],
+        ['Estado', filtroEstadoAlertas === 'TODOS' ? 'Todos los estados' : filtroEstadoAlertas]
+      ];
+    } else if (tab === 'recepcion') {
+      filtros = [
+        ['Búsqueda', recepcionSearchQuery.trim()],
+        ['Universo', 'OC en estado Enviada, Aceptada o Recepción Conforme Parcial']
+      ];
+    } else if (tab === 'valorizados') {
+      filtros = [
+        ['Búsqueda', searchValorizados.trim()],
+        ['Tipo de OC', filtroTipoValorizados === 'TODOS' ? 'Todos los tipos' : filtroTipoValorizados],
+        ['Orden', ORDEN_LABELS[sortByValorizados] || sortByValorizados]
+      ];
+    }
+
+    setExportingExcel(tab);
+    try {
+      await exportarOcsExcel({
+        tab,
+        ocs: lista,
+        catalog: articulosCatalog,
+        getPlazos: checkPlazos,
+        filtros
+      });
+    } catch (err) {
+      console.error('Error al exportar a Excel:', err);
+      alert('Error al exportar a Excel: ' + (err?.message || err));
+    } finally {
+      setExportingExcel(null);
+    }
+  };
+
+  const renderExportButton = (tab, lista) => {
+    const isBusy = exportingExcel === tab;
+    const isEmpty = !lista || lista.length === 0;
+    return (
+      <button
+        type="button"
+        id={`btn-exportar-excel-${tab}`}
+        onClick={() => handleExportExcel(tab, lista)}
+        disabled={!!exportingExcel || isEmpty}
+        title={isEmpty ? 'No hay órdenes para exportar con los filtros actuales' : `Exportar a Excel las ${lista.length} órdenes que se muestran con los filtros actuales`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '0 18px',
+          height: '46px',
+          flexShrink: 0,
+          borderRadius: '10px',
+          fontWeight: '700',
+          fontSize: '0.88rem',
+          cursor: (exportingExcel || isEmpty) ? 'not-allowed' : 'pointer',
+          opacity: isEmpty ? 0.5 : 1,
+          color: '#34d399',
+          background: 'rgba(16, 185, 129, 0.12)',
+          border: '1px solid rgba(16, 185, 129, 0.45)',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        {isBusy ? <RefreshCw size={18} className="animate-spin" /> : <FileSpreadsheet size={18} />}
+        {isBusy ? 'Generando...' : `Exportar a Excel (${lista ? lista.length : 0})`}
+      </button>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px' }}>
       <AnimatePresence mode="wait">
@@ -2631,6 +2738,8 @@ const SeguimientoOCModule = () => {
                         </select>
                       </div>
                       
+                      {renderExportButton('list', filteredOcs)}
+
                       <button 
                         onClick={handleStartCreate} 
                         className="btn-primary" 
@@ -2829,6 +2938,8 @@ const SeguimientoOCModule = () => {
                           <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
                         </select>
                       </div>
+
+                      {renderExportButton('alertas', filteredAlertasOcs)}
                     </div>
 
                     {/* Table */}
@@ -2878,6 +2989,13 @@ const SeguimientoOCModule = () => {
                             className="input-field"
                             style={{ paddingLeft: '44px', width: '100%' }}
                           />
+                        </div>
+
+                        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          {renderExportButton('recepcion', filteredActiveOcsForRecepcion)}
+                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                            Exporta las órdenes activas listadas abajo (según la búsqueda actual) con su desglose de artículos.
+                          </span>
                         </div>
 
                         {/* Search Results */}
@@ -3425,6 +3543,8 @@ const SeguimientoOCModule = () => {
                           <option value="avance_asc">Menor avance primero</option>
                           <option value="numero_oc">Por N° de OC</option>
                         </select>
+
+                        {renderExportButton('valorizados', filteredValorizadosOcs)}
                       </div>
                     </div>
 
