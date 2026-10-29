@@ -1950,8 +1950,8 @@ const SeguimientoOCModule = () => {
                     )}
                   </td>
                   <td style={{ padding: '16px' }}>
-                    <div style={{ fontWeight: '600', color: '#f8fafc' }}>{oc.proveedor}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>RUT: {oc.rut_proveedor || 'No registrado'}</div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{oc.proveedor}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>RUT: {oc.rut_proveedor || 'No registrado'}</div>
                   </td>
                   <td style={{ padding: '16px', fontSize: '0.85rem' }}>
                     <div>Envío: {formatDate(oc.fecha_envio)}</div>
@@ -2000,16 +2000,16 @@ const SeguimientoOCModule = () => {
                         border: `1px solid ${(plazos.isYellow || plazos.isExpired || plazos.isOrange || plazos.isRosa || plazos.isPurpura || oc.estado === 'Excepciones' || oc.estado === 'Recepción de excepción' || oc.estado === 'Cerrada con saldo pendiente' || oc.estado === 'Saldo liberado' || oc.estado === 'Recepción Conforme Parcial' || oc.estado === 'Recepción conforme parcial' || oc.estado === 'Recepcion conforme parcial') ? plazos.badgeColor : 'rgba(255,255,255,0.15)'}`
                       }}
                     >
-                      <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
-                      <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
-                      <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
-                      <option value="Recepción Conforme Parcial" style={{ background: '#0f172a', color: '#38bdf8' }}>Recepción Conforme Parcial</option>
-                      <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
-                      <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
-                      <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
-                      <option value="Cerrada con saldo pendiente" style={{ background: '#0f172a', color: '#ef4444' }}>Cerrada con saldo pendiente</option>
-                      <option value="Saldo liberado" style={{ background: '#0f172a', color: '#10b981' }}>Saldo liberado</option>
-                      <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
+                      <option value="Enviada">Enviada</option>
+                      <option value="Aceptada">Aceptada</option>
+                      <option value="Recepción Conforme">Recepción Conforme</option>
+                      <option value="Recepción Conforme Parcial" style={{ color: '#38bdf8' }}>Recepción Conforme Parcial</option>
+                      <option value="Recepción Con Multa">Recepción Con Multa</option>
+                      <option value="Excepciones">Excepciones</option>
+                      <option value="Recepción de excepción" style={{ color: '#c080c0' }}>Recepción de excepción</option>
+                      <option value="Cerrada con saldo pendiente" style={{ color: '#ef4444' }}>Cerrada con saldo pendiente</option>
+                      <option value="Saldo liberado" style={{ color: '#10b981' }}>Saldo liberado</option>
+                      <option value="Cancelado">Cancelado</option>
                     </select>
                   </td>
                   <td style={{ padding: '16px', textAlign: 'center' }}>
@@ -2357,10 +2357,10 @@ const SeguimientoOCModule = () => {
           >
             {/* Header del Módulo OC */}
             <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-              <h2 style={{ fontSize: '2.2rem', fontWeight: '800', color: '#f8fafc', margin: 0 }}>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
                 Gestión y Seguimiento de Órdenes de Compra
               </h2>
-              <p style={{ color: '#94a3b8', fontSize: '1rem', marginTop: '8px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '8px' }}>
                 Selecciona la sección o herramienta que deseas gestionar.
               </p>
             </div>
@@ -2390,19 +2390,18 @@ const SeguimientoOCModule = () => {
                   alignItems: 'center',
                   textAlign: 'center',
                   gap: '20px',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  borderRadius: '16px',
-                  background: 'rgba(59, 130, 246, 0.03)'
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  borderRadius: '16px'
                 }}
               >
                 <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%' }}>
                   <Truck size={48} color="#3b82f6" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: '#f8fafc' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
                     Asignación y seguimiento de oc
                   </h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
                     Registro, asignación a solicitudes, monitoreo de plazos, alertas y recepción de productos.
                   </p>
                 </div>
@@ -2645,8 +2644,8 @@ const SeguimientoOCModule = () => {
                       marginBottom: '30px' 
                     }}>
                       <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '15px 20px' }}>
-                        <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: '500' }}>TOTAL OC ACTIVAS</span>
-                        <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0' }}>{ocs.length}</h3>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>TOTAL OC ACTIVAS</span>
+                        <h3 style={{ fontSize: '2rem', fontWeight: '800', margin: '4px 0 0 0', color: 'var(--text-primary)' }}>{ocs.length}</h3>
                       </div>
                       <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '15px 20px' }}>
                         <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: '500' }}>ENVIADAS</span>
@@ -2708,7 +2707,7 @@ const SeguimientoOCModule = () => {
 
                       {/* Dropdown status filter for Seguimiento y Registro */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Filter size={16} color="#94a3b8" />
+                        <Filter size={16} color="var(--text-secondary)" />
                         <select
                           value={filtroEstadoList}
                           onChange={(e) => setFiltroEstadoList(e.target.value)}
@@ -2718,23 +2717,23 @@ const SeguimientoOCModule = () => {
                             fontSize: '0.88rem',
                             fontWeight: '600',
                             minWidth: '180px',
-                            background: 'rgba(15, 23, 42, 0.6)',
-                            borderColor: 'rgba(255, 255, 255, 0.1)',
-                            color: '#f8fafc',
+                            background: 'var(--input-bg)',
+                            borderColor: 'var(--border-color)',
+                            color: 'var(--text-primary)',
                             cursor: 'pointer'
                           }}
                         >
-                          <option value="TODOS" style={{ background: '#0f172a', color: '#f8fafc' }}>Todos los Estados</option>
-                          <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
-                          <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
-                          <option value="Recepción Conforme" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Conforme</option>
-                          <option value="Recepción Conforme Parcial" style={{ background: '#0f172a', color: '#38bdf8' }}>Recepción Conforme Parcial</option>
-                          <option value="Recepción Con Multa" style={{ background: '#0f172a', color: '#f8fafc' }}>Recepción Con Multa</option>
-                          <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
-                          <option value="Recepción de excepción" style={{ background: '#0f172a', color: '#c080c0' }}>Recepción de excepción</option>
-                          <option value="Cerrada con saldo pendiente" style={{ background: '#0f172a', color: '#ef4444' }}>Cerrada con saldo pendiente</option>
-                          <option value="Saldo liberado" style={{ background: '#0f172a', color: '#10b981' }}>Saldo liberado</option>
-                          <option value="Cancelado" style={{ background: '#0f172a', color: '#f8fafc' }}>Cancelado</option>
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="Enviada">Enviada</option>
+                          <option value="Aceptada">Aceptada</option>
+                          <option value="Recepción Conforme">Recepción Conforme</option>
+                          <option value="Recepción Conforme Parcial" style={{ color: '#38bdf8' }}>Recepción Conforme Parcial</option>
+                          <option value="Recepción Con Multa">Recepción Con Multa</option>
+                          <option value="Excepciones">Excepciones</option>
+                          <option value="Recepción de excepción" style={{ color: '#c080c0' }}>Recepción de excepción</option>
+                          <option value="Cerrada con saldo pendiente" style={{ color: '#ef4444' }}>Cerrada con saldo pendiente</option>
+                          <option value="Saldo liberado" style={{ color: '#10b981' }}>Saldo liberado</option>
+                          <option value="Cancelado">Cancelado</option>
                         </select>
                       </div>
                       
@@ -2916,7 +2915,7 @@ const SeguimientoOCModule = () => {
 
                       {/* Dropdown status filter for Alertas */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Filter size={16} color="#94a3b8" />
+                        <Filter size={16} color="var(--text-secondary)" />
                         <select
                           value={filtroEstadoAlertas}
                           onChange={(e) => setFiltroEstadoAlertas(e.target.value)}
@@ -2926,16 +2925,16 @@ const SeguimientoOCModule = () => {
                             fontSize: '0.88rem',
                             fontWeight: '600',
                             minWidth: '180px',
-                            background: 'rgba(15, 23, 42, 0.6)',
-                            borderColor: 'rgba(255, 255, 255, 0.1)',
-                            color: '#f8fafc',
+                            background: 'var(--input-bg)',
+                            borderColor: 'var(--border-color)',
+                            color: 'var(--text-primary)',
                             cursor: 'pointer'
                           }}
                         >
-                          <option value="TODOS" style={{ background: '#0f172a', color: '#f8fafc' }}>Todos los Estados</option>
-                          <option value="Enviada" style={{ background: '#0f172a', color: '#f8fafc' }}>Enviada</option>
-                          <option value="Aceptada" style={{ background: '#0f172a', color: '#f8fafc' }}>Aceptada</option>
-                          <option value="Excepciones" style={{ background: '#0f172a', color: '#f8fafc' }}>Excepciones</option>
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="Enviada">Enviada</option>
+                          <option value="Aceptada">Aceptada</option>
+                          <option value="Excepciones">Excepciones</option>
                         </select>
                       </div>
 
@@ -2978,7 +2977,7 @@ const SeguimientoOCModule = () => {
 
                       {/* Search Bar */}
                       <div style={{ marginBottom: '25px' }}>
-                        <label style={{ ...labelStyle, fontSize: '0.85rem', color: '#f8fafc' }}>Buscar Orden de Compra Activa</label>
+                        <label style={{ ...labelStyle, fontSize: '0.85rem', color: 'var(--text-primary)' }}>Buscar Orden de Compra Activa</label>
                         <div style={{ position: 'relative', width: '100%', maxWidth: '600px' }}>
                           <Search style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={18} />
                           <input
@@ -3026,13 +3025,13 @@ const SeguimientoOCModule = () => {
                                     setRecepcionQuantities({});
                                   }}
                                   style={{
-                                    background: isSelected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                                    border: isSelected ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.06)',
+                                    background: isSelected ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-card)',
+                                    border: isSelected ? '1px solid #10b981' : '1px solid var(--border-color)',
                                     borderRadius: '8px',
                                     padding: '12px 16px',
                                     textAlign: 'left',
                                     cursor: 'pointer',
-                                    color: '#f8fafc',
+                                    color: 'var(--text-primary)',
                                     transition: 'all 0.2s ease',
                                     display: 'flex',
                                     flexDirection: 'column',
@@ -3041,10 +3040,10 @@ const SeguimientoOCModule = () => {
                                 >
                                   <div style={{ fontWeight: '700', fontSize: '0.95rem', color: isSelected ? '#10b981' : '#3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                     <span>{oc.numero_oc}</span>
-                                    <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: '#94a3b8' }}>{oc.estado}</span>
+                                    <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'var(--btn-secondary-bg)', color: 'var(--text-secondary)' }}>{oc.estado}</span>
                                   </div>
-                                  <div style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: '500' }}>{oc.proveedor}</div>
-                                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Artículos: {oc.ordenes_compra_articulos?.length || 0}</div>
+                                  <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: '600' }}>{oc.proveedor}</div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Artículos: {oc.ordenes_compra_articulos?.length || 0}</div>
                                 </button>
                               );
                             })
@@ -3574,7 +3573,7 @@ const SeguimientoOCModule = () => {
                       <div className="table-container" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                           <thead>
-                            <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8', textAlign: 'left' }}>
+                            <tr style={{ background: 'var(--btn-secondary-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                               <th style={{ padding: '12px 14px' }}>N° OC / TIPO</th>
                               <th style={{ padding: '12px 14px' }}>PROVEEDOR</th>
                               <th style={{ padding: '12px 14px', width: '170px' }}>AVANCE FÍSICO</th>
@@ -3630,10 +3629,10 @@ const SeguimientoOCModule = () => {
 
                                     {/* Proveedor & RUT */}
                                     <td style={{ padding: '14px' }}>
-                                      <div style={{ fontWeight: '600', color: '#f8fafc', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      <div style={{ fontWeight: '600', color: 'var(--text-primary)', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {oc.proveedor}
                                       </div>
-                                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                         RUT: {oc.rut_proveedor || 'S/R'}
                                       </div>
                                     </td>
@@ -3655,7 +3654,7 @@ const SeguimientoOCModule = () => {
                                     </td>
 
                                     {/* Total Neto */}
-                                    <td style={{ padding: '14px', textAlign: 'right', fontWeight: '600', color: '#cbd5e1' }}>
+                                    <td style={{ padding: '14px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
                                       ${oc.totalNeto.toLocaleString('es-CL')}
                                     </td>
 
@@ -4794,17 +4793,17 @@ const SeguimientoOCModule = () => {
                       <div style={{
                         marginTop: '16px',
                         padding: '14px 18px',
-                        background: 'rgba(15, 23, 42, 0.7)',
+                        background: 'var(--input-bg)',
                         borderRadius: '10px',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        border: '1px solid var(--border-color)',
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                         gap: '12px',
                         alignItems: 'center'
                       }}>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Subtotal Artículos</span>
-                          <strong style={{ fontSize: '1.05rem', color: '#e2e8f0' }}>${subtotalArts.toLocaleString('es-CL')}</strong>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Subtotal Artículos</span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>${subtotalArts.toLocaleString('es-CL')}</strong>
                         </div>
                         {desc > 0 && (
                           <div>
@@ -4819,18 +4818,18 @@ const SeguimientoOCModule = () => {
                           </div>
                         )}
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Total Neto</span>
-                          <strong style={{ fontSize: '1.05rem', color: '#f8fafc' }}>${detNeto.toLocaleString('es-CL')}</strong>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Total Neto</span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>${detNeto.toLocaleString('es-CL')}</strong>
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>IVA (19%)</span>
-                          <strong style={{ fontSize: '1.05rem', color: '#cbd5e1' }}>${(detIva - detNeto).toLocaleString('es-CL')}</strong>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>IVA (19%)</span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>${(detIva - detNeto).toLocaleString('es-CL')}</strong>
                         </div>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total con IVA</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', display: 'block' }}>Total con IVA</span>
                           <strong style={{ fontSize: '1.05rem', color: '#38bdf8' }}>${detIva.toLocaleString('es-CL')}</strong>
                         </div>
-                        <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '14px' }}>
+                        <div style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '14px' }}>
                           <span style={{ fontSize: '0.72rem', color: '#10b981', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Saldo Pendiente OC</span>
                           <strong style={{ fontSize: '1.1rem', color: '#10b981' }}>${detSaldo.toLocaleString('es-CL')}</strong>
                         </div>

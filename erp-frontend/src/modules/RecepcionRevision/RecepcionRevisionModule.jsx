@@ -29,10 +29,10 @@ const RecepcionRevisionModule = () => {
           >
             {/* Header del Módulo */}
             <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-              <h2 style={{ fontSize: '2.2rem', fontWeight: '800', color: '#f8fafc', margin: 0 }}>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
                 Recepción y Revisión
               </h2>
-              <p style={{ color: '#94a3b8', fontSize: '1rem', marginTop: '8px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '8px' }}>
                 Selecciona la sección o proceso de mercadería que deseas gestionar.
               </p>
             </div>
@@ -62,19 +62,18 @@ const RecepcionRevisionModule = () => {
                   alignItems: 'center',
                   textAlign: 'center',
                   gap: '20px',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  borderRadius: '16px',
-                  background: 'rgba(59, 130, 246, 0.03)'
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  borderRadius: '16px'
                 }}
               >
                 <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%' }}>
                   <ClipboardList size={48} color="#3b82f6" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: '#f8fafc' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
                     Recepción en bahía de descarga
                   </h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
                     Registro inicial de bultos, facturas, actas CENABAST y trazabilidad de lotes recibidos.
                   </p>
                 </div>
@@ -102,19 +101,18 @@ const RecepcionRevisionModule = () => {
                   alignItems: 'center',
                   textAlign: 'center',
                   gap: '20px',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  borderRadius: '16px',
-                  background: 'rgba(16, 185, 129, 0.03)'
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  borderRadius: '16px'
                 }}
               >
                 <div style={{ padding: '20px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '50%' }}>
                   <ClipboardCheck size={48} color="#10b981" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: '#f8fafc' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px', color: 'var(--text-primary)' }}>
                     Revisión en bodega
                   </h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>
                     Verificación detallada de productos, inspección cuantitativa/cualitativa e historial de revisión.
                   </p>
                 </div>

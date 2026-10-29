@@ -33,21 +33,35 @@ input[type="number"] {
 body.light-theme {
   --bg-main: #f8fafc;
   --bg-main-gradient: radial-gradient(circle at top right, #e2e8f0 0%, #f1f5f9 100%);
-  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-card: #ffffff;
   --accent-primary: #2563eb;
   --accent-secondary: #059669;
   --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --border-color: rgba(15, 23, 42, 0.08);
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.16);
   --glass-effect: blur(12px) saturate(120%);
-  --input-bg: rgba(255, 255, 255, 0.95);
+  --input-bg: #f8fafc;
   --btn-secondary-bg: rgba(15, 23, 42, 0.05);
 }
 
-/* Force high-contrast text colors for elements with inline dark-theme styles in Light Mode */
+/* Opciones de select en modo claro */
+body.light-theme select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.light-theme select,
+body.light-theme select.input-field {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Forzar alto contraste en textos para elementos con estilos inline en Modo Claro */
 body.light-theme [style*="color: #cbd5e1"],
 body.light-theme [style*="color: rgb(203, 213, 225)"],
-body.light-theme [style*="color: #cbd5e1"] {
+body.light-theme [style*="color: #e2e8f0"],
+body.light-theme [style*="color: rgb(226, 232, 240)"] {
   color: var(--text-primary) !important;
 }
 
@@ -58,22 +72,25 @@ body.light-theme [style*="color: rgb(100, 116, 139)"] {
   color: var(--text-secondary) !important;
 }
 
-body.light-theme [style*="color: #f8fafc"],
-body.light-theme [style*="color: rgb(248, 250, 252)"],
-body.light-theme [style*="color: #ffffff"],
-body.light-theme [style*="color: rgb(255, 255, 255)"],
-body.light-theme [style*="color: white"] {
-  color: var(--text-primary);
-}
-
-body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]) > [style*="color: #f8fafc"],
-body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]) > [style*="color: #ffffff"],
-body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]) > [style*="color: white"] {
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]):not([style*="color: #ef"]):not([style*="color: #f5"]):not([style*="color: #f9"]):not([style*="color: #c0"]):not([style*="color: #f4"]):not([style*="color: #eab"])[style*="color: #f8fafc"],
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]):not([style*="color: #ef"]):not([style*="color: #f5"]):not([style*="color: #f9"]):not([style*="color: #c0"]):not([style*="color: #f4"]):not([style*="color: #eab"])[style*="color: rgb(248, 250, 252)"],
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]):not([style*="color: #ef"]):not([style*="color: #f5"]):not([style*="color: #f9"]):not([style*="color: #c0"]):not([style*="color: #f4"]):not([style*="color: #eab"])[style*="color: #ffffff"],
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]):not([style*="color: #ef"]):not([style*="color: #f5"]):not([style*="color: #f9"]):not([style*="color: #c0"]):not([style*="color: #f4"]):not([style*="color: #eab"])[style*="color: rgb(255, 255, 255)"],
+body.light-theme :not(.btn-primary):not(.btn-primary *):not([style*="color: #3b"]):not([style*="color: #10"]):not([style*="color: #a8"]):not([style*="color: #ef"]):not([style*="color: #f5"]):not([style*="color: #f9"]):not([style*="color: #c0"]):not([style*="color: #f4"]):not([style*="color: #eab"])[style*="color: white"] {
   color: var(--text-primary) !important;
 }
 
-/* Override inline dark backgrounds on card containers/buttons to keep them light and clean */
+/* Forzar títulos en Modo Claro para que sean negros legibles */
+body.light-theme h1:not(.btn-primary *),
+body.light-theme h2:not(.btn-primary *),
+body.light-theme h3:not(.btn-primary *),
+body.light-theme h4:not(.btn-primary *) {
+  color: var(--text-primary) !important;
+}
+
+/* Fondos oscuros inline convertidos a tarjetas claras en Modo Claro */
 body.light-theme [style*="rgba(30, 41, 59"],
+body.light-theme [style*="rgba(30,41,59"],
 body.light-theme [style*="background: rgba(30, 41, 59"],
 body.light-theme [style*="background-color: rgba(30, 41, 59"],
 body.light-theme [style*="#1e293b"],
@@ -83,26 +100,36 @@ body.light-theme [style*="#0f172a"],
 body.light-theme [style*="background: #0f172a"],
 body.light-theme [style*="background-color: #0f172a"],
 body.light-theme [style*="rgb(30, 41, 59)"],
-body.light-theme [style*="rgb(15, 23, 42)"] {
+body.light-theme [style*="rgb(15, 23, 42)"],
+body.light-theme [style*="rgba(15, 23, 42"],
+body.light-theme [style*="rgba(15,23,42"] {
   background: var(--bg-card) !important;
   border-color: var(--border-color) !important;
   color: var(--text-primary) !important;
 }
 
 body.light-theme [style*="rgba(30, 41, 59"]:hover,
-body.light-theme [style*="background: rgba(30, 41, 59"]:hover {
-  background: rgba(15, 23, 42, 0.03) !important;
-  border-color: rgba(15, 23, 42, 0.15) !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05) !important;
+body.light-theme [style*="background: rgba(30, 41, 59"]:hover,
+body.light-theme [style*="rgba(15, 23, 42"]:hover {
+  background: rgba(15, 23, 42, 0.04) !important;
+  border-color: rgba(15, 23, 42, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.07) !important;
 }
 
-/* Force dark border-colors instead of faint transparent white borders in Light Mode */
+/* Bordes nítidos y definidos en Modo Claro */
 body.light-theme [style*="border-color: rgba(255, 255, 255"],
 body.light-theme [style*="border: 1px solid rgba(255, 255, 255"],
+body.light-theme [style*="border: 1px solid rgba(255,255,255"],
 body.light-theme [style*="border-bottom: 1px solid rgba(255, 255, 255"],
 body.light-theme [style*="border-right: 1px solid rgba(255, 255, 255"],
 body.light-theme [style*="border-bottom: 1px solid rgba(255,255,255"] {
   border-color: var(--border-color) !important;
+}
+
+body.light-theme .glass-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.14) !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04) !important;
 }
 
 * {

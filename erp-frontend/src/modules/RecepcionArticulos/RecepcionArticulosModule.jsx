@@ -450,22 +450,22 @@ const RecepcionArticulosModule = () => {
           style={{
             background: activeMode === 'cenabast'
               ? 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.05) 100%)'
-              : 'rgba(30,41,59,0.4)',
-            border: activeMode === 'cenabast' ? '2px solid #10b981' : '2px solid rgba(255,255,255,0.05)',
+              : 'var(--btn-secondary-bg)',
+            border: activeMode === 'cenabast' ? '2px solid #10b981' : '1px solid var(--border-color)',
             borderRadius: '16px', padding: '24px', textAlign: 'left', cursor: 'pointer',
-            color: '#ffffff', transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+            transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
             boxShadow: activeMode === 'cenabast' ? '0 10px 25px -5px rgba(16,185,129,0.15)' : 'none',
             display: 'flex', alignItems: 'start', gap: '18px'
           }}
-          onMouseOver={e => { if (activeMode !== 'cenabast') { e.currentTarget.style.border = '2px solid rgba(16,185,129,0.4)'; e.currentTarget.style.background = 'rgba(30,41,59,0.6)'; }}}
-          onMouseOut={e  => { if (activeMode !== 'cenabast') { e.currentTarget.style.border = '2px solid rgba(255,255,255,0.05)'; e.currentTarget.style.background = 'rgba(30,41,59,0.4)'; }}}
+          onMouseOver={e => { if (activeMode !== 'cenabast') { e.currentTarget.style.border = '1px solid rgba(16,185,129,0.4)'; e.currentTarget.style.background = 'rgba(16,185,129,0.04)'; }}}
+          onMouseOut={e  => { if (activeMode !== 'cenabast') { e.currentTarget.style.border = '1px solid var(--border-color)'; e.currentTarget.style.background = 'var(--btn-secondary-bg)'; }}}
         >
           <div style={{ padding: '12px', background: activeMode === 'cenabast' ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.03)', borderRadius: '12px', color: activeMode === 'cenabast' ? '#10b981' : '#94a3b8', transition: 'all 0.3s' }}>
             <Activity size={28} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 6px 0', color: activeMode === 'cenabast' ? '#10b981' : '#f8fafc' }}>Recepción de Cenabast</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 6px 0', color: activeMode === 'cenabast' ? '#10b981' : 'var(--text-primary)' }}>Recepción de Cenabast</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
               Registrar recepciones de despachos Cenabast.
             </p>
           </div>
@@ -528,13 +528,14 @@ const RecepcionArticulosModule = () => {
                       key={oc.id}
                       onClick={() => setSelectedOcForModal(oc)}
                       style={{
-                        background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.04)',
+                        background: 'var(--bg-card)', border: '1px solid var(--border-color)',
                         borderRadius: '12px', padding: '16px 20px',
                         display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between',
-                        alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.2s ease'
+                        alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)'
                       }}
-                      onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.25)'; }}
-                      onMouseOut={e  => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)'; }}
+                      onMouseOver={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.35)'; }}
+                      onMouseOut={e  => { e.currentTarget.style.borderColor = 'var(--border-color)'; }}
                     >
                       {/* 1. Columna Izquierda: N° OC, Proveedor, RUT y Estados */}
                       <div style={{ flex: '1 1 260px', minWidth: '220px' }}>
@@ -552,8 +553,8 @@ const RecepcionArticulosModule = () => {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: '600', color: '#cbd5e1', marginTop: '4px' }}>
-                          {oc.proveedor} <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '400' }}>(RUT: {oc.rut_proveedor || 'S/R'})</span>
+                        <div style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '4px' }}>
+                          {oc.proveedor} <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: '400' }}>(RUT: {oc.rut_proveedor || 'S/R'})</span>
                         </div>
                         <ResumenArts arts={articulosOc} />
                       </div>
@@ -563,15 +564,15 @@ const RecepcionArticulosModule = () => {
                         flex: '2 1 320px', 
                         minWidth: '240px', 
                         maxWidth: '620px',
-                        background: 'rgba(15, 23, 42, 0.4)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        background: 'var(--input-bg)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '8px',
                         padding: '10px 14px'
                       }}>
                         <div style={{ 
                           fontSize: '0.72rem', 
                           fontWeight: '700', 
-                          color: '#94a3b8', 
+                          color: 'var(--text-secondary)', 
                           textTransform: 'uppercase', 
                           letterSpacing: '0.5px',
                           marginBottom: '6px',
@@ -583,7 +584,7 @@ const RecepcionArticulosModule = () => {
                           Artículos contenidos ({articulosOc.length})
                         </div>
                         {articulosOc.length === 0 ? (
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                             Sin artículos registrados
                           </div>
                         ) : (
@@ -613,8 +614,8 @@ const RecepcionArticulosModule = () => {
                                     [{art.codigo_articulo}]
                                   </span>
                                   <span style={{ 
-                                    color: '#e2e8f0', 
-                                    fontWeight: '500', 
+                                    color: 'var(--text-primary)', 
+                                    fontWeight: '600', 
                                     overflow: 'hidden', 
                                     textOverflow: 'ellipsis', 
                                     whiteSpace: 'nowrap' 
