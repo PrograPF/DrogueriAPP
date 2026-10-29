@@ -14,6 +14,52 @@ import {
 import { useNavigate } from 'react-router-dom';
 import QFCalendarioTareas from './components/QFCalendarioTareas';
 
+class QFErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Error en Módulo QF:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div 
+          className="glass-card" 
+          style={{ 
+            padding: '36px', 
+            textAlign: 'center', 
+            borderRadius: '16px', 
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            background: 'rgba(239, 68, 68, 0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+        >
+          <h3 style={{ color: '#ef4444', margin: 0, fontSize: '1.2rem' }}>Ocurrió un error al cargar el submódulo</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+            {this.state.error?.message || 'Error inesperado de ejecución.'}
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="btn-primary" 
+            style={{ marginTop: '8px', padding: '8px 18px', fontSize: '0.85rem' }}
+          >
+            Recargar Página
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const QFModule = () => {
   const navigate = useNavigate();
   const [submoduloActivo, setSubmoduloActivo] = useState('CALENDARIO'); // 'CALENDARIO' | 'RESUMEN'
@@ -111,7 +157,9 @@ const QFModule = () => {
 
       {/* Renderizado de Submódulos */}
       {submoduloActivo === 'CALENDARIO' ? (
-        <QFCalendarioTareas />
+        <QFErrorBoundary>
+          <QFCalendarioTareas />
+        </QFErrorBoundary>
       ) : (
         /* VISTA DE RESUMEN TÉCNICO Y ENLACES */
         <div 

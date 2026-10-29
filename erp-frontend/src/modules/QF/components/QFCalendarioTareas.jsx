@@ -330,6 +330,127 @@ export default function QFCalendarioTareas() {
     }
   };
 
+  // Renderizador de cada tarjeta de tarea
+  const renderCardTarea = (tarea) => {
+    const cat = categoriaMap[tarea.categoria_codigo] || {
+      nombre: tarea.categoria_codigo || 'General',
+      color: '#3b82f6',
+      color_bg: 'rgba(59, 130, 246, 0.15)'
+    };
+
+    const esRealizada = tarea.estado === 'REALIZADA';
+    const esNoAplica = tarea.estado === 'NO_APLICA';
+
+    return (
+      <div
+        key={tarea.id}
+        onClick={() => abrirModalCompletar(tarea)}
+        style={{
+          padding: '12px',
+          borderRadius: '12px',
+          border: esRealizada 
+            ? '1px solid rgba(16, 185, 129, 0.4)' 
+            : esNoAplica 
+            ? '1px dashed var(--border-color)' 
+            : '1px solid var(--border-color)',
+          background: esRealizada 
+            ? 'rgba(16, 185, 129, 0.05)' 
+            : esNoAplica 
+            ? 'rgba(255, 255, 255, 0.02)' 
+            : 'var(--input-bg)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          position: 'relative'
+        }}
+      >
+        {/* Categoría Badge y Estado */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+          <span style={{
+            fontSize: '0.7rem',
+            fontWeight: '800',
+            padding: '2px 8px',
+            borderRadius: '6px',
+            background: cat.color_bg,
+            color: cat.color,
+            border: `1px solid ${cat.color}40`,
+            letterSpacing: '0.04em'
+          }}>
+            {tarea.categoria_codigo || 'QF'}
+          </span>
+
+          <span style={{
+            fontSize: '0.72rem',
+            fontWeight: '700',
+            padding: '2px 6px',
+            borderRadius: '6px',
+            background: esRealizada ? 'rgba(16, 185, 129, 0.2)' : esNoAplica ? 'rgba(255, 255, 255, 0.05)' : 'rgba(245, 158, 11, 0.15)',
+            color: esRealizada ? '#10b981' : esNoAplica ? 'var(--text-secondary)' : '#f59e0b',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            {esRealizada ? <Check size={12} /> : null}
+            {tarea.estado}
+          </span>
+        </div>
+
+        {/* Título de la Tarea */}
+        <div style={{
+          fontSize: '0.85rem',
+          fontWeight: '600',
+          lineHeight: '1.35',
+          color: esNoAplica ? 'var(--text-secondary)' : 'var(--text-primary)',
+          textDecoration: esNoAplica ? 'line-through' : 'none'
+        }}>
+          {tarea.titulo}
+        </div>
+
+        {/* Información de cumplimiento (QF y Fecha) */}
+        {esRealizada && tarea.realizado_por && (
+          <div style={{
+            fontSize: '0.72rem',
+            color: '#10b981',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginTop: '2px'
+          }}>
+            <CheckCircle2 size={12} />
+            <span>{tarea.realizado_por}</span>
+            {tarea.fecha_realizacion && (
+              <span style={{ opacity: 0.8 }}>
+                · {new Date(tarea.fecha_realizacion).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Indicador de Comentarios */}
+        {tarea.comentario && (
+          <div style={{
+            fontSize: '0.75rem',
+            color: '#3b82f6',
+            background: 'rgba(59, 130, 246, 0.08)',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '6px',
+            marginTop: '2px'
+          }}>
+            <MessageSquare size={12} style={{ marginTop: '2px', flexShrink: 0 }} />
+            <span style={{ fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {tarea.comentario}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
       {/* 1. BARRA SUPERIOR: SELECTOR DE MES, PROGRESO GLOBAL Y BOTONES DE GESTIÓN */}
@@ -830,127 +951,6 @@ export default function QFCalendarioTareas() {
           </div>
         </div>
       )}
-
-      {/* RENDERIZADOR DE CADA TARJETA DE TAREA */}
-      {function renderCardTarea(tarea) {
-        const cat = categoriaMap[tarea.categoria_codigo] || {
-          nombre: tarea.categoria_codigo || 'General',
-          color: '#3b82f6',
-          color_bg: 'rgba(59, 130, 246, 0.15)'
-        };
-
-        const esRealizada = tarea.estado === 'REALIZADA';
-        const esNoAplica = tarea.estado === 'NO_APLICA';
-
-        return (
-          <div
-            key={tarea.id}
-            onClick={() => abrirModalCompletar(tarea)}
-            style={{
-              padding: '12px',
-              borderRadius: '12px',
-              border: esRealizada 
-                ? '1px solid rgba(16, 185, 129, 0.4)' 
-                : esNoAplica 
-                ? '1px dashed var(--border-color)' 
-                : '1px solid var(--border-color)',
-              background: esRealizada 
-                ? 'rgba(16, 185, 129, 0.05)' 
-                : esNoAplica 
-                ? 'rgba(255, 255, 255, 0.02)' 
-                : 'var(--input-bg)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              position: 'relative'
-            }}
-          >
-            {/* Categoría Badge y Estado */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-              <span style={{
-                fontSize: '0.7rem',
-                fontWeight: '800',
-                padding: '2px 8px',
-                borderRadius: '6px',
-                background: cat.color_bg,
-                color: cat.color,
-                border: `1px solid ${cat.color}40`,
-                letterSpacing: '0.04em'
-              }}>
-                {tarea.categoria_codigo || 'QF'}
-              </span>
-
-              <span style={{
-                fontSize: '0.72rem',
-                fontWeight: '700',
-                padding: '2px 6px',
-                borderRadius: '6px',
-                background: esRealizada ? 'rgba(16, 185, 129, 0.2)' : esNoAplica ? 'rgba(255, 255, 255, 0.05)' : 'rgba(245, 158, 11, 0.15)',
-                color: esRealizada ? '#10b981' : esNoAplica ? 'var(--text-secondary)' : '#f59e0b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                {esRealizada ? <Check size={12} /> : null}
-                {tarea.estado}
-              </span>
-            </div>
-
-            {/* Título de la Tarea */}
-            <div style={{
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              lineHeight: '1.35',
-              color: esNoAplica ? 'var(--text-secondary)' : 'var(--text-primary)',
-              textDecoration: esNoAplica ? 'line-through' : 'none'
-            }}>
-              {tarea.titulo}
-            </div>
-
-            {/* Información de cumplimiento (QF y Fecha) */}
-            {esRealizada && tarea.realizado_por && (
-              <div style={{
-                fontSize: '0.72rem',
-                color: '#10b981',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '2px'
-              }}>
-                <CheckCircle2 size={12} />
-                <span>{tarea.realizado_por}</span>
-                {tarea.fecha_realizacion && (
-                  <span style={{ opacity: 0.8 }}>
-                    · {new Date(tarea.fecha_realizacion).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Indicador de Comentarios */}
-            {tarea.comentario && (
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#3b82f6',
-                background: 'rgba(59, 130, 246, 0.08)',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '6px',
-                marginTop: '2px'
-              }}>
-                <MessageSquare size={12} style={{ marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {tarea.comentario}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      }}
 
       {/* 4. MODAL: COMPLETAR / MODIFICAR ESTADO Y COMENTARIOS DE TAREA */}
       <AnimatePresence>
