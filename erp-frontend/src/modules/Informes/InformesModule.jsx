@@ -8,19 +8,25 @@ import { formatDate } from '../../utils/dateFormatter';
 
 import { fetchArticulosCatalogMap, resolveArticuloNombre } from '../../utils/catalogHelper';
 
-const PAGE_SIZE = 50;
 
 const InformesModule = ({ onBack }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterCodigo, setFilterCodigo] = useState('');
+  const [filterCodigoInput, setFilterCodigoInput] = useState('');
+  const [filterCodigoDebounced, setFilterCodigoDebounced] = useState('');
   const [filterEstado, setFilterEstado] = useState('vigente');
   const [filterCentro, setFilterCentro] = useState('');
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const { centros } = useCentros();
   const [articulosCatalog, setArticulosCatalog] = useState({});
   const [catalogLoaded, setCatalogLoaded] = useState(false);
+
+  // Debounce de 350ms entre que el usuario escribe y se ejecuta el filtro
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilterCodigoDebounced(filterCodigoInput.trim());
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [filterCodigoInput]);
 
   // Cargar catálogo de fármacos y DM para traducción en caliente
   useEffect(() => {
@@ -33,23 +39,17 @@ const InformesModule = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
-    setData([]);
-    setPage(0);
-    setHasMore(true);
-    fetchData(0, true);
+    fetchData();
   }, [filterEstado]);
 
-  const fetchData = async (pageNum = 0, reset = false) => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const from = pageNum * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
       let query = supabase
         .from('pendientes')
         .select('*, centros(nombre)')
         .order('fecha', { ascending: false })
-        .range(from, to);
+        .range(0, 4999);
 
       if (filterEstado === 'vigente') {
         query = query.eq('es_vigente', true);
@@ -60,27 +60,20 @@ const InformesModule = ({ onBack }) => {
       
       const mappedData = pendientes.map(item => ({
         id: item.id,
-        cod: item.codigo_articulo || 'S/C',
+        cod: String(item.codigo_articulo || 'S/C').trim(),
         centro: item.centros?.nombre || 'S/C',
         cantidad: item.pendiente,
         fecha: item.fecha,
         esVigente: item.es_vigente,
-        esResuelto: item.es_resuelto // Nuevo campo
+        esResuelto: item.es_resuelto
       }));
 
-      setData(prev => reset ? mappedData : [...prev, ...mappedData]);
-      setHasMore(pendientes.length === PAGE_SIZE);
+      setData(mappedData);
     } catch (err) {
       console.error('Error cargando datos:', err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchData(nextPage);
   };
 
   const handleToggleResuelto = async (id, currentState) => {
@@ -91,7 +84,6 @@ const InformesModule = ({ onBack }) => {
         .eq('id', id);
       
       if (error) {
-        // Si el error es que la columna no existe, avisar al usuario
         if (error.code === '42703') {
           alert('Error: La columna "es_resuelto" no existe en la base de datos Supabase. Por favor, añádela como booleano (default false).');
         } else {
@@ -128,10 +120,24 @@ const InformesModule = ({ onBack }) => {
       ...item,
       nombre: resolveArticuloNombre(articulosCatalog, item.cod, item.nombre, catalogLoaded)
     })).filter(item => {
-      if (filterCodigo) {
-        const term = filterCodigo.toLowerCase();
-        if (!item.cod.toLowerCase().includes(term) && !item.nombre.toLowerCase().includes(term)) {
-          return false;
+      if (filterCodigoDebounced) {
+        const term = filterCodigoDebounced.toLowerCase().trim();
+        const isNumericCode = /^\d+$/.test(term);
+
+        if (isNumericCode) {
+          // Búsqueda por código numérico: coincidencia exacta (soporta ceros a la izquierda)
+          const cleanTerm = term.replace(/^0+/, '');
+          const cleanItemCod = String(item.cod).trim().replace(/^0+/, '');
+          if (cleanItemCod !== cleanTerm) {
+            return false;
+          }
+        } else {
+          // Búsqueda por texto (nombre / descripción del producto)
+          const cleanItemCod = String(item.cod).trim().toLowerCase();
+          const itemNombre = (item.nombre || '').toLowerCase();
+          if (!cleanItemCod.includes(term) && !itemNombre.includes(term)) {
+            return false;
+          }
         }
       }
 
@@ -153,22 +159,24 @@ const InformesModule = ({ onBack }) => {
 
       return true;
     });
-  }, [data, articulosCatalog, filterCodigo, filterCentro, filterEstado]);
+  }, [data, articulosCatalog, filterCodigoDebounced, filterCentro, filterEstado, catalogLoaded]);
 
   const totalGlobal = useMemo(() => {
     return filteredData.filter(i => i.esVigente && !i.esResuelto).reduce((sum, item) => sum + item.cantidad, 0);
   }, [filteredData]);
 
   const totalPendienteProducto = useMemo(() => {
-    if (!filterCodigo) return null;
+    if (!filterCodigoDebounced) return null;
     const activeData = filteredData.filter(i => i.esVigente && !i.esResuelto);
-    const uniqueCodes = [...new Set(activeData.map(item => item.cod))];
+    if (activeData.length === 0) return null;
+
+    const uniqueCodes = [...new Set(activeData.map(item => String(item.cod).replace(/^0+/, '')))];
     if (uniqueCodes.length === 1) {
       const total = activeData.reduce((sum, item) => sum + item.cantidad, 0);
       return { nombre: activeData[0]?.nombre || 'Producto', total };
     }
     return null;
-  }, [filteredData, filterCodigo]);
+  }, [filteredData, filterCodigoDebounced]);
 
   return (
     <motion.div 
@@ -246,14 +254,37 @@ const InformesModule = ({ onBack }) => {
             <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Search size={16} /> Buscar por Código / Nombre
             </label>
-            <input 
-              type="text"
-              placeholder="Ej: 1227 o Paracetamol..."
-              value={filterCodigo}
-              onChange={(e) => setFilterCodigo(e.target.value)}
-              className="input-field"
-              style={{ fontSize: '0.95rem' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="text"
+                placeholder="Código o nombre..."
+                value={filterCodigoInput}
+                onChange={(e) => setFilterCodigoInput(e.target.value)}
+                className="input-field"
+                style={{ fontSize: '0.95rem', width: '100%', paddingRight: filterCodigoInput ? '35px' : '12px' }}
+              />
+              {filterCodigoInput && (
+                <button
+                  type="button"
+                  onClick={() => setFilterCodigoInput('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    padding: '2px 6px'
+                  }}
+                  title="Limpiar búsqueda"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Filtro por Estado */}
@@ -374,14 +405,12 @@ const InformesModule = ({ onBack }) => {
         </table>
       </div>
 
-      {hasMore && !loading && (
-        <div className="no-print" style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button onClick={loadMore} className="btn-secondary" style={{ padding: '10px 30px' }}>
-            Cargar más registros...
-          </button>
-        </div>
+      {!loading && filteredData.length === 0 && (
+        <p style={{ textAlign: 'center', color: '#64748b', marginTop: '30px', fontSize: '0.95rem' }}>
+          No se encontraron artículos pendientes con los filtros aplicados.
+        </p>
       )}
-      {loading && <p style={{ textAlign: 'center', color: '#64748b', marginTop: '20px' }}>Cargando...</p>}
+      {loading && <p style={{ textAlign: 'center', color: '#64748b', marginTop: '20px' }}>Cargando datos...</p>}
 
       <style>{`
         @media print {
