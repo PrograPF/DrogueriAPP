@@ -73,7 +73,8 @@ export const qfService = {
         const tareasDia = plantillas.filter(p => 
           !p.es_periodica && 
           p.semana === semanaMes && 
-          (p.dia_semana === diaSemanaJs || p.dia_semana === null)
+          p.dia_semana === diaSemanaJs &&
+          (p.bloque === 'AM' || p.bloque === 'PM')
         );
 
         for (const t of tareasDia) {

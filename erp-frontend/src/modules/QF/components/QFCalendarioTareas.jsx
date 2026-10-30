@@ -195,11 +195,6 @@ export default function QFCalendarioTareas() {
     return tareasMes.filter(t => !t.es_periodica && t.semana_mes === semanaActiva);
   }, [tareasMes, semanaActiva]);
 
-  // Tareas diarias de la semana activa ("Todos los días")
-  const tareasDiarias = useMemo(() => {
-    if (semanaActiva === 'PERIODICAS') return [];
-    return tareasDeLaSemana.filter(t => t.bloque === 'DIARIO');
-  }, [tareasDeLaSemana, semanaActiva]);
 
   // Abrir modal para marcar/editar tarea
   const abrirModalCompletar = (tarea) => {
@@ -553,7 +548,7 @@ export default function QFCalendarioTareas() {
                   setQfNombre(e.target.value);
                   localStorage.setItem('qf_usuario_activo', e.target.value);
                 }}
-                placeholder="Nombre del QF"
+
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -796,75 +791,6 @@ export default function QFCalendarioTareas() {
       ) : (
         /* VISTA SEMANAL (LUNES A VIERNES + TAREAS DIARIAS) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Fila / Tarjeta "Todos los días (Diario)" de la semana activa */}
-          {tareasDiarias.length > 0 && (
-            <div 
-              style={{
-                padding: '16px 20px',
-                borderRadius: '14px',
-                background: 'rgba(2, 132, 199, 0.08)',
-                border: '1px solid rgba(2, 132, 199, 0.25)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0284c7', fontWeight: '700', fontSize: '0.85rem' }}>
-                <Clock size={16} /> Tareas Diarias Continuas (Todos los días de esta semana):
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {tareasDiarias.map(td => (
-                  <div 
-                    key={td.id}
-                    onClick={() => abrirModalCompletar(td)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 14px',
-                      background: 'var(--bg-card)',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border-color)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: td.estado === 'REALIZADA' ? '#10b981' : 'transparent',
-                        border: td.estado === 'REALIZADA' ? 'none' : '2px solid var(--border-color)',
-                        color: '#ffffff'
-                      }}>
-                        {td.estado === 'REALIZADA' && <Check size={16} />}
-                      </div>
-                      <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                        {td.titulo}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {td.comentario && <MessageSquare size={16} color="#3b82f6" title={td.comentario} />}
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: '700',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        background: td.estado === 'REALIZADA' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-                        color: td.estado === 'REALIZADA' ? '#10b981' : 'var(--text-secondary)'
-                      }}>
-                        {td.estado}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Grilla de 5 Columnas (Lunes a Viernes) */}
           <div style={{
@@ -1087,7 +1013,7 @@ export default function QFCalendarioTareas() {
                     type="text"
                     value={formQf}
                     onChange={(e) => setFormQf(e.target.value)}
-                    placeholder="Ej: QF Juan Pérez"
+
                     className="input-field"
                     style={{
                       padding: '12px 14px',
@@ -1110,7 +1036,7 @@ export default function QFCalendarioTareas() {
                   rows={3}
                   value={formComentario}
                   onChange={(e) => setFormComentario(e.target.value)}
-                  placeholder="Ej: Se completó verificación de stock y Data Logger sin alertas de temperatura..."
+
                   style={{
                     padding: '12px 14px',
                     borderRadius: '10px',
@@ -1282,7 +1208,6 @@ export default function QFCalendarioTareas() {
                     >
                       <option value="AM">Mañana (AM)</option>
                       <option value="PM">Tarde (PM)</option>
-                      <option value="DIARIO">Continuo / Diario</option>
                       <option value="PERIODICA">Periódica del Mes</option>
                     </select>
                   </div>
@@ -1309,7 +1234,7 @@ export default function QFCalendarioTareas() {
                     required
                     value={formPlantilla.titulo}
                     onChange={(e) => setFormPlantilla({ ...formPlantilla, titulo: e.target.value })}
-                    placeholder="Ej: Bajar info Data Logger / Revisión QFs: T° y H%..."
+
                     className="input-field"
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', marginTop: '4px' }}
                   />
@@ -1563,7 +1488,7 @@ export default function QFCalendarioTareas() {
                     required
                     value={formNuevaMes.titulo}
                     onChange={(e) => setFormNuevaMes({ ...formNuevaMes, titulo: e.target.value })}
-                    placeholder="Descripción de la tarea adicional..."
+
                     className="input-field"
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', marginTop: '4px' }}
                   />
