@@ -209,7 +209,6 @@ export const exportarOcsExcel = async ({ tab, ocs = [], catalog = {}, getPlazos,
   wb.created = now;
 
   const ws = wb.addWorksheet(cfg.sheetName, {
-    properties: { outlineProperties: { summaryBelow: false, summaryRight: false } },
     views: [{ state: 'frozen', xSplit: 1, ySplit: 4, showGridLines: false }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   });
@@ -227,7 +226,7 @@ export const exportarOcsExcel = async ({ tab, ocs = [], catalog = {}, getPlazos,
   const totalArticulos = ocs.reduce((s, o) => s + (o.ordenes_compra_articulos || []).length, 0);
   ws.mergeCells(2, 1, 2, lastCol);
   const st = ws.getCell(2, 1);
-  st.value = `Exportado el ${stampForHuman(now)}  ·  ${ocs.length} órdenes de compra  ·  ${totalArticulos} artículos  ·  Use los botones [+]/[-] de la izquierda para desplegar el desglose de artículos`;
+  st.value = `Exportado el ${stampForHuman(now)}  ·  ${ocs.length} órdenes de compra  ·  ${totalArticulos} artículos  ·  Los artículos de cada OC se muestran como sub-filas a continuación`;
   styleCell(st, { color: C.muted, italic: true, size: 10 });
   st.border = {};
   ws.getRow(2).height = 20;
@@ -277,11 +276,10 @@ export const exportarOcsExcel = async ({ tab, ocs = [], catalog = {}, getPlazos,
     const arts = oc.ordenes_compra_articulos || [];
     if (arts.length > 0) {
       const subRow = ws.getRow(r);
-      subRow.outlineLevel = 1;
       subRow.height = 20;
       ART_HEADERS.forEach(h => {
         const cell = subRow.getCell(h.col);
-        cell.value = h.header;
+        cell.value = h.col === 1 ? `  ▸  ${h.header}` : h.header;
         styleCell(cell, { fill: C.subHeader, color: C.white, bold: true, size: 9, align: h.align, wrap: true });
         if (h.mergeTo) {
           for (let c = h.col + 1; c <= h.mergeTo; c++) styleCell(subRow.getCell(c), { fill: C.subHeader });
@@ -301,7 +299,6 @@ export const exportarOcsExcel = async ({ tab, ocs = [], catalog = {}, getPlazos,
         const fill = idx % 2 === 0 ? C.artRow : C.artRowAlt;
 
         const row = ws.getRow(r);
-        row.outlineLevel = 1;
         row.height = 20;
 
         const put = (col, value, opts = {}) => {
@@ -309,7 +306,7 @@ export const exportarOcsExcel = async ({ tab, ocs = [], catalog = {}, getPlazos,
           cell.value = value;
           styleCell(cell, { fill, size: 10, ...opts });
         };
-        put(1, a.codigo_articulo || '', { color: C.blue, bold: true });
+        put(1, a.codigo_articulo ? `  ${a.codigo_articulo}` : '', { color: C.blue, bold: true });
         put(2, catalog[a.codigo_articulo] || a.descripcion || '', { wrap: true });
         styleCell(row.getCell(3), { fill });
         styleCell(row.getCell(4), { fill });

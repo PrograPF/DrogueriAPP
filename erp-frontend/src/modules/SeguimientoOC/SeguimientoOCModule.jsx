@@ -2285,6 +2285,7 @@ const SeguimientoOCModule = () => {
       ];
     }
 
+    console.log(`[Export Excel] tab=${tab} | lista.length=${lista?.length} | filtros=`, filtros);
     setExportingExcel(tab);
     try {
       await exportarOcsExcel({
