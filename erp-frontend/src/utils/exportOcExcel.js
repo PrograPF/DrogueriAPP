@@ -2,8 +2,10 @@
 // Exportación a Excel del módulo Gestión OC (todas las pestañas)
 //
 // Genera un archivo .xlsx con EXACTAMENTE las órdenes que la pestaña muestra en
-// pantalla (según búsqueda / filtros activos). Cada OC ocupa una fila principal y
-// sus artículos quedan agrupados (desplegables +/-) justo debajo.
+// pantalla (según búsqueda / filtros activos).
+//   Hoja 1: Vista agrupada — cada OC con sus artículos como sub-filas.
+//   Hoja 2: Detalle Artículos — tabla plana (una fila por artículo, datos OC repetidos).
+//   Hoja 3: Filtros aplicados — metadata de la exportación.
 //
 // Las fórmulas de montos replican las de la pestaña "Valorizados" para que el
 // Excel nunca difiera de lo que se ve en pantalla.
@@ -347,7 +349,86 @@ export const exportarOcsExcel = async ({ tab, ocs = [], catalog = {}, getPlazos,
     cell.alignment = { vertical: 'middle', horizontal: 'center' };
   }
 
-  // --- Hoja 2: filtros aplicados ---
+  // --- Hoja 2: Detalle Artículos (tabla plana — una fila por artículo) ---
+  const PLANA_COLS = [
+    { header: 'N° OC',                 width: 16,  get: (oc, _a) => oc.numero_oc || '',                                   fmt: null,    align: 'left',   color: C.blue,   bold: true  },
+    { header: 'Tipo OC',               width: 10,  get: (oc, _a) => oc.tipo_oc || '',                                     fmt: null,    align: 'center', color: null,     bold: false },
+    { header: 'Estado',                width: 26,  get: (oc, _a) => oc.estado || '',                                      fmt: null,    align: 'left',   color: null,     bold: false },
+    { header: 'Proveedor',             width: 38,  get: (oc, _a) => oc.proveedor || '',                                   fmt: null,    align: 'left',   color: null,     bold: true  },
+    { header: 'RUT',                   width: 16,  get: (oc, _a) => oc.rut_proveedor || 'No registrado',                  fmt: null,    align: 'left',   color: null,     bold: false },
+    { header: 'Código',                width: 16,  get: (_o, a)  => a ? (a.codigo_articulo || '') : '',                   fmt: null,    align: 'left',   color: C.blue,   bold: true  },
+    { header: 'Descripción',           width: 42,  get: (_o, a)  => a ? (catalog[a.codigo_articulo] || a.descripcion || '') : '', fmt: null, align: 'left', color: null, bold: false },
+    { header: 'Cantidad solicitada',   width: 18,  get: (_o, a)  => a ? num(a.cantidad) : '',                             fmt: FMT_UN,  align: 'right',  color: null,     bold: false },
+    { header: 'Cantidad recepcionada', width: 20,  get: (_o, a)  => a ? num(a.cantidad_recepcionada) : '',                fmt: FMT_UN,  align: 'right',  color: C.green,  bold: false },
+    { header: 'Cant. faltante',        width: 15,  get: (_o, a)  => a ? Math.max(0, num(a.cantidad) - num(a.cantidad_recepcionada)) : '', fmt: FMT_UN, align: 'right', color: C.orange, bold: false },
+    { header: 'Precio unit.',          width: 16,  get: (_o, a)  => a ? num(a.precio_unitario) : '',                      fmt: FMT_CLP, align: 'right',  color: null,     bold: false },
+    { header: 'Saldo faltante neto',   width: 20,  get: (_o, a)  => { if (!a) return ''; const f = Math.max(0, num(a.cantidad) - num(a.cantidad_recepcionada)); return f * num(a.precio_unitario); }, fmt: FMT_CLP, align: 'right', color: C.orange, bold: true },
+    { header: 'Saldo c/IVA',          width: 18,  get: (_o, a)  => { if (!a) return ''; const f = Math.max(0, num(a.cantidad) - num(a.cantidad_recepcionada)); return Math.round(f * num(a.precio_unitario) * IVA); }, fmt: FMT_CLP, align: 'right', color: C.purple, bold: true },
+  ];
+
+  const wp = wb.addWorksheet('Detalle Artículos', {
+    views: [{ state: 'frozen', ySplit: 2, showGridLines: false }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  });
+  wp.columns = PLANA_COLS.map(c => ({ width: c.width }));
+
+  // Fila 1 — título
+  wp.mergeCells(1, 1, 1, PLANA_COLS.length);
+  const pt = wp.getCell(1, 1);
+  pt.value = `${cfg.title} · Detalle por artículo`;
+  styleCell(pt, { fill: C.title, color: C.white, bold: true, size: 14 });
+  pt.border = {};
+  wp.getRow(1).height = 28;
+
+  // Fila 2 — encabezados
+  const pHead = wp.getRow(2);
+  pHead.height = 28;
+  PLANA_COLS.forEach((col, i) => {
+    const cell = pHead.getCell(i + 1);
+    cell.value = col.header;
+    styleCell(cell, { fill: C.header, color: C.white, bold: true, size: 10, align: col.fmt ? 'right' : col.align, wrap: true });
+  });
+
+  // Filas de datos — una fila por artículo
+  let pr = 3;
+  ocs.forEach(oc => {
+    const arts = oc.ordenes_compra_articulos || [];
+    const filasDatos = arts.length > 0 ? arts : [null]; // si no hay artículos, igual emite una fila
+    filasDatos.forEach((art, idx) => {
+      const fill = idx % 2 === 0 ? C.artRow : C.artRowAlt;
+      const pRow = wp.getRow(pr);
+      pRow.height = 20;
+      PLANA_COLS.forEach((col, i) => {
+        const value = col.get(oc, art);
+        const cell = pRow.getCell(i + 1);
+        cell.value = value === '' ? '' : value;
+        styleCell(cell, {
+          fill,
+          color: col.color || C.text,
+          bold: col.bold,
+          align: col.fmt ? 'right' : col.align,
+          fmt: col.fmt || undefined,
+          size: 10
+        });
+      });
+      pr += 1;
+    });
+  });
+
+  // Fila de totales plana
+  const pTotRow = wp.getRow(pr);
+  pTotRow.height = 24;
+  PLANA_COLS.forEach((col, i) => {
+    const cell = pTotRow.getCell(i + 1);
+    if (i === 0) {
+      cell.value = `TOTAL (${ocs.length} OC · ${totalArticulos} artículos)`;
+    } else {
+      cell.value = '';
+    }
+    styleCell(cell, { fill: C.totalRow, color: C.white, bold: true, size: 10, align: 'left' });
+  });
+
+  // --- Hoja 3: filtros aplicados ---
   const wf = wb.addWorksheet('Filtros aplicados', { views: [{ showGridLines: false }] });
   wf.columns = [{ width: 34 }, { width: 70 }];
   wf.mergeCells(1, 1, 1, 2);
