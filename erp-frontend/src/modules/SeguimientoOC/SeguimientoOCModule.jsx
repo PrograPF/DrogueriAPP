@@ -3,7 +3,7 @@ import {
   Truck, Plus, Search, Trash2, Calendar, FileText, ArrowLeft, ArrowRight,
   RefreshCw, CheckCircle, Clock, AlertTriangle, XCircle, ShoppingBag, 
   Activity, ClipboardList, X, Filter, ChevronDown, ChevronUp, Mail, Send, ExternalLink, Copy, Check,
-  Edit, Edit2, Edit3, Bell, AlertCircle, BarChart3, DollarSign, PackageOpen, Layers, ArrowUpDown, FileSpreadsheet
+  Edit, Edit2, Edit3, Bell, AlertCircle, BarChart3, DollarSign, PackageOpen, Layers, ArrowUpDown, FileSpreadsheet, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -208,6 +208,9 @@ const SeguimientoOCModule = () => {
     fecha_tope_entrega: '',
     fecha_tope_multa: '',
     fecha_insistencia: '',
+    plazo_aceptacion_dias: '',
+    plazo_entrega_dias: '',
+    tipo_plazo_entrega: '',
     estado: 'Enviada', // 'Enviada', 'Aceptada', 'Recepción Conforme', 'Recepción Con Multa', 'Cancelado', 'Excepciones'
     fecha_envio_display: getTodayDisplayString(),
     fecha_aceptacion_display: '',
@@ -257,6 +260,9 @@ const SeguimientoOCModule = () => {
     fecha_tope_entrega: '',
     fecha_tope_multa: '',
     fecha_insistencia: '',
+    plazo_aceptacion_dias: '',
+    plazo_entrega_dias: '',
+    tipo_plazo_entrega: '',
     descuento: '',
     cargo: ''
   });
@@ -342,7 +348,10 @@ const SeguimientoOCModule = () => {
       fecha_tope_aceptacion: (s.fecha_tope_aceptacion || '').slice(0, 10),
       fecha_tope_entrega: (s.fecha_tope_entrega || '').slice(0, 10),
       fecha_tope_multa: (s.fecha_tope_multa || '').slice(0, 10),
-      fecha_insistencia: (s.fecha_insistencia || '').slice(0, 10)
+      fecha_insistencia: (s.fecha_insistencia || '').slice(0, 10),
+      plazo_aceptacion_dias: s.plazo_aceptacion_dias != null && s.plazo_aceptacion_dias !== undefined ? String(s.plazo_aceptacion_dias) : '',
+      plazo_entrega_dias: s.plazo_entrega_dias != null && s.plazo_entrega_dias !== undefined ? String(s.plazo_entrega_dias) : '',
+      tipo_plazo_entrega: s.tipo_plazo_entrega || ''
     }));
     setShowSolicitudSuggestions(false);
 
@@ -683,6 +692,9 @@ const SeguimientoOCModule = () => {
       fecha_tope_entrega: '',
       fecha_tope_multa: '',
       fecha_insistencia: '',
+      plazo_aceptacion_dias: '',
+      plazo_entrega_dias: '',
+      tipo_plazo_entrega: '',
       estado: 'Enviada',
       fecha_envio_display: getTodayDisplayString(),
       fecha_aceptacion_display: '',
@@ -1045,6 +1057,9 @@ const SeguimientoOCModule = () => {
       fecha_tope_entrega: toDateInputString(oc.fecha_tope_entrega),
       fecha_tope_multa: toDateInputString(oc.fecha_tope_multa),
       fecha_insistencia: toDateInputString(oc.fecha_insistencia),
+      plazo_aceptacion_dias: oc.plazo_aceptacion_dias !== null && oc.plazo_aceptacion_dias !== undefined ? String(oc.plazo_aceptacion_dias) : '',
+      plazo_entrega_dias: oc.plazo_entrega_dias !== null && oc.plazo_entrega_dias !== undefined ? String(oc.plazo_entrega_dias) : '',
+      tipo_plazo_entrega: oc.tipo_plazo_entrega || '',
       descuento: oc.descuento !== undefined && oc.descuento !== null ? oc.descuento : '',
       cargo: oc.cargo !== undefined && oc.cargo !== null ? oc.cargo : ''
     });
@@ -1240,6 +1255,25 @@ const SeguimientoOCModule = () => {
       const totalConIva = Math.round(totalNeto * 1.19);
       const saldoOc = Math.max(0, totalNeto - totalRecepcionadoValor);
 
+      let parsedEditPlazoAceptacion = null;
+      if (editFormData.plazo_aceptacion_dias !== '' && editFormData.plazo_aceptacion_dias !== null && editFormData.plazo_aceptacion_dias !== undefined) {
+        const val = parseInt(editFormData.plazo_aceptacion_dias, 10);
+        if (!isNaN(val) && val >= 0) parsedEditPlazoAceptacion = val;
+      }
+
+      let parsedEditPlazoEntrega = null;
+      if (editFormData.plazo_entrega_dias !== '' && editFormData.plazo_entrega_dias !== null && editFormData.plazo_entrega_dias !== undefined) {
+        const val = parseInt(editFormData.plazo_entrega_dias, 10);
+        if (!isNaN(val) && val >= 0) parsedEditPlazoEntrega = val;
+      }
+
+      let normalizedEditTipoPlazo = null;
+      if (editFormData.tipo_plazo_entrega) {
+        if (/h[aá]biles/i.test(editFormData.tipo_plazo_entrega)) normalizedEditTipoPlazo = 'Hábiles';
+        else if (/corridos/i.test(editFormData.tipo_plazo_entrega)) normalizedEditTipoPlazo = 'Corridos';
+        else normalizedEditTipoPlazo = editFormData.tipo_plazo_entrega.trim();
+      }
+
       // 2. Update ordenes_compra
       const updates = {
         numero_oc: nuevoNumeroOc,
@@ -1256,6 +1290,9 @@ const SeguimientoOCModule = () => {
         total_neto: totalNeto,
         total_con_iva: totalConIva,
         saldo_oc: saldoOc,
+        plazo_aceptacion_dias: parsedEditPlazoAceptacion,
+        plazo_entrega_dias: parsedEditPlazoEntrega,
+        tipo_plazo_entrega: normalizedEditTipoPlazo,
         ...fechasTope
       };
 
@@ -1491,6 +1528,25 @@ const SeguimientoOCModule = () => {
       const totalConIva = Math.round(totalNeto * 1.19);
       const saldoOc = totalNeto;
 
+      let parsedPlazoAceptacion = null;
+      if (formData.plazo_aceptacion_dias !== '' && formData.plazo_aceptacion_dias !== null && formData.plazo_aceptacion_dias !== undefined) {
+        const val = parseInt(formData.plazo_aceptacion_dias, 10);
+        if (!isNaN(val) && val >= 0) parsedPlazoAceptacion = val;
+      }
+
+      let parsedPlazoEntrega = null;
+      if (formData.plazo_entrega_dias !== '' && formData.plazo_entrega_dias !== null && formData.plazo_entrega_dias !== undefined) {
+        const val = parseInt(formData.plazo_entrega_dias, 10);
+        if (!isNaN(val) && val >= 0) parsedPlazoEntrega = val;
+      }
+
+      let normalizedTipoPlazo = null;
+      if (formData.tipo_plazo_entrega) {
+        if (/h[aá]biles/i.test(formData.tipo_plazo_entrega)) normalizedTipoPlazo = 'Hábiles';
+        else if (/corridos/i.test(formData.tipo_plazo_entrega)) normalizedTipoPlazo = 'Corridos';
+        else normalizedTipoPlazo = formData.tipo_plazo_entrega.trim();
+      }
+
       const baseOcInsert = {
         numero_oc: formData.numero_oc.trim(),
         solicitud_compra: formattedSol,
@@ -1506,6 +1562,9 @@ const SeguimientoOCModule = () => {
         total_neto: totalNeto,
         total_con_iva: totalConIva,
         saldo_oc: saldoOc,
+        plazo_aceptacion_dias: parsedPlazoAceptacion,
+        plazo_entrega_dias: parsedPlazoEntrega,
+        tipo_plazo_entrega: normalizedTipoPlazo,
         ...fechasTope
       };
 
@@ -1565,6 +1624,9 @@ const SeguimientoOCModule = () => {
         fecha_tope_entrega: '',
         fecha_tope_multa: '',
         fecha_insistencia: '',
+        plazo_aceptacion_dias: '',
+        plazo_entrega_dias: '',
+        tipo_plazo_entrega: '',
         estado: 'Enviada',
         fecha_envio_display: getTodayDisplayString(),
         fecha_aceptacion_display: '',
@@ -4286,6 +4348,93 @@ const SeguimientoOCModule = () => {
                   </small>
                 </div>
 
+                {/* Aceptación y Plazos (Informativo) */}
+                <div style={{
+                  background: 'rgba(99, 102, 241, 0.06)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <strong style={{ color: '#818cf8', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={16} /> Aceptación y Plazos (Informativo)
+                  </strong>
+
+                  {formData.solicitud_compra && (formData.plazo_aceptacion_dias || formData.plazo_entrega_dias || formData.tipo_plazo_entrega) && (
+                    <small style={{ color: '#10b981', fontSize: '0.75rem' }}>
+                      Heredado de la solicitud {formData.solicitud_compra} (puede editarse).
+                    </small>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                        Plazo de aceptación (días)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Ej: 2"
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                        value={formData.plazo_aceptacion_dias}
+                        onKeyDown={(e) => {
+                          if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setFormData(prev => ({ ...prev, plazo_aceptacion_dias: val }));
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                        Plazo de entrega (días)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Ej: 15"
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                        value={formData.plazo_entrega_dias}
+                        onKeyDown={(e) => {
+                          if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setFormData(prev => ({ ...prev, plazo_entrega_dias: val }));
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                        Tipo de plazo de entrega
+                      </label>
+                      <select
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                        value={formData.tipo_plazo_entrega}
+                        onChange={(e) => setFormData(prev => ({ ...prev, tipo_plazo_entrega: e.target.value }))}
+                      >
+                        <option value="">—</option>
+                        <option value="Hábiles">Hábiles</option>
+                        <option value="Corridos">Corridos</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: 1.4 }}>
+                    * Datos exclusivamente informativos para carga en portales externos; no realizan cálculos de fechas ni alteran las alertas del sistema.
+                  </small>
+                </div>
+
                 <div>
                   <label style={labelStyle}>Estado Inicial</label>
                   <select
@@ -4590,6 +4739,45 @@ const SeguimientoOCModule = () => {
                   )}
                 </div>
               </div>
+
+              {/* Aceptación y Plazos (Informativo) en Detalle OC */}
+              {(selectedOcForModal.plazo_aceptacion_dias != null || selectedOcForModal.plazo_entrega_dias != null || selectedOcForModal.tipo_plazo_entrega) && (
+                <div style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  marginBottom: '20px'
+                }}>
+                  <span style={{ fontSize: '0.8rem', color: '#818cf8', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <Info size={15} /> Aceptación y Plazos (Informativo)
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Plazo de aceptación:</span>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                        {selectedOcForModal.plazo_aceptacion_dias != null 
+                          ? `${selectedOcForModal.plazo_aceptacion_dias} ${selectedOcForModal.plazo_aceptacion_dias === 1 ? 'día' : 'días'}` 
+                          : '—'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Plazo de entrega:</span>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                        {selectedOcForModal.plazo_entrega_dias != null 
+                          ? `${selectedOcForModal.plazo_entrega_dias} ${selectedOcForModal.plazo_entrega_dias === 1 ? 'día' : 'días'}` 
+                          : '—'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Tipo de plazo entrega:</span>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                        {selectedOcForModal.tipo_plazo_entrega || '—'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Alert Message inside Modal */}
               {(() => {
@@ -5414,7 +5602,10 @@ const SeguimientoOCModule = () => {
                                   solicitud_compra: s.numero_solicitud,
                                   fecha_tope_aceptacion: s.fecha_tope_aceptacion ? s.fecha_tope_aceptacion.slice(0, 10) : prev.fecha_tope_aceptacion,
                                   fecha_tope_entrega: s.fecha_tope_entrega ? s.fecha_tope_entrega.slice(0, 10) : prev.fecha_tope_entrega,
-                                  fecha_tope_multa: s.fecha_tope_multa ? s.fecha_tope_multa.slice(0, 10) : prev.fecha_tope_multa
+                                  fecha_tope_multa: s.fecha_tope_multa ? s.fecha_tope_multa.slice(0, 10) : prev.fecha_tope_multa,
+                                  plazo_aceptacion_dias: s.plazo_aceptacion_dias != null ? String(s.plazo_aceptacion_dias) : prev.plazo_aceptacion_dias,
+                                  plazo_entrega_dias: s.plazo_entrega_dias != null ? String(s.plazo_entrega_dias) : prev.plazo_entrega_dias,
+                                  tipo_plazo_entrega: s.tipo_plazo_entrega || prev.tipo_plazo_entrega
                                 }));
                                 setShowEditSolicitudSuggestions(false);
                               }}
@@ -5685,6 +5876,94 @@ const SeguimientoOCModule = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Aceptación y Plazos (Informativo) en Editar OC */}
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.06)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                padding: '16px',
+                borderRadius: '12px',
+                marginBottom: '22px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <strong style={{ color: '#818cf8', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={16} /> Aceptación y Plazos (Informativo)
+                </strong>
+
+                {editFormData.solicitud_compra && (editFormData.plazo_aceptacion_dias || editFormData.plazo_entrega_dias || editFormData.tipo_plazo_entrega) && (
+                  <small style={{ color: '#10b981', fontSize: '0.75rem' }}>
+                    Vinculado a la solicitud {editFormData.solicitud_compra} (puede editarse).
+                  </small>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      Plazo de aceptación (días)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Ej: 2"
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      value={editFormData.plazo_aceptacion_dias}
+                      onKeyDown={(e) => {
+                        if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setEditFormData(prev => ({ ...prev, plazo_aceptacion_dias: val }));
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      Plazo de entrega (días)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Ej: 15"
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      value={editFormData.plazo_entrega_dias}
+                      onKeyDown={(e) => {
+                        if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setEditFormData(prev => ({ ...prev, plazo_entrega_dias: val }));
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      Tipo de plazo de entrega
+                    </label>
+                    <select
+                      className="input-field"
+                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      value={editFormData.tipo_plazo_entrega}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, tipo_plazo_entrega: e.target.value }))}
+                    >
+                      <option value="">—</option>
+                      <option value="Hábiles">Hábiles</option>
+                      <option value="Corridos">Corridos</option>
+                    </select>
+                  </div>
+                </div>
+
+                <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: 1.4 }}>
+                  * Datos exclusivamente informativos para carga en portales externos; no realizan cálculos de fechas ni alteran las alertas del sistema.
+                </small>
               </div>
 
               {/* Articulos de la OC Section */}
