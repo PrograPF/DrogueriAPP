@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, Plus, Search, Trash2, Calendar, Edit2, 
   ArrowLeft, ArrowRight, RefreshCw, CheckCircle, Clock, AlertTriangle, 
-  Building2, Tag, X, Save, DollarSign, Package, Eye, Filter
+  Building2, Tag, X, Save, DollarSign, Package, Eye, Filter, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -58,6 +58,11 @@ const SolicitudesCompraModule = ({ onBack }) => {
   const [formTopeEntrega, setFormTopeEntrega] = useState('');
   const [formTopeMulta, setFormTopeMulta] = useState('');
   const [formFechaInsistencia, setFormFechaInsistencia] = useState('');
+
+  // Plazos informativos (sin cálculo / portales externos)
+  const [formPlazoAceptacionDias, setFormPlazoAceptacionDias] = useState('');
+  const [formPlazoEntregaDias, setFormPlazoEntregaDias] = useState('');
+  const [formTipoPlazoEntrega, setFormTipoPlazoEntrega] = useState('');
 
   // Sub-Centros de Costo options (for RESOLUTIVIDAD)
   const [subCentrosOptions, setSubCentrosOptions] = useState(['C.M', 'ORL', 'TD', 'UAPO']);
@@ -176,6 +181,9 @@ const SolicitudesCompraModule = ({ onBack }) => {
     setFormTopeEntrega('');
     setFormTopeMulta('');
     setFormFechaInsistencia('');
+    setFormPlazoAceptacionDias('');
+    setFormPlazoEntregaDias('');
+    setFormTipoPlazoEntrega('');
     setArticulosForm([
       { key: Date.now(), codigo: '', descripcion: '', cantidad: 1, sub_centro_costo: 'UAPO', suggestions: [], showSuggestions: false }
     ]);
@@ -194,6 +202,11 @@ const SolicitudesCompraModule = ({ onBack }) => {
     setFormTopeEntrega((item.fecha_tope_entrega || '').slice(0, 10));
     setFormTopeMulta((item.fecha_tope_multa || '').slice(0, 10));
     setFormFechaInsistencia((item.fecha_insistencia || '').slice(0, 10));
+    setFormPlazoAceptacionDias(item.plazo_aceptacion_dias !== null && item.plazo_aceptacion_dias !== undefined ? String(item.plazo_aceptacion_dias) : '');
+    setFormPlazoEntregaDias(item.plazo_entrega_dias !== null && item.plazo_entrega_dias !== undefined ? String(item.plazo_entrega_dias) : '');
+    const rawTipo = item.tipo_plazo_entrega || '';
+    const normalizedTipo = /h[aá]biles/i.test(rawTipo) ? 'Hábiles' : (/corridos/i.test(rawTipo) ? 'Corridos' : rawTipo);
+    setFormTipoPlazoEntrega(normalizedTipo);
 
     if (item.solicitudes_compra_articulos && item.solicitudes_compra_articulos.length > 0) {
       setArticulosForm(
@@ -320,6 +333,25 @@ const SolicitudesCompraModule = ({ onBack }) => {
     }
 
     try {
+      let parsedPlazoAceptacion = null;
+      if (formPlazoAceptacionDias !== '' && formPlazoAceptacionDias !== null && formPlazoAceptacionDias !== undefined) {
+        const val = parseInt(formPlazoAceptacionDias, 10);
+        if (!isNaN(val) && val >= 0) parsedPlazoAceptacion = val;
+      }
+
+      let parsedPlazoEntrega = null;
+      if (formPlazoEntregaDias !== '' && formPlazoEntregaDias !== null && formPlazoEntregaDias !== undefined) {
+        const val = parseInt(formPlazoEntregaDias, 10);
+        if (!isNaN(val) && val >= 0) parsedPlazoEntrega = val;
+      }
+
+      let normalizedTipoPlazo = null;
+      if (formTipoPlazoEntrega) {
+        if (/h[aá]biles/i.test(formTipoPlazoEntrega)) normalizedTipoPlazo = 'Hábiles';
+        else if (/corridos/i.test(formTipoPlazoEntrega)) normalizedTipoPlazo = 'Corridos';
+        else normalizedTipoPlazo = formTipoPlazoEntrega.trim();
+      }
+
       const parentPayload = {
         numero_solicitud: formattedNumero,
         centro_costo_id: formCentroCostoId ? parseInt(formCentroCostoId) : null,
@@ -331,7 +363,10 @@ const SolicitudesCompraModule = ({ onBack }) => {
         descripcion_articulo: validArticles[0].descripcion.trim().toUpperCase(),
         cantidad: parseInt(validArticles[0].cantidad) || 1,
         tipo_oc: formTipoOc,
-        ...fechasTope
+        ...fechasTope,
+        plazo_aceptacion_dias: parsedPlazoAceptacion,
+        plazo_entrega_dias: parsedPlazoEntrega,
+        tipo_plazo_entrega: normalizedTipoPlazo
       };
 
       let parentId = editingSolicitudId;
@@ -1104,6 +1139,73 @@ const SolicitudesCompraModule = ({ onBack }) => {
                   </small>
                 </div>
 
+                {/* Aceptación y Plazos (Informativo) */}
+                <div style={{
+                  background: 'rgba(99, 102, 241, 0.05)',
+                  border: '1px solid rgba(99, 102, 241, 0.22)',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <strong style={{ color: '#818cf8', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Info size={16} /> Aceptación y Plazos (Informativo)
+                  </strong>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                        Plazo de aceptación (días)
+                      </label>
+                      <input 
+                        type="number"
+                        min="0"
+                        placeholder="Ej: 5"
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                        value={formPlazoAceptacionDias}
+                        onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
+                        onChange={(e) => setFormPlazoAceptacionDias(e.target.value.replace(/[^0-9]/g, ''))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                        Plazo de entrega (días)
+                      </label>
+                      <input 
+                        type="number"
+                        min="0"
+                        placeholder="Ej: 15"
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                        value={formPlazoEntregaDias}
+                        onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
+                        onChange={(e) => setFormPlazoEntregaDias(e.target.value.replace(/[^0-9]/g, ''))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                        Tipo de plazo de entrega
+                      </label>
+                      <select
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                        value={formTipoPlazoEntrega}
+                        onChange={(e) => setFormTipoPlazoEntrega(e.target.value)}
+                      >
+                        <option value="">—</option>
+                        <option value="Hábiles">Hábiles</option>
+                        <option value="Corridos">Corridos</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: 1.4 }}>
+                    * Datos exclusivamente informativos para carga en portales externos; no realizan cálculos de fechas ni alteran las alertas del sistema.
+                  </small>
+                </div>
+
                 {/* Observaciones */}
                 <div>
                   <label style={labelStyle}>Observaciones / Notas</label>
@@ -1393,6 +1495,50 @@ const SolicitudesCompraModule = ({ onBack }) => {
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>Fecha tope máxima con multa:</span>
                   <strong style={{ color: '#fb923c' }}>{formatISOToDisplay(selectedSolicitudForModal.fecha_tope_multa)}</strong>
                 </div>
+                {selectedSolicitudForModal.tipo_oc === 'SE' && selectedSolicitudForModal.fecha_insistencia && (
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#f4c2c2', display: 'block' }}>Fecha de insistencia (SE):</span>
+                    <strong style={{ color: '#f4c2c2' }}>{formatISOToDisplay(selectedSolicitudForModal.fecha_insistencia)}</strong>
+                  </div>
+                )}
+                {(selectedSolicitudForModal.plazo_aceptacion_dias != null || selectedSolicitudForModal.plazo_entrega_dias != null || selectedSolicitudForModal.tipo_plazo_entrega) && (
+                  <div style={{
+                    gridColumn: 'span 2',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px solid rgba(99, 102, 241, 0.22)',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    marginTop: '2px'
+                  }}>
+                    <span style={{ fontSize: '0.75rem', color: '#818cf8', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <Info size={14} /> Aceptación y Plazos (Informativo)
+                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Plazo de aceptación:</span>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                          {selectedSolicitudForModal.plazo_aceptacion_dias != null 
+                            ? `${selectedSolicitudForModal.plazo_aceptacion_dias} ${selectedSolicitudForModal.plazo_aceptacion_dias === 1 ? 'día' : 'días'}` 
+                            : '—'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Plazo de entrega:</span>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                          {selectedSolicitudForModal.plazo_entrega_dias != null 
+                            ? `${selectedSolicitudForModal.plazo_entrega_dias} ${selectedSolicitudForModal.plazo_entrega_dias === 1 ? 'día' : 'días'}` 
+                            : '—'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Tipo de plazo entrega:</span>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                          {selectedSolicitudForModal.tipo_plazo_entrega || '—'}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {selectedSolicitudForModal.observaciones && (
                   <div style={{ gridColumn: 'span 2' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>Observaciones:</span>
